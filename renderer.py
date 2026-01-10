@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import List
 import arcade
+import array
 
 # ============================================================================
 # Configuration
@@ -106,7 +107,7 @@ class GameState:
     """Game state with dimensions and sprite indices"""
     width: int
     height: int
-    tilemap: List[int]
+    tilemap: array.array('B')
 
 
 # ============================================================================
@@ -121,13 +122,14 @@ class MockServer:
 
     def _load_map(self, path):
         """Load map from ASCII file, sprite indices are ASCII values"""
-        self.grid = []
+        self.grid = array.array('B')
         with open(path, 'rb') as f:
             for line in f:
                 line = line.rstrip(b'\r\n')
-                self.grid.append([byte for byte in line])
-        self.height = len(self.grid)
-        self.width = len(self.grid[0]) if self.grid else 0
+                for char in line:
+                    self.grid.append(char)
+        self.height = 45
+        self.width = 64
 
     def get_game_state(self):
         """Returns GameState with dimensions and sprite indices"""
@@ -159,10 +161,14 @@ class GameRenderer(arcade.Window):
                 self.textures[sprite_name] = arcade.load_texture(path)
 
         # Map tile IDs to textures
-        self.tile_id_to_texture_dictionary = {
-            tile_id: self.textures[sprite_name]
-            for tile_id, sprite_name in TILE_DICTIONARY.items()
-        }
+        self.tile_id_to_texture_dictionary = list()
+
+        for j in range(255):
+            self.tile_id_to_texture_dictionary.insert(tile_id, self.textures['empty'])
+
+        for tile_id, sprite_name in TILE_DICTIONARY.items():
+            self.tile_id_to_texture_dictionary.insert(tile_id, self.textures[sprite_name])
+
 
         # Sprite pool
         self.sprite_list = arcade.SpriteList()
@@ -181,6 +187,8 @@ class GameRenderer(arcade.Window):
                 sprite.center_y = SPRITE_CENTER_Y
                 sprite.scale = self.zoom
                 sprite_idx += 1
+
+        self.sprite_list.extend(self.sprites[:state.height * state.width])
 
         # Performance graph
         arcade.enable_timings()
@@ -212,19 +220,10 @@ class GameRenderer(arcade.Window):
         """Poll server and update tilemap"""
         state = self.server.get_game_state()
 
-        self.sprite_list.clear()
         sprite_idx = 0
 
-        for y, row in enumerate(state.tilemap):
-            SPRITE_CENTER_Y = self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-            for x, tile_id in enumerate(row):
-               ## tile_id = state.tilemap[y * state.width + x]
-                if tile_id in self.tile_id_to_texture_dictionary:
-                    sprite = self.sprites[sprite_idx]
-                    sprite.texture = self.tile_id_to_texture_dictionary[tile_id]
-                    self.sprite_list.append(sprite)
-
-                sprite_idx += 1
+        for i in range(state.height * state.width):
+            self.sprites[i].texture = self.tile_id_to_texture_dictionary[state.tilemap[i]]
 
 
     def on_draw(self):
