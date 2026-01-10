@@ -1,4 +1,4 @@
 assets/
 *.zip
 .claude/
-__pycache__/**
+**/__pycache__/**

@@ -47,7 +47,7 @@ class ChatFactory(protocol.ClientFactory):
 
 
 class Client():
-    def __init__(self) -> None:
-        reactor.connectTCP("localhost", 8123, ChatFactory())
+    def __init__(self, ip:str, port:int) -> None:
+        reactor.connectTCP(ip, port, ChatFactory())
         reactor.run()
 
