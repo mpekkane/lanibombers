@@ -1,14 +1,9 @@
+import sys
+import threading
 from twisted.internet import protocol, reactor
 from twisted.protocols.basic import LineReceiver
 
-import sys
-import threading
-
-
 class ChatClient(LineReceiver):
-    # IMPORTANT: don't override delimiter; default is b"\r\n"
-    # delimiter = b"\r\n"
-
     def connectionMade(self):
         print("connected")
 
@@ -28,7 +23,7 @@ class ChatClient(LineReceiver):
                 if not msg:
                     continue
                 data = msg.encode("utf-8", errors="replace")
-                reactor.callFromThread(self.sendLine, data)  # adds \r\n
+                reactor.callFromThread(self.sendLine, data)
         finally:
             reactor.callFromThread(self.transport.loseConnection)
             reactor.callFromThread(reactor.stop)

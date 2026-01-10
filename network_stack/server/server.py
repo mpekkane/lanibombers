@@ -1,11 +1,6 @@
-from network_stack.shared.web_utils import foobar
 from network_stack.messages.test_message import TestMessage
-from twisted.internet.protocol import Protocol
-
 from twisted.internet.protocol import Factory
-from twisted.internet.endpoints import TCP4ServerEndpoint
 from twisted.internet import reactor
-
 from twisted.protocols.basic import LineReceiver
 
 
@@ -62,14 +57,14 @@ class Chat(LineReceiver):
 
 class ChatFactory(Factory):
     def __init__(self):
-        self.users = {}  # maps user names to Chat instances
+        self.users = {}
 
     def buildProtocol(self, addr):
         return Chat(self.users)
 
 
 class Server():
-    def __init__(self) -> None:
-        # 8007 is the port you want to run under. Choose something >1024
-        reactor.listenTCP(8123, ChatFactory())
+    def __init__(self, port: int) -> None:
+        print(f"Starting server on port {port}")
+        reactor.listenTCP(port, ChatFactory())
         reactor.run()
