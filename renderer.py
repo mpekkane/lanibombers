@@ -16,6 +16,9 @@ import array
 MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.MNE')
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'sprites')
 
+TARGET_FPS = 60
+VSYNC = True
+
 SPRITE_SIZE = 10
 SPRITE_CENTER_OFFSET = SPRITE_SIZE // 2
 
@@ -148,7 +151,9 @@ class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
     def __init__(self, server, width=1280, height=960):
-        super().__init__(width, height, "lanibombers", vsync=True)
+        super().__init__(width, height, "lanibombers", vsync=VSYNC)
+        self.set_update_rate(1 / TARGET_FPS)
+        self.set_draw_rate(1 / TARGET_FPS)
         self.server = server
 
         self.zoom = min(width // 640, height // 480)
