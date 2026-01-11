@@ -198,6 +198,354 @@ def decode_pcx(data):
 
 
 # ============================================================================
+# Sprite Splitter
+# ============================================================================
+
+# Sprite definitions: (x, y, w, h, ox, oy, name)
+# x, y = position in sprite units (1 unit = w x h pixels)
+# w, h = size in pixels
+# ox, oy = pixel offset for fine adjustment
+# name = output filename
+SPRITE_DEFS = [
+    # (x, y, w, h, ox, oy, name)
+
+    # Row 0 
+    (0, 0, 10, 10, 0, 0, 'empty'),
+    (1, 0, 10, 10, 0, 0, 'concrete'),
+    (2, 0, 10, 10, 0, 0, 'dirt1'),
+    (3, 0, 10, 10, 0, 0, 'dirt2'),
+    (4, 0, 10, 10, 0, 0, 'dirt3'),
+    (5, 0, 10, 10, 0, 0, 'gravel1'),
+    (6, 0, 10, 10, 0, 0, 'gravel2'),
+    (7, 0, 10, 10, 0, 0, 'bedrock_nw'),
+    (8, 0, 10, 10, 0, 0, 'bedrock_ne'),
+    (9, 0, 10, 10, 0, 0, 'bedrock_se'),
+    (10, 0, 10, 10, 0, 0, 'bedrock_sw'),
+    (11, 0, 10, 10, 0, 0, 'boulder'),
+    (12, 0, 10, 10, 0, 0, 'bedrock1'),
+    (13, 0, 10, 10, 0, 0, 'bedrock2'),
+    (14, 0, 10, 10, 0, 0, 'bedrock3'),
+    (15, 0, 10, 10, 0, 0, 'bedrock4'),
+    (16, 0, 10, 10, 0, 0, 'player1_right_1'),
+    (17, 0, 10, 10, 0, 0, 'player1_right_2'),
+    (18, 0, 10, 10, 0, 0, 'player1_right_3'),
+    (19, 0, 10, 10, 0, 0, 'player1_right_4'),
+    (20, 0, 10, 10, 0, 0, 'player1_left_1'),
+    (21, 0, 10, 10, 0, 0, 'player1_left_2'),
+    (22, 0, 10, 10, 0, 0, 'player1_left_3'),
+    (23, 0, 10, 10, 0, 0, 'player1_left_4'),
+    (24, 0, 10, 10, 0, 0, 'player1_up_1'),
+    (25, 0, 10, 10, 0, 0, 'player1_up_2'),
+    (26, 0, 10, 10, 0, 0, 'player1_up_3'),
+    (27, 0, 10, 10, 0, 0, 'player1_up_4'),
+    (28, 0, 10, 10, 0, 0, 'player1_down_1'),
+    (29, 0, 10, 10, 0, 0, 'player1_down_2'),
+    (30, 0, 10, 10, 0, 0, 'player1_down_3'),
+    (31, 0, 10, 10, 0, 0, 'player1_down_4'),
+
+    # Row 1 
+    (0, 1, 10, 10, 0, 0, 'smallbomb1'),
+    (1, 1, 10, 10, 0, 0, 'bigbomb1'),
+    (2, 1, 10, 10, 0, 0, 'dynamite1'),
+    (3, 1, 10, 10, 0, 0, 'smallbarrel1'),
+    (4, 1, 10, 10, 0, 0, 'bigbarrel1'),
+    (5, 1, 10, 10, 0, 0, 'bigcrucifix'),
+    (6, 1, 10, 10, 0, 0, 'urethane'),
+    (7, 1, 10, 10, 0, 0, 'smallremote_player1'),
+    (8, 1, 10, 10, 0, 0, 'bigremote_player1'),
+    (9, 1, 10, 10, 0, 0, 'explosion'),
+    (10, 1, 10, 10, 0, 0, 'smoke1'),
+    (11, 1, 10, 10, 0, 0, 'smoke2'),
+    (12, 1, 10, 10, 0, 0, 'smallremote_player2'),
+    (13, 1, 10, 10, 0, 0, 'bigremote_player2'),
+    (14, 1, 10, 10, 0, 0, 'landmine'),
+    (15, 1, 10, 10, 0, 0, 'blood'),
+    (16, 1, 10, 10, 0, 0, 'player2_right_1'),
+    (17, 1, 10, 10, 0, 0, 'player2_right_2'),
+    (18, 1, 10, 10, 0, 0, 'player2_right_3'),
+    (19, 1, 10, 10, 0, 0, 'player2_right_4'),
+    (20, 1, 10, 10, 0, 0, 'player2_left_1'),
+    (21, 1, 10, 10, 0, 0, 'player2_left_2'),
+    (22, 1, 10, 10, 0, 0, 'player2_left_3'),
+    (23, 1, 10, 10, 0, 0, 'player2_left_4'),
+    (24, 1, 10, 10, 0, 0, 'player2_up_1'),
+    (25, 1, 10, 10, 0, 0, 'player2_up_2'),
+    (26, 1, 10, 10, 0, 0, 'player2_up_3'),
+    (27, 1, 10, 10, 0, 0, 'player2_up_4'),
+    (28, 1, 10, 10, 0, 0, 'player2_down_1'),
+    (29, 1, 10, 10, 0, 0, 'player2_down_2'),
+    (30, 1, 10, 10, 0, 0, 'player2_down_3'),
+    (31, 1, 10, 10, 0, 0, 'player2_down_4'),
+
+    # Row 2 
+    (0, 2, 10, 10, 0, 0, 'smallbomb2'),
+    (1, 2, 10, 10, 0, 0, 'smallbomb3'),
+    (2, 2, 10, 10, 0, 0, 'crate'),
+    (3, 2, 10, 10, 0, 0, 'smallbarrel2'),
+    (4, 2, 10, 10, 0, 0, 'bigbarrel2'),
+    (5, 2, 10, 10, 0, 0, 'smallcrucifix'),
+    (6, 2, 10, 10, 0, 0, 'bigbomb2'),
+    (7, 2, 10, 10, 0, 0, 'bigbomb3'),
+    (8, 2, 10, 10, 0, 0, 'dynamite2'),
+    (9, 2, 10, 10, 0, 0, 'dynamite3'),
+    (10, 2, 10, 10, 0, 0, 'smallpick'),
+    (11, 2, 10, 10, 0, 0, 'bigpick'),
+    (12, 2, 10, 10, 0, 0, 'drill'),
+    (13, 2, 10, 10, 0, 0, 'gold_shield'),
+    (14, 2, 10, 10, 0, 0, 'gold_egg'),
+    (15, 2, 10, 10, 0, 0, 'gold_coins'),
+    (16, 2, 10, 10, 0, 0, 'gold_bracelet'),
+    (17, 2, 10, 10, 0, 0, 'gold_bar'),
+    (18, 2, 10, 10, 0, 0, 'gold_cross'),
+    (19, 2, 10, 10, 0, 0, 'gold_sceptre'),
+    (20, 2, 10, 10, 0, 0, 'gold_ruby'),
+    (21, 2, 10, 10, 0, 0, 'gold_crown'),
+    (22, 2, 10, 10, 0, 0, 'urethane_block'),
+    (23, 2, 10, 10, 0, 0, 'tunnel'),
+    (24, 2, 10, 10, 0, 0, 'nuke1'),
+    (25, 2, 10, 10, 0, 0, 'nuke2'),
+    (26, 2, 10, 10, 0, 0, 'nuke3'),
+    (27, 2, 10, 10, 0, 0, 'c4'),
+    (28, 2, 10, 10, 0, 0, 'urethane_defused'),
+    (29, 2, 10, 10, 0, 0, 'diggerbomb'),
+    (30, 2, 10, 10, 0, 0, 'crackerbarrel'),
+    (31, 2, 10, 10, 0, 0, 'grenade'),
+
+
+    # Row 3
+    (0, 3, 10, 10, 0, 0, 'exit'),
+    (1, 3, 10, 10, 0, 0, 'securitydoor'),
+    (2, 3, 10, 10, 0, 0, 'smallremote_player3'),
+    (3, 3, 10, 10, 0, 0, 'bigremote_player3'),
+    (4, 3, 10, 10, 0, 0, 'smallremote_player4'),
+    (5, 3, 10, 10, 0, 0, 'bigremote_player4'),
+    (6, 3, 10, 10, 0, 0, 'medpack'),
+    (7, 3, 10, 10, 0, 0, 'bioslime'),
+    (8, 3, 10, 10, 0, 0, '_unknown'),
+    (9, 3, 10, 10, 0, 0, 'rock1'),
+    (10, 3, 10, 10, 0, 0, 'rock2'),
+    (11, 3, 10, 10, 0, 0, '_unknown2'),
+    (12, 3, 10, 10, 0, 0, 'smallbomb_defused'),
+    (13, 3, 10, 10, 0, 0, 'bigbomb_defused'),
+    (14, 3, 10, 10, 0, 0, 'dynamite_defused'),
+    (15, 3, 10, 10, 0, 0, 'diamond'),
+    (16, 3, 10, 10, 0, 0, 'player3_right_1'),
+    (17, 3, 10, 10, 0, 0, 'player3_right_2'),
+    (18, 3, 10, 10, 0, 0, 'player3_right_3'),
+    (19, 3, 10, 10, 0, 0, 'player3_right_4'),
+    (20, 3, 10, 10, 0, 0, 'player3_left_1'),
+    (21, 3, 10, 10, 0, 0, 'player3_left_2'),
+    (22, 3, 10, 10, 0, 0, 'player3_left_3'),
+    (23, 3, 10, 10, 0, 0, 'player3_left_4'),
+    (24, 3, 10, 10, 0, 0, 'player3_up_1'),
+    (25, 3, 10, 10, 0, 0, 'player3_up_2'),
+    (26, 3, 10, 10, 0, 0, 'player3_up_3'),
+    (27, 3, 10, 10, 0, 0, 'player3_up_4'),
+    (28, 3, 10, 10, 0, 0, 'player3_down_1'),
+    (29, 3, 10, 10, 0, 0, 'player3_down_2'),
+    (30, 3, 10, 10, 0, 0, 'player3_down_3'),
+    (31, 3, 10, 10, 0, 0, 'player3_down_4'),
+
+    # Row 4 
+    (14, 4, 10, 10, 0, 0, 'blood_green'),
+    (15, 4, 10, 10, 0, 0, 'grasshopper'),
+    (16, 4, 10, 10, 0, 0, 'player4_right_1'),
+    (17, 4, 10, 10, 0, 0, 'player4_right_2'),
+    (18, 4, 10, 10, 0, 0, 'player4_right_3'),
+    (19, 4, 10, 10, 0, 0, 'player4_right_4'),
+    (20, 4, 10, 10, 0, 0, 'player4_left_1'),
+    (21, 4, 10, 10, 0, 0, 'player4_left_2'),
+    (22, 4, 10, 10, 0, 0, 'player4_left_3'),
+    (23, 4, 10, 10, 0, 0, 'player4_left_4'),
+    (24, 4, 10, 10, 0, 0, 'player4_up_1'),
+    (25, 4, 10, 10, 0, 0, 'player4_up_2'),
+    (26, 4, 10, 10, 0, 0, 'player4_up_3'),
+    (27, 4, 10, 10, 0, 0, 'player4_up_4'),
+    (28, 4, 10, 10, 0, 0, 'player4_down_1'),
+    (29, 4, 10, 10, 0, 0, 'player4_down_2'),
+    (30, 4, 10, 10, 0, 0, 'player4_down_3'),
+    (31, 4, 10, 10, 0, 0, 'player4_down_4'),
+
+    # Row 5
+    (16, 5, 10, 10, 0, 0, 'furryman_right_1'),
+    (17, 5, 10, 10, 0, 0, 'furryman_right_2'),
+    (18, 5, 10, 10, 0, 0, 'furryman_right_3'),
+    (19, 5, 10, 10, 0, 0, 'furryman_right_4'),
+    (20, 5, 10, 10, 0, 0, 'furryman_left_1'),
+    (21, 5, 10, 10, 0, 0, 'furryman_left_2'),
+    (22, 5, 10, 10, 0, 0, 'furryman_left_3'),
+    (23, 5, 10, 10, 0, 0, 'furryman_left_4'),
+    (24, 5, 10, 10, 0, 0, 'furryman_up_1'),
+    (25, 5, 10, 10, 0, 0, 'furryman_up_2'),
+    (26, 5, 10, 10, 0, 0, 'furryman_up_3'),
+    (27, 5, 10, 10, 0, 0, 'furryman_up_4'),
+    (28, 5, 10, 10, 0, 0, 'furryman_down_1'),
+    (29, 5, 10, 10, 0, 0, 'furryman_down_2'),
+    (30, 5, 10, 10, 0, 0, 'furryman_down_3'),
+    (31, 5, 10, 10, 0, 0, 'furryman_down_4'),
+
+    # Row 6
+    (16, 6, 10, 10, 0, 0, 'grenademonster_right_1'),
+    (17, 6, 10, 10, 0, 0, 'grenademonster_right_2'),
+    (18, 6, 10, 10, 0, 0, 'grenademonster_right_3'),
+    (19, 6, 10, 10, 0, 0, 'grenademonster_right_4'),
+    (20, 6, 10, 10, 0, 0, 'grenademonster_left_1'),
+    (21, 6, 10, 10, 0, 0, 'grenademonster_left_2'),
+    (22, 6, 10, 10, 0, 0, 'grenademonster_left_3'),
+    (23, 6, 10, 10, 0, 0, 'grenademonster_left_4'),
+    (24, 6, 10, 10, 0, 0, 'grenademonster_up_1'),
+    (25, 6, 10, 10, 0, 0, 'grenademonster_up_2'),
+    (26, 6, 10, 10, 0, 0, 'grenademonster_up_3'),
+    (27, 6, 10, 10, 0, 0, 'grenademonster_up_4'),
+    (28, 6, 10, 10, 0, 0, 'grenademonster_down_1'),
+    (29, 6, 10, 10, 0, 0, 'grenademonster_down_2'),
+    (30, 6, 10, 10, 0, 0, 'grenademonster_down_3'),
+    (31, 6, 10, 10, 0, 0, 'grenademonster_down_4'),
+
+    # Row 7
+    (0, 7, 10, 10, 0, 0, 'brics1'),
+    (1, 7, 10, 10, 0, 0, 'brics2'),
+    (2, 7, 10, 10, 0, 0, 'brics3'),
+    (3, 7, 10, 10, 0, 0, 'doorswitch_red'),
+    (4, 7, 10, 10, 0, 0, 'doorswitch_green'),
+    (5, 7, 10, 10, 0, 0, '_math'),
+    (16, 7, 10, 10, 0, 0, 'slime_right_1'),
+    (17, 7, 10, 10, 0, 0, 'slime_right_2'),
+    (18, 7, 10, 10, 0, 0, 'slime_right_3'),
+    (19, 7, 10, 10, 0, 0, 'slime_right_4'),
+    (20, 7, 10, 10, 0, 0, 'slime_left_1'),
+    (21, 7, 10, 10, 0, 0, 'slime_left_2'),
+    (22, 7, 10, 10, 0, 0, 'slime_left_3'),
+    (23, 7, 10, 10, 0, 0, 'slime_left_4'),
+    (24, 7, 10, 10, 0, 0, 'slime_up_1'),
+    (25, 7, 10, 10, 0, 0, 'slime_up_2'),
+    (26, 7, 10, 10, 0, 0, 'slime_up_3'),
+    (27, 7, 10, 10, 0, 0, 'slime_up_4'),
+    (28, 7, 10, 10, 0, 0, 'slime_down_1'),
+    (29, 7, 10, 10, 0, 0, 'slime_down_2'),
+    (30, 7, 10, 10, 0, 0, 'slime_down_3'),
+    (31, 7, 10, 10, 0, 0, 'slime_down_4'),
+
+    # Row 8
+    (0, 8, 10, 10, 0, 0, 'alien_right_1'),
+    (1, 8, 10, 10, 0, 0, 'alien_right_2'),
+    (2, 8, 10, 10, 0, 0, 'alien_right_3'),
+    (3, 8, 10, 10, 0, 0, 'alien_right_4'),
+    (4, 8, 10, 10, 0, 0, 'alien_left_1'),
+    (5, 8, 10, 10, 0, 0, 'alien_left_2'),
+    (6, 8, 10, 10, 0, 0, 'alien_left_3'),
+    (7, 8, 10, 10, 0, 0, 'alien_left_4'),
+    (8, 8, 10, 10, 0, 0, 'alien_up_1'),
+    (9, 8, 10, 10, 0, 0, 'alien_up_2'),
+    (10, 8, 10, 10, 0, 0, 'alien_up_3'),
+    (11, 8, 10, 10, 0, 0, 'alien_up_4'),
+    (12, 8, 10, 10, 0, 0, 'alien_down_1'),
+    (13, 8, 10, 10, 0, 0, 'alien_down_2'),
+    (14, 8, 10, 10, 0, 0, 'alien_down_3'),
+    (15, 8, 10, 10, 0, 0, 'alien_down_4'),
+
+    # Row 18
+    (0, 18, 10, 10, 0, 0, 'player1_dig_right_1'),
+    (1, 18, 10, 10, 0, 0, 'player1_dig_right_2'),
+    (2, 18, 10, 10, 0, 0, 'player1_dig_right_3'),
+    (3, 18, 10, 10, 0, 0, 'player1_dig_right_4'),
+    (4, 18, 10, 10, 0, 0, 'player1_dig_left_1'),
+    (5, 18, 10, 10, 0, 0, 'player1_dig_left_2'),
+    (6, 18, 10, 10, 0, 0, 'player1_dig_left_3'),
+    (7, 18, 10, 10, 0, 0, 'player1_dig_left_4'),
+    (8, 18, 10, 10, 0, 0, 'player1_dig_up_1'),
+    (9, 18, 10, 10, 0, 0, 'player1_dig_up_2'),
+    (10, 18, 10, 10, 0, 0, 'player1_dig_up_3'),
+    (11, 18, 10, 10, 0, 0, 'player1_dig_up_4'),
+    (12, 18, 10, 10, 0, 0, 'player1_dig_down_1'),
+    (13, 18, 10, 10, 0, 0, 'player1_dig_down_2'),
+    (14, 18, 10, 10, 0, 0, 'player1_dig_down_3'),
+    (15, 18, 10, 10, 0, 0, 'player1_dig_down_4'),
+    (16, 18, 10, 10, 0, 0, 'player2_dig_right_1'),
+    (17, 18, 10, 10, 0, 0, 'player2_dig_right_2'),
+    (18, 18, 10, 10, 0, 0, 'player2_dig_right_3'),
+    (19, 18, 10, 10, 0, 0, 'player2_dig_right_4'),
+    (20, 18, 10, 10, 0, 0, 'player2_dig_left_1'),
+    (21, 18, 10, 10, 0, 0, 'player2_dig_left_2'),
+    (22, 18, 10, 10, 0, 0, 'player2_dig_left_3'),
+    (23, 18, 10, 10, 0, 0, 'player2_dig_left_4'),
+    (24, 18, 10, 10, 0, 0, 'player2_dig_up_1'),
+    (25, 18, 10, 10, 0, 0, 'player2_dig_up_2'),
+    (26, 18, 10, 10, 0, 0, 'player2_dig_up_3'),
+    (27, 18, 10, 10, 0, 0, 'player2_dig_up_4'),
+    (28, 18, 10, 10, 0, 0, 'player2_dig_down_1'),
+    (29, 18, 10, 10, 0, 0, 'player2_dig_down_2'),
+    (30, 18, 10, 10, 0, 0, 'player2_dig_down_3'),
+    (31, 18, 10, 10, 0, 0, 'player2_dig_down_4'),
+
+    # Row 19
+    (0, 19, 10, 10, 0, 0, 'player3_dig_right_1'),
+    (1, 19, 10, 10, 0, 0, 'player3_dig_right_2'),
+    (2, 19, 10, 10, 0, 0, 'player3_dig_right_3'),
+    (3, 19, 10, 10, 0, 0, 'player3_dig_right_4'),
+    (4, 19, 10, 10, 0, 0, 'player3_dig_left_1'),
+    (5, 19, 10, 10, 0, 0, 'player3_dig_left_2'),
+    (6, 19, 10, 10, 0, 0, 'player3_dig_left_3'),
+    (7, 19, 10, 10, 0, 0, 'player3_dig_left_4'),
+    (8, 19, 10, 10, 0, 0, 'player3_dig_up_1'),
+    (9, 19, 10, 10, 0, 0, 'player3_dig_up_2'),
+    (10, 19, 10, 10, 0, 0, 'player3_dig_up_3'),
+    (11, 19, 10, 10, 0, 0, 'player3_dig_up_4'),
+    (12, 19, 10, 10, 0, 0, 'player3_dig_down_1'),
+    (13, 19, 10, 10, 0, 0, 'player3_dig_down_2'),
+    (14, 19, 10, 10, 0, 0, 'player3_dig_down_3'),
+    (15, 19, 10, 10, 0, 0, 'player3_dig_down_4'),
+    (16, 19, 10, 10, 0, 0, 'player4_dig_right_1'),
+    (17, 19, 10, 10, 0, 0, 'player4_dig_right_2'),
+    (18, 19, 10, 10, 0, 0, 'player4_dig_right_3'),
+    (19, 19, 10, 10, 0, 0, 'player4_dig_right_4'),
+    (20, 19, 10, 10, 0, 0, 'player4_dig_left_1'),
+    (21, 19, 10, 10, 0, 0, 'player4_dig_left_2'),
+    (22, 19, 10, 10, 0, 0, 'player4_dig_left_3'),
+    (23, 19, 10, 10, 0, 0, 'player4_dig_left_4'),
+    (24, 19, 10, 10, 0, 0, 'player4_dig_up_1'),
+    (25, 19, 10, 10, 0, 0, 'player4_dig_up_2'),
+    (26, 19, 10, 10, 0, 0, 'player4_dig_up_3'),
+    (27, 19, 10, 10, 0, 0, 'player4_dig_up_4'),
+    (28, 19, 10, 10, 0, 0, 'player4_dig_down_1'),
+    (29, 19, 10, 10, 0, 0, 'player4_dig_down_2'),
+    (30, 19, 10, 10, 0, 0, 'player4_dig_down_3'),
+    (31, 19, 10, 10, 0, 0, 'player4_dig_down_4'),
+
+]
+
+
+def split_sprites(output_base):
+    """Split SIKA.png into individual sprite files based on SPRITE_DEFS"""
+    sika_path = os.path.join(output_base, 'graphics', 'SIKA.png')
+    sprites_dir = os.path.join(output_base, 'sprites')
+    os.makedirs(sprites_dir, exist_ok=True)
+
+    if not os.path.exists(sika_path):
+        print(f"  SIKA.png not found, skipping sprite split")
+        return 0
+
+    img = Image.open(sika_path)
+
+    if not SPRITE_DEFS:
+        print(f"  No sprite definitions, skipping sprite split")
+        return 0
+
+    print(f"  Extracting {len(SPRITE_DEFS)} named sprites...")
+    count = 0
+
+    for x, y, w, h, ox, oy, name in SPRITE_DEFS:
+        px = x * w + ox
+        py = y * h + oy
+        sprite = img.crop((px, py, px + w, py + h))
+        sprite.save(os.path.join(sprites_dir, f"{name}.png"))
+        count += 1
+
+    print(f"  Extracted {count} sprites")
+    return count
+
+
+# ============================================================================
 # Main Extractor
 # ============================================================================
 
@@ -291,12 +639,14 @@ def main():
         return
 
     stats = extract_assets(zip_path, output_base)
+    sprite_count = split_sprites(output_base)
 
     print(f"\nExtraction complete!")
     print(f"  Graphics: {stats['graphics']}")
     print(f"  Sounds:   {stats['sounds']}")
     print(f"  Music:    {stats['music']}")
     print(f"  Maps:     {stats['maps']}")
+    print(f"  Sprites:  {sprite_count}")
 
 
 if __name__ == '__main__':
