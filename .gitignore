@@ -2,3 +2,5 @@ assets/
 *.zip
 .claude/
 **/__pycache__/
+build/
+dist/
