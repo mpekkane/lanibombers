@@ -7,7 +7,7 @@ def main() -> None:
         config = yaml.load(f, Loader=yaml.SafeLoader)
 
     port = config.get("port")
-    server = Server(port)
+    _ = Server(port)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,20 @@
-import yaml 
+import yaml
 from network_stack.client.client import Client
 from network_stack.client.scan import Scanner
+
 
 def main() -> None:
     with open('cfg/client_config.yaml', 'r') as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
 
-    subnet = config.get("subnet")
-    port = config.get("port")
+    try:
+        subnet = config.get("subnet")
+    except Exception:
+        subnet = None
+    try:
+        port = config.get("port")
+    except Exception:
+        port = None
     scanner = Scanner(subnet, port)
     servers = scanner.scan()
 
@@ -16,6 +23,7 @@ def main() -> None:
 
     selected = False
     ok = True
+    ip = ""
     while not selected:
         try:
             inp = input("Select server or q to quit: ")
@@ -25,11 +33,13 @@ def main() -> None:
             num = int(inp)
             ip = servers[num]
             selected = True
-        except:
+        except Exception:
             pass
 
     if ok:
-        client = Client(ip, port)
+        assert ip, "IP not set"
+        assert port, "Port is not set"
+        _ = Client(ip, port)
 
 
 if __name__ == "__main__":
