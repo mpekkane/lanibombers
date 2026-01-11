@@ -1,0 +1,6 @@
+---
+  subnet: 101
+  port: 8888
+  host: 104
+  protocol: "udp"
+  timeout: 10.0
