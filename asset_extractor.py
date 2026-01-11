@@ -512,7 +512,88 @@ SPRITE_DEFS = [
     (30, 19, 10, 10, 0, 0, 'player4_dig_down_3'),
     (31, 19, 10, 10, 0, 0, 'player4_dig_down_4'),
 
+    # tile transition sprites
+    (0 , 0, 4, 10, 148, 60, 'transition_horizontal_empty_bedrock'),
+    (0 , 0, 4, 10, 154, 60, 'transition_horizontal_bedrock_empty'),
+
+    (0 , 0, 10, 3, 148, 71, 'transition_vertical_empty_bedrock'),
+    (0 , 0, 10, 3, 148, 75, 'transition_vertical_bedrock_empty'),
+
+    (0 , 0, 4, 10, 194, 98, 'transition_horizontal_empty_dirt'),
+    (0 , 0, 4, 10, 200, 98, 'transition_horizontal_dirt_empty'),
+
+    (0 , 0, 10, 3, 194, 109, 'transition_vertical_empty_dirt'),
+    (0 , 0, 10, 3, 194, 113, 'transition_vertical_dirt_empty'),
+
 ]
+
+
+# Sprite padding definitions: (name, target_w, target_h, pad_side)
+# pad_side: 'left', 'right', 'top', 'bottom' - which side gets transparent padding
+SPRITE_PADDING_DEFS = [
+    # Horizontal transitions: 4x10 -> 8x10 (4 pixels padding)
+    ('transition_horizontal_empty_bedrock', 8, 10, 'left'),
+    ('transition_horizontal_bedrock_empty', 8, 10, 'right'),
+    ('transition_horizontal_empty_dirt', 8, 10, 'left'),
+    ('transition_horizontal_dirt_empty', 8, 10, 'right'),
+
+    # Vertical transitions: 10x3 -> 10x6 (3 pixels padding)
+    ('transition_vertical_empty_bedrock', 10, 6, 'top'),
+    ('transition_vertical_bedrock_empty', 10, 6, 'bottom'),
+    ('transition_vertical_empty_dirt', 10, 6, 'top'),
+    ('transition_vertical_dirt_empty', 10, 6, 'bottom'),
+]
+
+
+def pad_sprites(output_base):
+    """Pad sprite PNG files to target sizes with transparent pixels.
+
+    Reads saved sprite files from disk, pads them according to SPRITE_PADDING_DEFS,
+    and overwrites them with the padded versions.
+    """
+    sprites_dir = os.path.join(output_base, 'sprites')
+
+    if not os.path.exists(sprites_dir):
+        return 0
+
+    count = 0
+    for name, target_w, target_h, pad_side in SPRITE_PADDING_DEFS:
+        sprite_path = os.path.join(sprites_dir, f"{name}.png")
+
+        if not os.path.exists(sprite_path):
+            continue
+
+        sprite = Image.open(sprite_path)
+        sprite_rgba = sprite.convert('RGBA')
+        orig_w, orig_h = sprite_rgba.size
+
+        # Create padded image with transparent background
+        padded = Image.new('RGBA', (target_w, target_h), (0, 0, 0, 0))
+
+        # Calculate paste position based on padding side
+        if pad_side == 'left':
+            paste_x = target_w - orig_w
+            paste_y = 0
+        elif pad_side == 'right':
+            paste_x = 0
+            paste_y = 0
+        elif pad_side == 'top':
+            paste_x = 0
+            paste_y = target_h - orig_h
+        elif pad_side == 'bottom':
+            paste_x = 0
+            paste_y = 0
+        else:
+            continue
+
+        padded.paste(sprite_rgba, (paste_x, paste_y))
+        padded.save(sprite_path)
+        count += 1
+
+    if count > 0:
+        print(f"  Padded {count} sprites")
+
+    return count
 
 
 def split_sprites(output_base):
@@ -640,6 +721,7 @@ def main():
 
     stats = extract_assets(zip_path, output_base)
     sprite_count = split_sprites(output_base)
+    padded_count = pad_sprites(output_base)
 
     print(f"\nExtraction complete!")
     print(f"  Graphics: {stats['graphics']}")
