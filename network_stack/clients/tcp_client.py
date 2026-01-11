@@ -4,10 +4,13 @@ import threading
 from typing import Callable, Optional, Any
 
 from twisted.internet import protocol, reactor
-from twisted.protocols.basic import Int32StringReceiver
 from twisted.python.failure import Failure
 from twisted.internet import error
-from network_stack.shared.alias import (OnMessage, OnConnect, OnDisconnect)
+from network_stack.clients.transport_client import (
+    TransportClient,
+    TransportClientProtocol,
+)
+from network_stack.shared.alias import OnMessage, OnConnect, OnDisconnect
 from network_stack.messages.messages import (
     Message,
     encode_message,
@@ -15,7 +18,7 @@ from network_stack.messages.messages import (
 )
 
 
-class TCPClientProtocol(Int32StringReceiver):
+class TCPClientProtocol(TransportClientProtocol):
     def __init__(
         self,
         on_message: OnMessage,
@@ -69,7 +72,7 @@ class TCPClientFactory(protocol.ClientFactory):
         reactor.stop()  # type: ignore
 
 
-class TCPClient:
+class TCPClient(TransportClient):
     """
     Library-style client:
       - start() spins reactor in a background thread

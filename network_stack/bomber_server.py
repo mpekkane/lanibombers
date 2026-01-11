@@ -3,7 +3,12 @@ from dataclasses import dataclass
 import yaml
 from typing import Optional, Callable, Dict, Type, TypeVar, cast
 from network_stack.messages.messages import Message
-from network_stack.servers.tcp_server import TCPServer, TCPServerProtocol, PeerState
+from network_stack.shared.factory import get_server
+from network_stack.servers.transport_server import (
+    TransportServer,
+    TransportServerProtocol,
+)
+from network_stack.shared.types import PeerState
 
 
 @dataclass
@@ -15,7 +20,7 @@ class ClientContext:
 
     server: BomberServer
     state: PeerState
-    _proto: TCPServerProtocol
+    _proto: TransportServerProtocol
 
     @property
     def name(self) -> Optional[str]:
@@ -44,19 +49,22 @@ class BomberServer:
         with open(cfg_path, "r") as f:
             cfg = yaml.safe_load(f)
         self.port = cfg.get("port")
+        self.protocol = cfg.get("protocol")
         self._running = False
-        self._tcp = TCPServer(port=self.port, on_receive=self._on_receive)  # private
+        self._server: TransportServer = get_server(
+            self.protocol, self.port, self._on_receive
+        )  # private
         self._handlers: Dict[Type[Message], Handler] = {}
 
     def start(self) -> None:
-        self._tcp.start()
+        self._server.start()
         self._running = True
 
     def stop(self) -> None:
         self._running = False
-        self._tcp.stop()
+        self._server.stop()
 
-    def set_handler(
+    def set_callback(
         self, msg_type: Type[MsgType], handler: Callable[[MsgType, ClientContext], None]
     ) -> bool:
         if msg_type in self._handlers:
@@ -67,30 +75,30 @@ class BomberServer:
 
     # ---- game-level send APIs ----
     def broadcast(
-        self, msg: Message, exclude: Optional[TCPServerProtocol] = None
+        self, msg: Message, exclude: Optional[TransportServerProtocol] = None
     ) -> None:
-        self._tcp.broadcast(msg, exclude=exclude)
+        self._server.broadcast(msg, exclude=exclude)
 
     # Optional: you can expose a send-to-name API, etc.
     def broadcast_chat(
         self,
         text: str,
         sender: Optional[str] = None,
-        exclude: Optional[TCPServerProtocol] = None,
+        exclude: Optional[TransportServerProtocol] = None,
     ) -> None:
         from network_stack.messages.messages import ChatText
 
         prefix = sender if sender else "?"
         self.broadcast(ChatText(text=f"<{prefix}> {text}"), exclude=exclude)
 
-    def _send_to_proto(self, proto: TCPServerProtocol, msg: Message) -> None:
-        self._tcp.send_to(proto, msg)
+    def _send_to_proto(self, proto: TransportServerProtocol, msg: Message) -> None:
+        self._server.send_to(proto, msg)
 
-    def disconnect(self, proto: TCPServerProtocol) -> None:
-        self._tcp.disconnect(proto)
+    def disconnect(self, proto: TransportServerProtocol) -> None:
+        self._server.disconnect(proto)
 
     def _on_receive(
-        self, msg: Message, state: PeerState, proto: TCPServerProtocol
+        self, msg: Message, state: PeerState, proto: TransportServerProtocol
     ) -> None:
         if not self._running:
             return

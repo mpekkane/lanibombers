@@ -1,9 +1,12 @@
 import yaml
-import time
-from typing import Dict, Type, Callable
-from network_stack.clients.tcp_client import TCPClient
+from typing import Dict, Type, Callable, TypeVar, cast
+from network_stack.clients.transport_client import TransportClient
+from network_stack.shared.factory import get_client
 from network_stack.clients.scan import Scanner
 from network_stack.messages.messages import Message, Name
+
+MsgType = TypeVar("MsgType", bound=Message)
+ClientHandler = Callable[[Message], None]
 
 
 class BomberClient:
@@ -26,10 +29,11 @@ class BomberClient:
         except Exception:
             self.host = None
 
+        self.protocol = config.get("protocol")
         self.server_ip = ""
         self.server_port = -1
         self.acquired_server = False
-        self.client: TCPClient
+        self.client: TransportClient
         self.connected = False
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
 
@@ -58,26 +62,26 @@ class BomberClient:
 
     def start(self) -> bool:
         "Starts the client"
-        client = TCPClient(
+        def _on_connect():
+            self.connected = True
+        client = get_client(
+            protocol=self.protocol,
             ip=self.server_ip,
             port=self.server_port,
             on_message=self.on_msg,
-            on_connect=lambda: print("connected"),
+            on_connect=_on_connect,
         )
         client.start()
-        time.sleep(1)
         self.client = client
-        self.connected = True
         # FIXME: error checking
         return True
 
     def set_callback(
-        self, type: Type[Message], callback: Callable[[Message], None]
+        self, msg_type: Type[MsgType], callback: Callable[[MsgType], None]
     ) -> bool:
-        if type in self.callbacks:
+        if msg_type in self.callbacks:
             return False
-
-        self.callbacks[type] = callback
+        self.callbacks[msg_type] = cast(ClientHandler, callback)
         return True
 
     # messaging
@@ -96,6 +100,7 @@ class BomberClient:
             return False
 
     def on_msg(self, msg: Message) -> None:
-        msg_type = type(msg)
-        callback = self.callbacks[msg_type]
+        callback = self.callbacks.get(type(msg))
+        if callback is None:
+            return
         callback(msg)

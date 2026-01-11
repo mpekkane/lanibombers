@@ -23,8 +23,8 @@ def main() -> None:
 
     server = BomberServer(cfg)
 
-    server.set_handler(Name, on_name)
-    server.set_handler(ChatText, on_chat)
+    server.set_callback(Name, on_name)
+    server.set_callback(ChatText, on_chat)
 
     server.start()
 

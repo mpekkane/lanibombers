@@ -5,16 +5,19 @@ import threading
 
 from twisted.internet.protocol import Factory
 from twisted.internet import reactor, error
-from twisted.protocols.basic import Int32StringReceiver
 from twisted.python.failure import Failure
 
+from network_stack.servers.transport_server import (
+    TransportServer,
+    TransportServerProtocol,
+)
 from network_stack.messages.messages import Message, encode_message, decode_message
 from network_stack.shared.types import PeerState
 
 OnReceive = Callable[[Message, PeerState, "TCPServerProtocol"], None]
 
 
-class TCPServerProtocol(Int32StringReceiver):
+class TCPServerProtocol(TransportServerProtocol):
     def __init__(
         self, peers: Dict["TCPServerProtocol", PeerState], on_receive: OnReceive
     ) -> None:
@@ -53,7 +56,7 @@ class TCPServerFactory(Factory):
         return self._peers
 
 
-class TCPServer:
+class TCPServer(TransportServer):
     def __init__(self, port: int, on_receive: OnReceive) -> None:
         self.port = port
         self._factory = TCPServerFactory(on_receive=on_receive)
@@ -83,7 +86,7 @@ class TCPServer:
         reactor.callFromThread(_do)  # type: ignore
 
     def broadcast(
-        self, msg: Message, exclude: Optional[TCPServerProtocol] = None
+        self, msg: Message, exclude: Optional[TransportServerProtocol] = None
     ) -> None:
         def _do():
             payload = encode_message(msg)
@@ -94,14 +97,14 @@ class TCPServer:
 
         reactor.callFromThread(_do)  # type: ignore
 
-    def send_to(self, proto: TCPServerProtocol, msg: Message) -> None:
+    def send_to(self, proto: TransportServerProtocol, msg: Message) -> None:
         def _do():
             if proto.transport is not None:  # type: ignore
                 proto.send_message(msg)
 
         reactor.callFromThread(_do)  # type: ignore
 
-    def disconnect(self, proto: TCPServerProtocol) -> None:
+    def disconnect(self, proto: TransportServerProtocol) -> None:
         def _do():
             if proto.transport is not None:  # type: ignore
                 proto.transport.loseConnection()  # type: ignore
