@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 class Scanner:
-    def __init__(self, subnet: Optional[int], port: Optional[int]) -> None:
+    def __init__(self, subnet: Optional[int], port: Optional[int], host: Optional[int]) -> None:
         self.scan_subnets = False
         self.scan_ports = False
         if subnet:
@@ -20,20 +20,24 @@ class Scanner:
             self.port = -1
             self.scan_ports = True
             print("WARNING: missing port config")
+        if host:
+            self.host = host
+        else:
+            self.host = -1
 
-    def _scan_port(self, ip: int, port: int) -> Tuple[bool, str]:
+    def _scan_port(self, ip: int, port: int) -> Tuple[bool, str, int]:
         tgt = f"192.168.{self.subnet}.{ip}"
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(1)
             result = sock.connect_ex((tgt, port))
             sock.close()
-            return result == 0, tgt
+            return result == 0, tgt, port
         except Exception:
-            return False, ""
+            return False, "", -1
 
-    def _scan_ports(self, ip_start: int, ip_end: int) -> List[Tuple[bool, str]]:
-        open_ports: List[Tuple[bool, str]] = []
+    def _scan_ports(self, ip_start: int, ip_end: int) -> List[Tuple[bool, str, int]]:
+        open_ports: List[Tuple[bool, str, int]] = []
         with ThreadPoolExecutor(max_workers=100) as executor:
             futures = [
                 executor.submit(self._scan_port, ip, self.port)
@@ -45,7 +49,7 @@ class Scanner:
                     open_ports.append(result)
         return open_ports
 
-    def scan(self) -> List[str]:
+    def scan(self) -> List[Tuple[str, int]]:
         if self.scan_subnets:
             subnets = range(0, 256)
         else:
@@ -56,10 +60,10 @@ class Scanner:
         else:
             ports = [self.port]
 
-        all_found: List[str] = []
+        all_found: List[Tuple[str, int]] = []
         first = True
         for subnet, port in product(subnets, ports):
-            found = self._scan_one(subnet, port)
+            found = self._scan_one(subnet, port, self.host)
             if first:
                 all_found = found
                 first = False
@@ -67,13 +71,21 @@ class Scanner:
                 all_found += found
         return all_found
 
-    def _scan_one(self, subnet: int, port: int) -> List[str]:
+    def _scan_one(self, subnet: int, port: int, host: int) -> List[Tuple[str, int]]:
         print(f"Subnet: {subnet}")
         print(f"Port: {port}")
         print("Looking for servers...")
-        results = self._scan_ports(0, 200)
-        found: List[str] = []
-        for res, tgt in results:
+
+        if host > 0 and host < 256:
+            ip_from = host
+            ip_to = host
+        else:
+            ip_from = 0
+            ip_to = 256
+
+        results = self._scan_ports(ip_from, ip_to)
+        found: List[Tuple[str, int]] = []
+        for res, tgt, port in results:
             if res:
-                found.append(tgt)
+                found.append((tgt, port))
         return found

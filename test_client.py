@@ -1,45 +1,36 @@
-import yaml
-from network_stack.client.client import Client
-from network_stack.client.scan import Scanner
+import time
+from argparse import ArgumentParser
+from network_stack.messages.messages import ChatText
+from network_stack.bomber_client import BomberClient
+
+
+def on_chattxt(msg: ChatText):
+    print(msg)
 
 
 def main() -> None:
-    with open('cfg/client_config.yaml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--cfg", "-c", type=str, default="cfg/client_config.yaml"
+    )
+    args = parser.parse_args()
+    cfg_path = args.cfg
 
-    try:
-        subnet = config.get("subnet")
-    except Exception:
-        subnet = None
-    try:
-        port = config.get("port")
-    except Exception:
-        port = None
-    scanner = Scanner(subnet, port)
-    servers = scanner.scan()
+    client = BomberClient(cfg_path)
+    server_found = client.find_host()
+    if not server_found:
+        print("No server found")
+        return
 
-    for i, s in enumerate(servers):
-        print(f"{i}: {s}")
+    client.set_callback(ChatText, on_chattxt)
 
-    selected = False
-    ok = True
-    ip = ""
-    while not selected:
-        try:
-            inp = input("Select server or q to quit: ")
-            if inp == "q" or inp == "Q":
-                selected = True
-                ok = False
-            num = int(inp)
-            ip = servers[num]
-            selected = True
-        except Exception:
-            pass
-
-    if ok:
-        assert ip, "IP not set"
-        assert port, "Port is not set"
-        _ = Client(ip, port)
+    client.start()
+    name = input("Name: ")
+    client.set_name(name)
+    while True:
+        msg = input(": ")
+        client.send(ChatText(msg))
+        time.sleep(0.1)
 
 
 if __name__ == "__main__":
