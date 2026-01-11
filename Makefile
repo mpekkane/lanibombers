@@ -1,3 +1,5 @@
+.PHONY: clean
+
 all: server client
 init: server-init client-init
 
