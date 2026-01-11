@@ -4,7 +4,7 @@ from itertools import product
 from concurrent.futures import ThreadPoolExecutor
 
 
-class Scanner:
+class TCPScanner:
     def __init__(self, subnet: Optional[int], port: Optional[int], host: Optional[int]) -> None:
         self.scan_subnets = False
         self.scan_ports = False

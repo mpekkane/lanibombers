@@ -1,53 +1,37 @@
+# network_stack/servers/transport_server.py
 from __future__ import annotations
-from typing import Dict, Optional, Callable
-from abc import ABC
-from twisted.internet import error
-from twisted.protocols.basic import Int32StringReceiver
-from twisted.python.failure import Failure
+from typing import Protocol, Optional, Callable, runtime_checkable
+from abc import ABC, abstractmethod
 
 from network_stack.messages.messages import Message
 from network_stack.shared.types import PeerState
 
-
 OnReceive = Callable[[Message, PeerState, "TransportServerProtocol"], None]
 
 
-class TransportServerProtocol(ABC, Int32StringReceiver):
-    def __init__(
-        self, peers: Dict["TransportServerProtocol", PeerState], on_receive: OnReceive
-    ) -> None:
-        pass
-
-    def connectionMade(self) -> None:
-        pass
-
-    def connectionLost(self, reason: Failure = Failure(error.ConnectionDone())) -> None:
-        pass
-
-    def stringReceived(self, string: bytes) -> None:
-        pass
-
-    def send_message(self, msg: Message) -> None:
-        pass
+@runtime_checkable
+class TransportServerProtocol(Protocol):
+    def send_message(self, msg: Message) -> None: ...
 
 
 class TransportServer(ABC):
     def __init__(self, port: int, on_receive: OnReceive) -> None:
-        pass
+        self.port = port
+        self._on_receive = on_receive
 
-    def start(self) -> None:
-        pass
+    @abstractmethod
+    def start(self) -> None: ...
 
-    def stop(self) -> None:
-        pass
+    @abstractmethod
+    def stop(self) -> None: ...
 
+    @abstractmethod
     def broadcast(
         self, msg: Message, exclude: Optional[TransportServerProtocol] = None
-    ) -> None:
-        pass
+    ) -> None: ...
 
-    def send_to(self, proto: TransportServerProtocol, msg: Message) -> None:
-        pass
+    @abstractmethod
+    def send_to(self, proto: TransportServerProtocol, msg: Message) -> None: ...
 
-    def disconnect(self, proto: TransportServerProtocol) -> None:
-        pass
+    @abstractmethod
+    def disconnect(self, proto: TransportServerProtocol) -> None: ...

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, Dict, Type, Iterable
+import struct
 
 
 class Message:
@@ -88,3 +89,60 @@ class RawBytes(Message):
     @classmethod
     def from_bytes(cls, payload: bytes) -> RawBytes:
         return cls(payload)
+
+
+@register_message
+@dataclass(frozen=True)
+class Discover(Message):
+    TYPE: ClassVar[int] = 4
+
+    def to_bytes(self) -> bytes:
+        return bytes()
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> RawBytes:
+        return cls()
+
+
+_MAGIC = b"BMBR"
+_VERSION = 1
+
+
+@register_message
+@dataclass(frozen=True)
+class Announce(Message):
+    TYPE: ClassVar[int] = 5
+    port: int
+    name: str
+
+    def to_bytes(self) -> bytes:
+        name_b = self.name.encode("utf-8", errors="strict")
+        if len(name_b) > 255:
+            raise ValueError("Announce.name too long (max 255 bytes UTF-8)")
+
+        if not (0 <= self.port <= 65535):
+            raise ValueError("Announce.port out of range")
+
+        # ! = network byte order (big endian)
+        header = struct.pack("!4sBH", _MAGIC, _VERSION, self.port)
+        return header + struct.pack("!B", len(name_b)) + name_b
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> Announce:
+        # Need at least magic(4) + ver(1) + port(2) + name_len(1)
+        if len(payload) < 8:
+            raise ValueError("Announce payload too short")
+
+        magic, ver, port = struct.unpack("!4sBH", payload[:7])
+        if magic != _MAGIC:
+            raise ValueError("Bad Announce magic")
+        if ver != _VERSION:
+            raise ValueError(f"Unsupported Announce version: {ver}")
+
+        (name_len,) = struct.unpack("!B", payload[7:8])
+        if len(payload) != 8 + name_len:
+            raise ValueError("Announce name length mismatch")
+
+        name_b = payload[8:8 + name_len]
+        name = name_b.decode("utf-8", errors="strict")
+        return cls(port=port, name=name)

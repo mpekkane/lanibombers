@@ -6,18 +6,17 @@ import threading
 from twisted.internet.protocol import Factory
 from twisted.internet import reactor, error
 from twisted.python.failure import Failure
-
+from twisted.protocols.basic import Int32StringReceiver
 from network_stack.servers.transport_server import (
     TransportServer,
     TransportServerProtocol,
+    OnReceive
 )
 from network_stack.messages.messages import Message, encode_message, decode_message
 from network_stack.shared.types import PeerState
 
-OnReceive = Callable[[Message, PeerState, "TCPServerProtocol"], None]
 
-
-class TCPServerProtocol(TransportServerProtocol):
+class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
     def __init__(
         self, peers: Dict["TCPServerProtocol", PeerState], on_receive: OnReceive
     ) -> None:

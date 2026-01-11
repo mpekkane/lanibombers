@@ -1,8 +1,10 @@
 import yaml
-from typing import Dict, Type, Callable, TypeVar, cast
+from typing import Dict, Type, Callable, TypeVar, cast, Tuple, List
 from network_stack.clients.transport_client import TransportClient
 from network_stack.shared.factory import get_client
-from network_stack.clients.scan import Scanner
+# FIXME: factory
+from network_stack.clients.tcp_scanner import TCPScanner
+from network_stack.clients.udp_scanner import UDPScanner
 from network_stack.messages.messages import Message, Name
 
 MsgType = TypeVar("MsgType", bound=Message)
@@ -38,9 +40,10 @@ class BomberClient:
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
 
     def find_host(self) -> bool:
-        "Finds servers in the subnet"
-        scanner = Scanner(self.subnet, self.port, self.host)
-        servers = scanner.scan()
+        if self.protocol == "tcp":
+            servers = self.find_tcp_host()
+        else:
+            servers = self.find_udp_host()
 
         for i, s in enumerate(servers):
             print(f"{i}: {s}")
@@ -59,6 +62,16 @@ class BomberClient:
                 pass
 
         return self.acquired_server
+
+    def find_udp_host(self) -> List[Tuple[str, int]]:
+        #FIXME
+        scanner = UDPScanner(self.subnet, self.port, 5)
+        return scanner.scan()
+
+    def find_tcp_host(self) -> List[Tuple[str, int]]:
+        "Finds servers in the subnet"
+        scanner = TCPScanner(self.subnet, self.port, self.host)
+        return scanner.scan()
 
     def start(self) -> bool:
         "Starts the client"
