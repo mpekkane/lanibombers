@@ -1,37 +1,36 @@
-import yaml
-from typing import Dict, Type, Callable, TypeVar, cast, Tuple, List
+"""
+LaniBombers network client.
+This is the main client-side class that abstracts all of the networking stuff away.
+The idea is that a instance of this class is created by the game client,
+and this class handles all of the network communication.
+
+The usage is:
+1. Create instance, and pass the configuration file as parameter
+2. Register the callbacks that are needed
+3. Start client
+
+After this, the responsibility of receiving and sending logic is to the owning class.
+"""
+
+from typing import Dict, Type, Callable, TypeVar, cast
 from network_stack.clients.transport_client import TransportClient
-from network_stack.shared.factory import get_client
-# FIXME: factory
-from network_stack.clients.tcp_scanner import TCPScanner
-from network_stack.clients.udp_scanner import UDPScanner
+from network_stack.shared.factory import get_client, get_scanner
 from network_stack.messages.messages import Message, Name
+from common.config_reader import ConfigReader
 
 MsgType = TypeVar("MsgType", bound=Message)
 ClientHandler = Callable[[Message], None]
 
 
-class BomberClient:
+class BomberNetworkClient:
     def __init__(self, cfg_path: str) -> None:
         "Init class, read config from YAML"
-        # read YAML
-        with open(cfg_path, "r") as f:
-            config = yaml.load(f, Loader=yaml.SafeLoader)
-        try:
-            self.subnet = config.get("subnet")
-        except Exception:
-            self.subnet = None
-        try:
-            self.port = config.get("port")
-        except Exception:
-            self.port = None
-
-        try:
-            self.host = config.get("host")
-        except Exception:
-            self.host = None
-
-        self.protocol = config.get("protocol")
+        self.config = ConfigReader(cfg_path)
+        self.subnet = self.config.get_config("subnet", int)
+        self.port = self.config.get_config("port", int)
+        self.host = self.config.get_config("host", int)
+        self.protocol = self.config.get_config_mandatory("protocol", str)
+        self.timeout = self.config.get_config("timeout", float)
         self.server_ip = ""
         self.server_port = -1
         self.acquired_server = False
@@ -40,11 +39,10 @@ class BomberClient:
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
 
     def find_host(self) -> bool:
-        if self.protocol == "tcp":
-            servers = self.find_tcp_host()
-        else:
-            servers = self.find_udp_host()
-
+        scanner = get_scanner(
+            self.protocol, self.subnet, self.port, self.host, self.timeout
+        )
+        servers = scanner.scan()
         for i, s in enumerate(servers):
             print(f"{i}: {s}")
 
@@ -63,20 +61,12 @@ class BomberClient:
 
         return self.acquired_server
 
-    def find_udp_host(self) -> List[Tuple[str, int]]:
-        #FIXME
-        scanner = UDPScanner(self.subnet, self.port, 5)
-        return scanner.scan()
-
-    def find_tcp_host(self) -> List[Tuple[str, int]]:
-        "Finds servers in the subnet"
-        scanner = TCPScanner(self.subnet, self.port, self.host)
-        return scanner.scan()
-
     def start(self) -> bool:
         "Starts the client"
+
         def _on_connect():
             self.connected = True
+
         client = get_client(
             protocol=self.protocol,
             ip=self.server_ip,

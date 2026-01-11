@@ -1,7 +1,10 @@
+"""
+Test code for server-side
+"""
 
 import time
 from argparse import ArgumentParser
-from network_stack.bomber_server import BomberServer, ClientContext
+from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
 from network_stack.messages.messages import Name, ChatText
 
 
@@ -21,7 +24,7 @@ def main() -> None:
     args = parser.parse_args()
     cfg = args.cfg
 
-    server = BomberServer(cfg)
+    server = BomberNetworkServer(cfg)
 
     server.set_callback(Name, on_name)
     server.set_callback(ChatText, on_chat)

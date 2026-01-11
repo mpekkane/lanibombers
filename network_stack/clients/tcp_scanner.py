@@ -1,10 +1,21 @@
+"""
+TCP protocol server scanner.
+This is used with TCP clients to discover TCP servers via Discovery/Announce.
+Not so neat, as it goes through a lot if the config if wrong, but guarantees
+that the communication port is open, since the discovery and communication are
+from the same port. Efficiently-minded could use UDP server as a discovery server
+that actually replies with the TCP server address, if needed, since UDP discovery
+is A LOT faster, due to the UDP broadcast.
+"""
+
 from typing import Optional, List, Tuple
 import socket
 from itertools import product
 from concurrent.futures import ThreadPoolExecutor
+from network_stack.clients.transport_scanner import TransportScanner
 
 
-class TCPScanner:
+class TCPScanner(TransportScanner):
     def __init__(self, subnet: Optional[int], port: Optional[int], host: Optional[int]) -> None:
         self.scan_subnets = False
         self.scan_ports = False

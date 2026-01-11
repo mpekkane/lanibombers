@@ -1,3 +1,8 @@
+"""
+UDP protocol server scanner.
+This is used with UDP clients to discover UDP servers via Discovery/Announce.
+"""
+
 from __future__ import annotations
 from typing import List, Tuple, Optional
 import socket
@@ -5,15 +10,16 @@ import time
 
 from network_stack.messages.messages import encode_message, decode_message
 from network_stack.messages.messages import Message, Discover, Announce
+from network_stack.clients.transport_scanner import TransportScanner
 
 
 def _local_broadcast_addr(subnet: int) -> str:
     return f"192.168.{subnet}.255"
 
 
-class UDPScanner:
+class UDPScanner(TransportScanner):
     def __init__(
-        self, subnet: Optional[int], port: int, timeout_s: float = 1.0
+        self, subnet: Optional[int], port: int, timeout_s: Optional[float] = 1.0
     ) -> None:
         self.subnet = subnet
         self.port = port

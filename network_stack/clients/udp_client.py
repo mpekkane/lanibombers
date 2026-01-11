@@ -1,4 +1,8 @@
-# network_stack/clients/udp_client.py
+"""
+UDP client.
+This client communicates with a UDP server.
+"""
+
 from __future__ import annotations
 import threading
 from typing import Optional
@@ -54,6 +58,7 @@ class _UDPClientWire(DatagramProtocol):
 
 
 class UDPClient(TransportClient):
+    """Twisted wrapper"""
     def __init__(
         self,
         ip: str,

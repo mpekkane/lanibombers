@@ -1,4 +1,8 @@
-# client.py
+"""
+TCP client.
+This client communicates with a TCP server.
+"""
+
 from __future__ import annotations
 import threading
 from typing import Callable, Optional, Any
@@ -19,6 +23,7 @@ from network_stack.messages.messages import (
 
 
 class TCPClientProtocol(TransportClientProtocol):
+    """Twisted protocol"""
     def __init__(
         self,
         on_message: OnMessage,
@@ -51,6 +56,7 @@ class TCPClientProtocol(TransportClientProtocol):
 
 
 class TCPClientFactory(protocol.ClientFactory):
+    """Object factory"""
     def __init__(self, build_proto: Callable[[], TCPClientProtocol]):
         self._build_proto = build_proto
         self.proto: Optional[TCPClientProtocol] = None

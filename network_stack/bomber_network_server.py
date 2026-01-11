@@ -1,6 +1,19 @@
+"""
+LaniBombers network server.
+This is the main server-side class that abstracts all of the networking stuff away.
+The idea is that a instance of this class is created by the game server,
+and this class handles all of the network communication.
+
+The usage is:
+1. Create instance, and pass the configuration file as parameter
+2. Register the callbacks that are needed
+3. Start client
+
+After this, the responsibility of receiving and sending logic is to the owning class.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass
-import yaml
 from typing import Optional, Callable, Dict, Type, TypeVar, cast
 from network_stack.messages.messages import Message
 from network_stack.shared.factory import get_server
@@ -9,6 +22,7 @@ from network_stack.servers.transport_server import (
     TransportServerProtocol,
 )
 from network_stack.shared.types import PeerState
+from common.config_reader import ConfigReader
 
 
 @dataclass
@@ -18,7 +32,7 @@ class ClientContext:
     No Twisted imports needed in user code if you keep this in bomber_server.py.
     """
 
-    server: BomberServer
+    server: BomberNetworkServer
     state: PeerState
     _proto: TransportServerProtocol
 
@@ -44,12 +58,11 @@ MsgType = TypeVar("MsgType", bound=Message)
 Handler = Callable[[Message, ClientContext], None]
 
 
-class BomberServer:
+class BomberNetworkServer:
     def __init__(self, cfg_path: str) -> None:
-        with open(cfg_path, "r") as f:
-            cfg = yaml.safe_load(f)
-        self.port = cfg.get("port")
-        self.protocol = cfg.get("protocol")
+        self.config = ConfigReader(cfg_path)
+        self.port = self.config.get_config_mandatory("port", int)
+        self.protocol = self.config.get_config_mandatory("protocol", str)
         self._running = False
         self._server: TransportServer = get_server(
             self.protocol, self.port, self._on_receive

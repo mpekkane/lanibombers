@@ -1,3 +1,8 @@
+"""
+Transport layer client abstraction interface.
+Abstract base class for TCP/UDP clients.
+"""
+
 from abc import ABC
 from typing import Optional
 from twisted.protocols.basic import Int32StringReceiver
@@ -8,6 +13,7 @@ from network_stack.messages.messages import Message
 
 
 class TransportClientProtocol(Int32StringReceiver):
+    """This is abstraction for the twisted protocol"""
     def __init__(
         self,
         on_message: OnMessage,

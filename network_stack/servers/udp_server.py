@@ -1,4 +1,8 @@
-# network_stack/servers/udp_server.py
+"""
+UDP server.
+Handles server-side UPD traffic.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
@@ -6,7 +10,13 @@ import threading
 from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
 
-from network_stack.messages.messages import Message, encode_message, decode_message, Discover, Announce
+from network_stack.messages.messages import (
+    Message,
+    encode_message,
+    decode_message,
+    Discover,
+    Announce,
+)
 from network_stack.shared.types import PeerState
 from network_stack.servers.transport_server import (
     TransportServer,
@@ -94,6 +104,7 @@ class UDPServer(TransportServer):
         self._listen_multiple = listen_multiple
 
     def start(self) -> None:
+        """Start the server"""
         def _listen():
             if self.multicast_group is not None:
                 self._listening_port = reactor.listenMulticast(
@@ -123,11 +134,13 @@ class UDPServer(TransportServer):
         self._reactor_thread.start()
 
     def stop(self) -> None:
+        """Stop the server"""
         if self._listening_port is not None:
             self._listening_port.stopListening()
             self._listening_port = None
 
     def _get_peer(self, addr: Addr) -> UDPPeer:
+        """Get status of connected client"""
         peer = self._peers_by_addr.get(addr)
         if peer is None:
             peer = UDPPeer(addr=addr, _server=self)
@@ -136,6 +149,7 @@ class UDPServer(TransportServer):
         return peer
 
     def _datagram_received(self, data: bytes, addr: Addr) -> None:
+        """Receive and marshall data"""
         try:
             msg = decode_message(data)
         except Exception as e:
@@ -153,6 +167,7 @@ class UDPServer(TransportServer):
         self._on_receive(msg, state, peer)
 
     def _send_to_addr(self, addr: Addr, msg: Message) -> None:
+        """Send datagram"""
         payload = encode_message(msg)
         # DatagramProtocol transport is stored on wire
         self._wire.transport.write(payload, addr)
@@ -160,6 +175,7 @@ class UDPServer(TransportServer):
     def broadcast(
         self, msg: Message, exclude: Optional[TransportServerProtocol] = None
     ) -> None:
+        """UDP Broadcasting"""
         payload = encode_message(msg)
 
         # If we can do true broadcast (no exclude), send ONE datagram to broadcast address.
@@ -180,11 +196,11 @@ class UDPServer(TransportServer):
             self._wire.transport.write(payload, peer.addr)
 
     def send_to(self, proto: TransportServerProtocol, msg: Message) -> None:
-        # Works for UDPPeer and any other TransportServerProtocol
+        """Works for UDPPeer and any other TransportServerProtocol"""
         proto.send_message(msg)
 
     def disconnect(self, proto: TransportServerProtocol) -> None:
-        # UDP has no connection to close. We can forget the peer state.
+        """UDP has no connection to close. We can forget the peer state"""
         if isinstance(proto, UDPPeer):
             self._state_by_peer.pop(proto, None)
             self._peers_by_addr.pop(proto.addr, None)

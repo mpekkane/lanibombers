@@ -1,4 +1,8 @@
-# network_stack/servers/transport_server.py
+"""
+Transport layer server abstraction interface.
+Abstract base class for TCP/UDP servers.
+"""
+
 from __future__ import annotations
 from typing import Protocol, Optional, Callable, runtime_checkable
 from abc import ABC, abstractmethod

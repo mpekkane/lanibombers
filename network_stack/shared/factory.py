@@ -1,3 +1,8 @@
+"""
+Server and client factory.
+This enables the BomberClient/Server to create transport layer client/servers
+"""
+
 from typing import Optional
 from network_stack.servers.transport_server import TransportServer, OnReceive
 from network_stack.servers.tcp_server import TCPServer
@@ -6,6 +11,9 @@ from network_stack.clients.transport_client import TransportClient
 from network_stack.clients.tcp_client import TCPClient
 from network_stack.clients.udp_client import UDPClient
 from network_stack.shared.alias import OnMessage, OnConnect, OnDisconnect
+from network_stack.clients.transport_scanner import TransportScanner
+from network_stack.clients.tcp_scanner import TCPScanner
+from network_stack.clients.udp_scanner import UDPScanner
 
 
 def get_server(protocol: str, port: int, on_receive: OnReceive) -> TransportServer:
@@ -40,4 +48,19 @@ def get_client(
             on_connect=on_connect,
             on_disconnect=on_disconnect,
         )
+    raise ValueError(protocol)
+
+
+def get_scanner(
+    protocol: str,
+    subnet: Optional[int],
+    port: Optional[int],
+    host: Optional[int],
+    timeout: Optional[float],
+) -> TransportScanner:
+    if protocol == "udp":
+        assert port, "UDP scanning required a known port"
+        return UDPScanner(subnet, port, timeout)
+    if protocol == "tcp":
+        return TCPScanner(subnet, port, host)
     raise ValueError(protocol)

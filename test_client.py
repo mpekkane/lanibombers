@@ -1,7 +1,11 @@
+"""
+Test code for client-side
+"""
+
 import time
 from argparse import ArgumentParser
 from network_stack.messages.messages import ChatText
-from network_stack.bomber_client import BomberClient
+from network_stack.bomber_network_client import BomberNetworkClient
 
 
 def on_chattxt(msg: ChatText):
@@ -16,7 +20,7 @@ def main() -> None:
     args = parser.parse_args()
     cfg_path = args.cfg
 
-    client = BomberClient(cfg_path)
+    client = BomberNetworkClient(cfg_path)
     server_found = client.find_host()
     if not server_found:
         print("No server found")
