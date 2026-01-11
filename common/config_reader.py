@@ -1,3 +1,4 @@
+import sys
 from typing import Union, TypeVar, Callable, List, Any
 import yaml
 from pathlib import Path
@@ -6,12 +7,29 @@ from pathlib import Path
 T = TypeVar("T")
 
 
+def _base_dir() -> Path:
+    """
+    Returns the base directory where bundled resources live.
+    - Dev: project root (parent of 'common/')
+    - PyInstaller: sys._MEIPASS (onefile temp dir / onedir bundle dir)
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+
+    # dev mode: common/ is a package folder, so go one up to project root
+    return Path(__file__).resolve().parent.parent
+
+
+def resource_path(relative: str | Path) -> Path:
+    return _base_dir() / Path(relative)
+
 class ConfigReader:
     """YAML Config reader class"""
 
     def __init__(self, config_file: str):
-        if Path(config_file).exists():
-            with open(config_file, "r", encoding="utf-8") as f:
+        cfg_path = resource_path(config_file)
+        if Path(cfg_path).exists():
+            with open(cfg_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
             # print(f"Load config: {config_file}")
         else:

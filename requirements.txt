@@ -2,3 +2,4 @@ twisted
 tqdm
 pyyaml
 pyinstaller
+pillow

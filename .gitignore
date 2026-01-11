@@ -4,3 +4,4 @@ assets/
 **/__pycache__/
 build/
 dist/
+*.exe*
