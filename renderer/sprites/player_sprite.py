@@ -8,12 +8,13 @@ SPRITE_SIZE = 10
 class PlayerSprite(arcade.Sprite):
     """Extended sprite class for player entities with animation support"""
 
-    def __init__(self, sprite_id: int, colour: tuple, player_textures: dict, transparent_texture, zoom: float, screen_height: int):
+    def __init__(self, sprite_id: int, colour: tuple, player_textures: dict, transparent_texture, blood_texture, zoom: float, screen_height: int):
         super().__init__()
         self.sprite_id = sprite_id
         self.colour = colour
         self.player_textures = player_textures
         self.transparent_texture = transparent_texture
+        self.blood_texture = blood_texture
         self.zoom = zoom
         self.screen_height = screen_height
 
@@ -34,6 +35,11 @@ class PlayerSprite(arcade.Sprite):
         # Update position (rounded to pixel grid before zoom)
         self.center_x = round((player.x + 0.5) * SPRITE_SIZE) * self.zoom
         self.center_y = self.screen_height - round((player.y + 0.5) * SPRITE_SIZE) * self.zoom
+
+        # Handle dead state
+        if player.state == 'dead':
+            self.texture = self.blood_texture
+            return
 
         # Update animation frame if walking or digging
         if player.state in ('walk', 'dig'):

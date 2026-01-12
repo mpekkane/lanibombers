@@ -6,6 +6,7 @@ Simulates a game server returning sprite index arrays.
 import os
 import time
 import array
+import random
 
 from cfg.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
 from game_engine.entities import Direction, EntityType, DynamicEntity
@@ -41,6 +42,7 @@ class MockServer:
             DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', colour=(0, 255, 0), sprite_id=2, state='walk'),
         ]
         self.start_time = time.time()
+        self.last_damage_time = self.start_time
         # Player 2 movement pattern: start position
         self.player2_start_x = 8
         self.player2_start_y = 18
@@ -125,9 +127,28 @@ class MockServer:
                 # Replace spawn tile with empty
                 self.grid[i] = EMPTY_TILE_ID
 
+    def _update_random_damage(self):
+        """Deal damage to a random player and monster every 10 seconds"""
+        current_time = time.time()
+        if current_time - self.last_damage_time >= 10.0:
+            self.last_damage_time = current_time
+
+            # Damage a random alive player
+            alive_players = [p for p in self.players if p.state != 'dead']
+            if alive_players:
+                player = random.choice(alive_players)
+                player.take_damage(100)
+
+            # Damage a random alive monster
+            alive_monsters = [m for m in self.monsters if m.state != 'dead']
+            if alive_monsters:
+                monster = random.choice(alive_monsters)
+                monster.take_damage(100)
+
     def get_render_state(self):
         """Returns RenderState with dimensions and sprite indices"""
         self._update_player2_movement()
+        self._update_random_damage()
         return RenderState(
             width=self.width,
             height=self.height,

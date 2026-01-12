@@ -11,6 +11,8 @@ from cfg.tile_dictionary import (
     EMPTY_TILE_NAMES,
     BEDROCK_TILE_NAMES,
     DIRT_TILE_NAMES,
+    PLAYER_DEATH_SPRITE,
+    MONSTER_DEATH_SPRITE,
 )
 from game_engine.entities import Direction, EntityType
 from renderer.sprites import PlayerSprite, MonsterSprite
@@ -82,6 +84,10 @@ class GameRenderer(arcade.Window):
         from PIL import Image
         transparent_image = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
         self.transparent_texture = arcade.Texture(transparent_image)
+
+        # Load death textures
+        self.blood_texture = arcade.load_texture(os.path.join(SPRITES_PATH, f"{PLAYER_DEATH_SPRITE}.png"))
+        self.blood_green_texture = arcade.load_texture(os.path.join(SPRITES_PATH, f"{MONSTER_DEATH_SPRITE}.png"))
 
         # Load horizontal transition textures
         self.horizontal_transition_textures = {}
@@ -231,6 +237,7 @@ class GameRenderer(arcade.Window):
                 colour=player.colour,
                 player_textures=self.player_textures,
                 transparent_texture=self.transparent_texture,
+                blood_texture=self.blood_texture,
                 zoom=self.zoom,
                 screen_height=self.height
             )
@@ -249,6 +256,7 @@ class GameRenderer(arcade.Window):
                 entity_type=monster.entity_type,
                 monster_textures=self.monster_textures,
                 transparent_texture=self.transparent_texture,
+                blood_green_texture=self.blood_green_texture,
                 zoom=self.zoom,
                 screen_height=self.height
             )

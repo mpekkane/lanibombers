@@ -28,3 +28,11 @@ class DynamicEntity:
     speed: float = 0.0
     state: str = 'idle'
     sprite_id: int = 1  # Used for player entities (1-4)
+    health: int = 100
+
+    def take_damage(self, amount: int):
+        """Reduce health by amount. Sets state to 'dead' if health reaches 0."""
+        self.health -= amount
+        if self.health <= 0:
+            self.health = 0
+            self.state = 'dead'
