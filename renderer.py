@@ -4,50 +4,23 @@ Main graphics processing and display loop.
 """
 
 import os
-import time
-from dataclasses import dataclass, field
-from typing import List
-from enum import Enum
 import arcade
-import array
 
+from cfg.tile_dictionary import (
+    TILE_DICTIONARY,
+    EMPTY_TILE_NAMES,
+    BEDROCK_TILE_NAMES,
+    DIRT_TILE_NAMES,
+)
+from game_engine.entities import Direction, EntityType
+from renderer.sprites import PlayerSprite, MonsterSprite
+from mock_server import MockServer
 
-# ============================================================================
-# Dynamic Entities
-# ============================================================================
-
-class Direction(Enum):
-    UP = 'up'
-    DOWN = 'down'
-    LEFT = 'left'
-    RIGHT = 'right'
-
-
-class EntityType(Enum):
-    PLAYER = 'player'
-    FURRYMAN = 'furryman'
-    SLIME = 'slime'
-    ALIEN = 'alien'
-    GRENADEMONSTER = 'grenademonster'
-
-
-@dataclass
-class DynamicEntity:
-    x: float
-    y: float
-    direction: Direction
-    entity_type: EntityType
-    name: str = ''
-    colour: tuple = (255, 255, 255)
-    speed: float = 0.0
-    state: str = 'idle'
-    sprite_id: int = 1  # Used for player entities (1-4)
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
-MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.MNE')
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'sprites')
 
 TARGET_FPS = 60
@@ -60,79 +33,6 @@ SPRITE_CENTER_OFFSET = SPRITE_SIZE // 2
 GRAPH_WIDTH = 200
 GRAPH_HEIGHT = 120
 GRAPH_MARGIN = 5
-
-# Map tile IDs to sprite names
-TILE_DICTIONARY = {
-    # Basic terrain
-    48: 'empty',     
-    49: 'concrete',  
-    50: 'dirt1',     
-    51: 'dirt2',     
-    52: 'dirt3',     
-    53: 'gravel1',   
-    54: 'gravel2',   
-    55: 'bedrock_nw',
-    56: 'bedrock_ne',
-    57: 'bedrock_se',
-    #
-    # 
-    65: 'bedrock_sw',       
-    66: 'boulder',          
-    67: 'bedrock1',         
-    68: 'bedrock2',         
-    69: 'bedrock3',         
-    70: 'bedrock4',         
-    71: 'furryman_right_1', # FURRYMAN
-    # more furryman
-    # ??
-    74: 'furryman_right_1', # FURRYMAN
-    79: 'slime_right_1',    # SLIME
-    80: 'slime_right_1',    # SLIME
-    81: 'slime_right_1',    # SLIME
-    # more slime or alien?
-    83: 'alien_right_1',    # ALIEN
-    84: 'alien_right_1',    # ALIEN
-    86: 'alien_right_1',    # ALIEN
-    #
-    #
-    101: 'landmine',
-    #
-    #
-    108: 'securitydoor',  
-    109: 'medpack',      
-    #
-    111: 'bioslime',      
-    112: 'rock2', 
-    113: 'rock1',
-    #
-    #
-    121: 'crate',          
-    #
-    #
-    143: 'smallpick',       
-    144: 'bigpick',         
-    145: 'drill',           
-    146: 'gold_shield',     
-    147: 'gold_egg',        
-    148: 'gold_coins',      
-    149: 'gold_bracelet',   
-    150: 'gold_bar',        
-    151: 'gold_cross',      
-    152: 'gold_sceptre',    
-    153: 'gold_ruby',       
-    154: 'gold_crown',      
-    155: 'urethane_block',  
-    156: 'tunnel',          
-    #
-    #
-    164: 'crackerbarrel', 
-    #
-    #
-    172: 'brics1',
-    #
-    #
-    180: 'doorswitch_red',
-}
 
 # Horizontal transition textures (8x10 pixels, between columns)
 HORIZONTAL_TRANSITION_TEXTURES = {
@@ -150,206 +50,10 @@ VERTICAL_TRANSITION_TEXTURES = {
     'dirt_empty': 'transition_vertical_dirt_empty',
 }
 
-# Sprite names grouped by type for transition lookups
-EMPTY_SPRITE_NAMES = {
-    'empty',
-    'boulder',
-    'landmine',
-    'crate',
-    'smallpick',
-    'bigpick',
-    'drill',
-    'gold_shield',
-    'gold_egg',
-    'gold_coins',
-    'gold_bracelet',
-    'gold_bar',
-    'gold_cross',
-    'gold_sceptre',
-    'gold_ruby',
-    'gold_crown',
-    'tunnel',
-    'crackerbarrel',
-}
-
-BEDROCK_SPRITE_NAMES = {'bedrock1', 'bedrock2', 'bedrock3', 'bedrock4'}
-DIRT_SPRITE_NAMES = {'dirt1', 'dirt2', 'dirt3'}
-
 # Build tile ID sets from TILE_DICTIONARY
-EMPTY_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in EMPTY_SPRITE_NAMES}
-BEDROCK_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in BEDROCK_SPRITE_NAMES}
-DIRT_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in DIRT_SPRITE_NAMES}
-
-
-# ============================================================================
-# Game State
-# ============================================================================
-
-@dataclass
-class GameState:
-    """Game state with dimensions and sprite indices"""
-    width: int
-    height: int
-    tilemap: array.array('B')
-    players: List[DynamicEntity] = field(default_factory=list)
-
-
-# ============================================================================
-# Mock Server
-# ============================================================================
-
-class MockServer:
-    """Simulates a game server returning sprite index arrays"""
-
-    def __init__(self, map_path=MAP_PATH):
-        self._load_map(map_path)
-        self._init_players()
-
-    def _load_map(self, path):
-        """Load map from ASCII file, sprite indices are ASCII values"""
-        self.grid = array.array('B')
-        with open(path, 'rb') as f:
-            for line in f:
-                line = line.rstrip(b'\r\n')
-                for char in line:
-                    self.grid.append(char)
-        self.height = 45
-        self.width = 64
-
-    def _init_players(self):
-        """Initialize mock players"""
-        self.players = [
-            DynamicEntity(x=9, y=9, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player1', colour=(255, 0, 0), sprite_id=1, state='idle'),
-            DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', colour=(0, 255, 0), sprite_id=2, state='walk'),
-        ]
-        self.start_time = time.time()
-        # Player 2 movement pattern: start position
-        self.player2_start_x = 8
-        self.player2_start_y = 18
-
-    def _update_player2_movement(self):
-        """Move player 2 in a square pattern"""
-        elapsed = time.time() - self.start_time
-        # Pattern: 4s right, 1s stop, 4s down, 1s stop, 4s left, 1s stop, 4s up, 1s stop = 20s cycle
-        # Speed: 1.5 blocks/second (6 blocks in 4 seconds)
-        cycle_time = elapsed % 20.0
-        player = self.players[1]
-        speed = 1.5  # blocks per second
-
-        if cycle_time < 4.0:
-            # Moving right
-            player.x = self.player2_start_x + cycle_time * speed
-            player.y = self.player2_start_y
-            player.direction = Direction.RIGHT
-            player.state = 'walk'
-        elif cycle_time < 5.0:
-            # Stopped after right
-            player.x = self.player2_start_x + 6
-            player.y = self.player2_start_y
-            player.direction = Direction.RIGHT
-            player.state = 'idle'
-        elif cycle_time < 9.0:
-            # Moving down
-            player.x = self.player2_start_x + 6
-            player.y = self.player2_start_y + (cycle_time - 5.0) * speed
-            player.direction = Direction.DOWN
-            player.state = 'walk'
-        elif cycle_time < 10.0:
-            # Stopped after down
-            player.x = self.player2_start_x + 6
-            player.y = self.player2_start_y + 6
-            player.direction = Direction.DOWN
-            player.state = 'idle'
-        elif cycle_time < 14.0:
-            # Moving left
-            player.x = self.player2_start_x + 6 - (cycle_time - 10.0) * speed
-            player.y = self.player2_start_y + 6
-            player.direction = Direction.LEFT
-            player.state = 'walk'
-        elif cycle_time < 15.0:
-            # Stopped after left
-            player.x = self.player2_start_x
-            player.y = self.player2_start_y + 6
-            player.direction = Direction.LEFT
-            player.state = 'idle'
-        elif cycle_time < 19.0:
-            # Moving up
-            player.x = self.player2_start_x
-            player.y = self.player2_start_y + 6 - (cycle_time - 15.0) * speed
-            player.direction = Direction.UP
-            player.state = 'walk'
-        else:
-            # Stopped after up
-            player.x = self.player2_start_x
-            player.y = self.player2_start_y
-            player.direction = Direction.UP
-            player.state = 'idle'
-
-    def get_game_state(self):
-        """Returns GameState with dimensions and sprite indices"""
-        self._update_player2_movement()
-        return GameState(
-            width=self.width,
-            height=self.height,
-            tilemap=self.grid,
-            players=self.players
-        )
-
-
-# ============================================================================
-# Player Sprite
-# ============================================================================
-
-class PlayerSprite(arcade.Sprite):
-    """Extended sprite class for player entities with animation support"""
-
-    def __init__(self, sprite_id: int, colour: tuple, player_textures: dict, transparent_texture, zoom: float, screen_height: int):
-        super().__init__()
-        self.sprite_id = sprite_id
-        self.colour = colour
-        self.player_textures = player_textures
-        self.transparent_texture = transparent_texture
-        self.zoom = zoom
-        self.screen_height = screen_height
-
-        # Animation state
-        self.current_frame = 1
-        self.frame_timer = 0.0
-        self.frames_per_second = 4  # Animation speed
-
-        # Previous state for idle frame persistence
-        self.last_direction = Direction.DOWN
-        self.last_frame = 1
-
-        self.scale = zoom
-        self.texture = transparent_texture
-
-    def update_from_entity(self, player: DynamicEntity, delta_time: float):
-        """Update sprite position, texture and animation from player entity data"""
-        # Update position
-        self.center_x = (player.x + 0.5) * SPRITE_SIZE * self.zoom
-        self.center_y = self.screen_height - (player.y + 0.5) * SPRITE_SIZE * self.zoom
-
-        # Update animation frame if walking or digging
-        if player.state in ('walk', 'dig'):
-            self.frame_timer += delta_time
-            frame_duration = 1.0 / self.frames_per_second
-            if self.frame_timer >= frame_duration:
-                self.frame_timer -= frame_duration
-                self.current_frame = (self.current_frame % 4) + 1
-            self.last_direction = player.direction
-            self.last_frame = self.current_frame
-        else:
-            # Idle: keep last frame from walk/dig animation
-            self.frame_timer = 0.0
-
-        # Get texture based on state
-        frame_to_use = self.current_frame if player.state in ('walk', 'dig') else self.last_frame
-        texture = self.player_textures.get(
-            (self.sprite_id, player.state, player.direction, frame_to_use),
-            self.transparent_texture
-        )
-        self.texture = texture
+EMPTY_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in EMPTY_TILE_NAMES}
+BEDROCK_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in BEDROCK_TILE_NAMES}
+DIRT_TILE_IDS = {tile_id for tile_id, name in TILE_DICTIONARY.items() if name in DIRT_TILE_NAMES}
 
 
 # ============================================================================
@@ -410,6 +114,22 @@ class GameRenderer(arcade.Window):
                     path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                     self.player_textures[(sprite_id, 'dig', direction, frame)] = arcade.load_texture(path)
 
+        # Load monster textures: (entity_type, direction, frame) -> texture
+        self.monster_textures = {}
+        monster_types = [
+            (EntityType.SLIME, 'slime'),
+            (EntityType.FURRYMAN, 'furryman'),
+            (EntityType.ALIEN, 'alien'),
+            (EntityType.GRENADEMONSTER, 'grenademonster'),
+        ]
+        for entity_type, sprite_prefix in monster_types:
+            for direction in Direction:
+                for frame in range(1, 5):
+                    sprite_name = f"{sprite_prefix}_{direction.value}_{frame}"
+                    path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
+                    texture = arcade.load_texture(path)
+                    self.monster_textures[(entity_type, direction, frame)] = texture
+
         # Build tile pair to transition texture dictionaries
         # Key: (tile_id_left, tile_id_right) for horizontal, (tile_id_top, tile_id_bottom) for vertical
         self.horizontal_tile_pair_to_texture = {}
@@ -445,7 +165,7 @@ class GameRenderer(arcade.Window):
         self.background_tile_sprite_list = arcade.SpriteList()
         self.background_tile_sprite_list.initialize()
         self.background_tile_sprite_list.preload_textures(self.textures.values())
-        state = server.get_game_state()
+        state = server.get_render_state()
         max_sprites = state.width * state.height
         self.sprites = [arcade.Sprite() for _ in range(max_sprites)]
 
@@ -518,6 +238,24 @@ class GameRenderer(arcade.Window):
 
         self.player_sprite_list.extend(self.player_sprites)
 
+        # Monster sprite pool
+        self.monster_sprite_list = arcade.SpriteList()
+        self.monster_sprite_list.initialize()
+        self.monster_sprite_list.preload_textures(self.monster_textures.values())
+        self.monster_sprites = []
+
+        for monster in state.monsters:
+            sprite = MonsterSprite(
+                entity_type=monster.entity_type,
+                monster_textures=self.monster_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height
+            )
+            self.monster_sprites.append(sprite)
+
+        self.monster_sprite_list.extend(self.monster_sprites)
+
         # Performance graph
         arcade.enable_timings()
 
@@ -546,7 +284,7 @@ class GameRenderer(arcade.Window):
 
     def on_update(self, delta_time):
         """Poll server and update tilemap"""
-        state = self.server.get_game_state()
+        state = self.server.get_render_state()
 
         # Update background tiles
         for i in range(state.height * state.width):
@@ -575,6 +313,10 @@ class GameRenderer(arcade.Window):
                 texture = self.vertical_tile_pair_to_texture.get((top_tile, bottom_tile), self.transparent_texture)
                 self.vertical_transition_sprites[i].texture = texture
 
+        # Update monsters
+        for i, monster in enumerate(state.monsters):
+            self.monster_sprites[i].update_from_entity(monster, delta_time)
+
         # Update players
         for i, player in enumerate(state.players):
             self.player_sprites[i].update_from_entity(player, delta_time)
@@ -585,6 +327,7 @@ class GameRenderer(arcade.Window):
         self.background_tile_sprite_list.draw(pixelated=True)
         self.vertical_transition_sprite_list.draw(pixelated=True)
         self.horizontal_transition_sprite_list.draw(pixelated=True)
+        self.monster_sprite_list.draw(pixelated=True)
         self.player_sprite_list.draw(pixelated=True)
         self.perf_graph_list.draw()
 
@@ -595,7 +338,7 @@ class GameRenderer(arcade.Window):
 
 def main():
     server = MockServer()
-    state = server.get_game_state()
+    state = server.get_render_state()
     print(f"Loaded map: {state.width}x{state.height}")
     print(f"Sprites: {SPRITES_PATH}")
 

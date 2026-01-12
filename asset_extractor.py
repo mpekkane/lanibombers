@@ -444,73 +444,73 @@ SPRITE_DEFS = [
     (14, 8, 10, 10, 0, 0, 'alien_down_3'),
     (15, 8, 10, 10, 0, 0, 'alien_down_4'),
 
-    # Row 18
-    (0, 18, 10, 10, 0, 0, 'player1_dig_right_1'),
-    (1, 18, 10, 10, 0, 0, 'player1_dig_right_2'),
-    (2, 18, 10, 10, 0, 0, 'player1_dig_right_3'),
-    (3, 18, 10, 10, 0, 0, 'player1_dig_right_4'),
-    (4, 18, 10, 10, 0, 0, 'player1_dig_left_1'),
-    (5, 18, 10, 10, 0, 0, 'player1_dig_left_2'),
-    (6, 18, 10, 10, 0, 0, 'player1_dig_left_3'),
-    (7, 18, 10, 10, 0, 0, 'player1_dig_left_4'),
-    (8, 18, 10, 10, 0, 0, 'player1_dig_up_1'),
-    (9, 18, 10, 10, 0, 0, 'player1_dig_up_2'),
-    (10, 18, 10, 10, 0, 0, 'player1_dig_up_3'),
-    (11, 18, 10, 10, 0, 0, 'player1_dig_up_4'),
-    (12, 18, 10, 10, 0, 0, 'player1_dig_down_1'),
-    (13, 18, 10, 10, 0, 0, 'player1_dig_down_2'),
-    (14, 18, 10, 10, 0, 0, 'player1_dig_down_3'),
-    (15, 18, 10, 10, 0, 0, 'player1_dig_down_4'),
-    (16, 18, 10, 10, 0, 0, 'player2_dig_right_1'),
-    (17, 18, 10, 10, 0, 0, 'player2_dig_right_2'),
-    (18, 18, 10, 10, 0, 0, 'player2_dig_right_3'),
-    (19, 18, 10, 10, 0, 0, 'player2_dig_right_4'),
-    (20, 18, 10, 10, 0, 0, 'player2_dig_left_1'),
-    (21, 18, 10, 10, 0, 0, 'player2_dig_left_2'),
-    (22, 18, 10, 10, 0, 0, 'player2_dig_left_3'),
-    (23, 18, 10, 10, 0, 0, 'player2_dig_left_4'),
-    (24, 18, 10, 10, 0, 0, 'player2_dig_up_1'),
-    (25, 18, 10, 10, 0, 0, 'player2_dig_up_2'),
-    (26, 18, 10, 10, 0, 0, 'player2_dig_up_3'),
-    (27, 18, 10, 10, 0, 0, 'player2_dig_up_4'),
-    (28, 18, 10, 10, 0, 0, 'player2_dig_down_1'),
-    (29, 18, 10, 10, 0, 0, 'player2_dig_down_2'),
-    (30, 18, 10, 10, 0, 0, 'player2_dig_down_3'),
-    (31, 18, 10, 10, 0, 0, 'player2_dig_down_4'),
+    # diggins sprites
+    (0, 0, 10, 10, 0, 200, 'player1_dig_right_1'),
+    (1, 0, 10, 10, 0, 200, 'player1_dig_right_2'),
+    (2, 0, 10, 10, 0, 200, 'player1_dig_right_3'),
+    (3, 0, 10, 10, 0, 200, 'player1_dig_right_4'),
+    (4, 0, 10, 10, 0, 200, 'player1_dig_left_1'),
+    (5, 0, 10, 10, 0, 200, 'player1_dig_left_2'),
+    (6, 0, 10, 10, 0, 200, 'player1_dig_left_3'),
+    (7, 0, 10, 10, 0, 200, 'player1_dig_left_4'),
+    (8, 0, 10, 10, 0, 200, 'player1_dig_up_1'),
+    (9, 0, 10, 10, 0, 200, 'player1_dig_up_2'),
+    (10, 0, 10, 10, 0, 200, 'player1_dig_up_3'),
+    (11, 0, 10, 10, 0, 200, 'player1_dig_up_4'),
+    (12, 0, 10, 10, 0, 200, 'player1_dig_down_1'),
+    (13, 0, 10, 10, 0, 200, 'player1_dig_down_2'),
+    (14, 0, 10, 10, 0, 200, 'player1_dig_down_3'),
+    (15, 0, 10, 10, 0, 200, 'player1_dig_down_4'),
+    (16, 0, 10, 10, 0, 200, 'player2_dig_right_1'),
+    (17, 0, 10, 10, 0, 200, 'player2_dig_right_2'),
+    (18, 0, 10, 10, 0, 200, 'player2_dig_right_3'),
+    (19, 0, 10, 10, 0, 200, 'player2_dig_right_4'),
+    (20, 0, 10, 10, 0, 200, 'player2_dig_left_1'),
+    (21, 0, 10, 10, 0, 200, 'player2_dig_left_2'),
+    (22, 0, 10, 10, 0, 200, 'player2_dig_left_3'),
+    (23, 0, 10, 10, 0, 200, 'player2_dig_left_4'),
+    (24, 0, 10, 10, 0, 200, 'player2_dig_up_1'),
+    (25, 0, 10, 10, 0, 200, 'player2_dig_up_2'),
+    (26, 0, 10, 10, 0, 200, 'player2_dig_up_3'),
+    (27, 0, 10, 10, 0, 200, 'player2_dig_up_4'),
+    (28, 0, 10, 10, 0, 200, 'player2_dig_down_1'),
+    (29, 0, 10, 10, 0, 200, 'player2_dig_down_2'),
+    (30, 0, 10, 10, 0, 200, 'player2_dig_down_3'),
+    (31, 0, 10, 10, 0, 200, 'player2_dig_down_4'),
 
     # Row 19
-    (0, 19, 10, 10, 0, 0, 'player3_dig_right_1'),
-    (1, 19, 10, 10, 0, 0, 'player3_dig_right_2'),
-    (2, 19, 10, 10, 0, 0, 'player3_dig_right_3'),
-    (3, 19, 10, 10, 0, 0, 'player3_dig_right_4'),
-    (4, 19, 10, 10, 0, 0, 'player3_dig_left_1'),
-    (5, 19, 10, 10, 0, 0, 'player3_dig_left_2'),
-    (6, 19, 10, 10, 0, 0, 'player3_dig_left_3'),
-    (7, 19, 10, 10, 0, 0, 'player3_dig_left_4'),
-    (8, 19, 10, 10, 0, 0, 'player3_dig_up_1'),
-    (9, 19, 10, 10, 0, 0, 'player3_dig_up_2'),
-    (10, 19, 10, 10, 0, 0, 'player3_dig_up_3'),
-    (11, 19, 10, 10, 0, 0, 'player3_dig_up_4'),
-    (12, 19, 10, 10, 0, 0, 'player3_dig_down_1'),
-    (13, 19, 10, 10, 0, 0, 'player3_dig_down_2'),
-    (14, 19, 10, 10, 0, 0, 'player3_dig_down_3'),
-    (15, 19, 10, 10, 0, 0, 'player3_dig_down_4'),
-    (16, 19, 10, 10, 0, 0, 'player4_dig_right_1'),
-    (17, 19, 10, 10, 0, 0, 'player4_dig_right_2'),
-    (18, 19, 10, 10, 0, 0, 'player4_dig_right_3'),
-    (19, 19, 10, 10, 0, 0, 'player4_dig_right_4'),
-    (20, 19, 10, 10, 0, 0, 'player4_dig_left_1'),
-    (21, 19, 10, 10, 0, 0, 'player4_dig_left_2'),
-    (22, 19, 10, 10, 0, 0, 'player4_dig_left_3'),
-    (23, 19, 10, 10, 0, 0, 'player4_dig_left_4'),
-    (24, 19, 10, 10, 0, 0, 'player4_dig_up_1'),
-    (25, 19, 10, 10, 0, 0, 'player4_dig_up_2'),
-    (26, 19, 10, 10, 0, 0, 'player4_dig_up_3'),
-    (27, 19, 10, 10, 0, 0, 'player4_dig_up_4'),
-    (28, 19, 10, 10, 0, 0, 'player4_dig_down_1'),
-    (29, 19, 10, 10, 0, 0, 'player4_dig_down_2'),
-    (30, 19, 10, 10, 0, 0, 'player4_dig_down_3'),
-    (31, 19, 10, 10, 0, 0, 'player4_dig_down_4'),
+    (0, 0, 10, 10, 0, 200, 'player3_dig_right_1'),
+    (1, 0, 10, 10, 0, 200, 'player3_dig_right_2'),
+    (2, 0, 10, 10, 0, 200, 'player3_dig_right_3'),
+    (3, 0, 10, 10, 0, 200, 'player3_dig_right_4'),
+    (4, 0, 10, 10, 0, 200, 'player3_dig_left_1'),
+    (5, 0, 10, 10, 0, 200, 'player3_dig_left_2'),
+    (6, 0, 10, 10, 0, 200, 'player3_dig_left_3'),
+    (7, 0, 10, 10, 0, 200, 'player3_dig_left_4'),
+    (8, 0, 10, 10, 0, 200, 'player3_dig_up_1'),
+    (9, 0, 10, 10, 0, 200, 'player3_dig_up_2'),
+    (10, 0, 10, 10, 0, 200, 'player3_dig_up_3'),
+    (11, 0, 10, 10, 0, 200, 'player3_dig_up_4'),
+    (12, 0, 10, 10, 0, 200, 'player3_dig_down_1'),
+    (13, 0, 10, 10, 0, 200, 'player3_dig_down_2'),
+    (14, 0, 10, 10, 0, 200, 'player3_dig_down_3'),
+    (15, 0, 10, 10, 0, 200, 'player3_dig_down_4'),
+    (16, 0, 10, 10, 0, 200, 'player4_dig_right_1'),
+    (17, 0, 10, 10, 0, 200, 'player4_dig_right_2'),
+    (18, 0, 10, 10, 0, 200, 'player4_dig_right_3'),
+    (19, 0, 10, 10, 0, 200, 'player4_dig_right_4'),
+    (20, 0, 10, 10, 0, 200, 'player4_dig_left_1'),
+    (21, 0, 10, 10, 0, 200, 'player4_dig_left_2'),
+    (22, 0, 10, 10, 0, 200, 'player4_dig_left_3'),
+    (23, 0, 10, 10, 0, 200, 'player4_dig_left_4'),
+    (24, 0, 10, 10, 0, 200, 'player4_dig_up_1'),
+    (25, 0, 10, 10, 0, 200, 'player4_dig_up_2'),
+    (26, 0, 10, 10, 0, 200, 'player4_dig_up_3'),
+    (27, 0, 10, 10, 0, 200, 'player4_dig_up_4'),
+    (28, 0, 10, 10, 0, 200, 'player4_dig_down_1'),
+    (29, 0, 10, 10, 0, 200, 'player4_dig_down_2'),
+    (30, 0, 10, 10, 0, 200, 'player4_dig_down_3'),
+    (31, 0, 10, 10, 0, 200, 'player4_dig_down_4'),
 
     # tile transition sprites
     (0 , 0, 4, 10, 148, 60, 'transition_horizontal_empty_bedrock'),
@@ -543,6 +543,105 @@ SPRITE_PADDING_DEFS = [
     ('transition_vertical_empty_dirt', 10, 6, 'top'),
     ('transition_vertical_dirt_empty', 10, 6, 'bottom'),
 ]
+
+
+# Background color to make transparent (brown)
+SPRITE_BACKGROUND_COLOR = (75, 43, 0)
+
+# Sprites that need background color removed
+SPRITES_WITH_BACKGROUND = [
+    # Player 1
+    'player1_right_1', 'player1_right_2', 'player1_right_3', 'player1_right_4',
+    'player1_left_1', 'player1_left_2', 'player1_left_3', 'player1_left_4',
+    'player1_up_1', 'player1_up_2', 'player1_up_3', 'player1_up_4',
+    'player1_down_1', 'player1_down_2', 'player1_down_3', 'player1_down_4',
+    'player1_dig_right_1', 'player1_dig_right_2', 'player1_dig_right_3', 'player1_dig_right_4',
+    'player1_dig_left_1', 'player1_dig_left_2', 'player1_dig_left_3', 'player1_dig_left_4',
+    'player1_dig_up_1', 'player1_dig_up_2', 'player1_dig_up_3', 'player1_dig_up_4',
+    'player1_dig_down_1', 'player1_dig_down_2', 'player1_dig_down_3', 'player1_dig_down_4',
+    # Player 2
+    'player2_right_1', 'player2_right_2', 'player2_right_3', 'player2_right_4',
+    'player2_left_1', 'player2_left_2', 'player2_left_3', 'player2_left_4',
+    'player2_up_1', 'player2_up_2', 'player2_up_3', 'player2_up_4',
+    'player2_down_1', 'player2_down_2', 'player2_down_3', 'player2_down_4',
+    'player2_dig_right_1', 'player2_dig_right_2', 'player2_dig_right_3', 'player2_dig_right_4',
+    'player2_dig_left_1', 'player2_dig_left_2', 'player2_dig_left_3', 'player2_dig_left_4',
+    'player2_dig_up_1', 'player2_dig_up_2', 'player2_dig_up_3', 'player2_dig_up_4',
+    'player2_dig_down_1', 'player2_dig_down_2', 'player2_dig_down_3', 'player2_dig_down_4',
+    # Player 3
+    'player3_right_1', 'player3_right_2', 'player3_right_3', 'player3_right_4',
+    'player3_left_1', 'player3_left_2', 'player3_left_3', 'player3_left_4',
+    'player3_up_1', 'player3_up_2', 'player3_up_3', 'player3_up_4',
+    'player3_down_1', 'player3_down_2', 'player3_down_3', 'player3_down_4',
+    'player3_dig_right_1', 'player3_dig_right_2', 'player3_dig_right_3', 'player3_dig_right_4',
+    'player3_dig_left_1', 'player3_dig_left_2', 'player3_dig_left_3', 'player3_dig_left_4',
+    'player3_dig_up_1', 'player3_dig_up_2', 'player3_dig_up_3', 'player3_dig_up_4',
+    'player3_dig_down_1', 'player3_dig_down_2', 'player3_dig_down_3', 'player3_dig_down_4',
+    # Player 4
+    'player4_right_1', 'player4_right_2', 'player4_right_3', 'player4_right_4',
+    'player4_left_1', 'player4_left_2', 'player4_left_3', 'player4_left_4',
+    'player4_up_1', 'player4_up_2', 'player4_up_3', 'player4_up_4',
+    'player4_down_1', 'player4_down_2', 'player4_down_3', 'player4_down_4',
+    'player4_dig_right_1', 'player4_dig_right_2', 'player4_dig_right_3', 'player4_dig_right_4',
+    'player4_dig_left_1', 'player4_dig_left_2', 'player4_dig_left_3', 'player4_dig_left_4',
+    'player4_dig_up_1', 'player4_dig_up_2', 'player4_dig_up_3', 'player4_dig_up_4',
+    'player4_dig_down_1', 'player4_dig_down_2', 'player4_dig_down_3', 'player4_dig_down_4',
+    # Monsters
+    'furryman_right_1', 'furryman_right_2', 'furryman_right_3', 'furryman_right_4',
+    'furryman_left_1', 'furryman_left_2', 'furryman_left_3', 'furryman_left_4',
+    'furryman_up_1', 'furryman_up_2', 'furryman_up_3', 'furryman_up_4',
+    'furryman_down_1', 'furryman_down_2', 'furryman_down_3', 'furryman_down_4',
+    'slime_right_1', 'slime_right_2', 'slime_right_3', 'slime_right_4',
+    'slime_left_1', 'slime_left_2', 'slime_left_3', 'slime_left_4',
+    'slime_up_1', 'slime_up_2', 'slime_up_3', 'slime_up_4',
+    'slime_down_1', 'slime_down_2', 'slime_down_3', 'slime_down_4',
+    'alien_right_1', 'alien_right_2', 'alien_right_3', 'alien_right_4',
+    'alien_left_1', 'alien_left_2', 'alien_left_3', 'alien_left_4',
+    'alien_up_1', 'alien_up_2', 'alien_up_3', 'alien_up_4',
+    'alien_down_1', 'alien_down_2', 'alien_down_3', 'alien_down_4',
+    'grenademonster_right_1', 'grenademonster_right_2', 'grenademonster_right_3', 'grenademonster_right_4',
+    'grenademonster_left_1', 'grenademonster_left_2', 'grenademonster_left_3', 'grenademonster_left_4',
+    'grenademonster_up_1', 'grenademonster_up_2', 'grenademonster_up_3', 'grenademonster_up_4',
+    'grenademonster_down_1', 'grenademonster_down_2', 'grenademonster_down_3', 'grenademonster_down_4',
+]
+
+
+def remove_background_color(output_base):
+    """Remove background color from sprites and make it transparent.
+
+    Reads saved sprite files from disk, replaces the background color with
+    transparency, and overwrites them.
+    """
+    sprites_dir = os.path.join(output_base, 'sprites')
+
+    if not os.path.exists(sprites_dir):
+        return 0
+
+    count = 0
+    for name in SPRITES_WITH_BACKGROUND:
+        sprite_path = os.path.join(sprites_dir, f"{name}.png")
+
+        if not os.path.exists(sprite_path):
+            continue
+
+        sprite = Image.open(sprite_path)
+        sprite_rgba = sprite.convert('RGBA')
+        pixels = sprite_rgba.load()
+
+        width, height = sprite_rgba.size
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = pixels[x, y]
+                if (r, g, b) == SPRITE_BACKGROUND_COLOR:
+                    pixels[x, y] = (0, 0, 0, 0)
+
+        sprite_rgba.save(sprite_path)
+        count += 1
+
+    if count > 0:
+        print(f"  Removed background from {count} sprites")
+
+    return count
 
 
 def pad_sprites(output_base):
@@ -722,6 +821,7 @@ def main():
     stats = extract_assets(zip_path, output_base)
     sprite_count = split_sprites(output_base)
     padded_count = pad_sprites(output_base)
+    bg_removed_count = remove_background_color(output_base)
 
     print(f"\nExtraction complete!")
     print(f"  Graphics: {stats['graphics']}")
