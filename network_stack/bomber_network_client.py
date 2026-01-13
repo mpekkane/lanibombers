@@ -26,6 +26,7 @@ class BomberNetworkClient:
     def __init__(self, cfg_path: str) -> None:
         "Init class, read config from YAML"
         self.config = ConfigReader(cfg_path)
+        self.base_addr = self.config.get_config_mandatory("base_addr", str)
         self.subnet = self.config.get_config("subnet", int)
         self.port = self.config.get_config("port", int)
         self.host = self.config.get_config("host", int)
@@ -40,7 +41,7 @@ class BomberNetworkClient:
 
     def find_host(self) -> bool:
         scanner = get_scanner(
-            self.protocol, self.subnet, self.port, self.host, self.timeout
+            self.protocol, self.base_addr, self.subnet, self.port, self.host, self.timeout
         )
         servers = scanner.scan()
         for i, s in enumerate(servers):

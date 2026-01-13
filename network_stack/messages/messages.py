@@ -3,19 +3,26 @@ Container for the game messaging.
 This file contains all the network message definitions (subclasses of Message),
 and handles registry of the message types, encoding and decoding.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, Dict, Type, Iterable
 import struct
+import time
 
 
 class Message:
     """Abstract class for message objects"""
+
+    def __init__(self) -> None:
+        self.timestamp = time.time_ns()
+
     TYPE: ClassVar[int] = -1  # override
+    timestamp: int
 
     def to_bytes(self) -> bytes: ...
     @classmethod
-    def from_bytes(cls, payload: bytes) -> "Message": ...
+    def from_bytes(cls, payload: bytes) -> Message: ...
 
 
 # This is intentionally global
@@ -42,9 +49,14 @@ def encode_message(msg: Message) -> bytes:
       N bytes: payload
     """
     t = msg.TYPE
+    stamp = getattr(msg, "timestamp", None)
+    if stamp is None:
+        stamp = time.time_ns()
+        object.__setattr__(msg, "timestamp", stamp)
+    stamp = msg.timestamp.to_bytes(8, "big")  # 64 bits, 8 bytes
     if not (0 <= t <= 255):
         raise ValueError(f"TYPE must be 0..255, got {t}")
-    return bytes([t]) + msg.to_bytes()
+    return bytes([t]) + stamp + msg.to_bytes()
 
 
 def decode_message(frame: bytes) -> Message:
@@ -52,17 +64,21 @@ def decode_message(frame: bytes) -> Message:
     if len(frame) < 1:
         raise ValueError("Empty frame")
     t = frame[0]
-    payload = frame[1:]
+    stamp = int.from_bytes(frame[1:9], "big")
+    payload = frame[9:]
     cls = _REGISTRY.get(t)
     if cls is None:
         raise ValueError(f"Unknown message TYPE={t}")
-    return cls.from_bytes(payload)
+    msg = cls.from_bytes(payload)
+    object.__setattr__(msg, "timestamp", stamp)
+    return msg
 
 
 @register_message
 @dataclass(frozen=True)
 class Name(Message):
     """This is demo message, TO BE REMOVED"""
+
     TYPE: ClassVar[int] = 1
     name: str
 
@@ -71,13 +87,14 @@ class Name(Message):
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> Name:
-        return cls(payload.decode("utf-8", errors="replace"))
+        return cls(name=payload.decode("utf-8", errors="replace"))
 
 
 @register_message
 @dataclass(frozen=True)
 class ChatText(Message):
     """This is demo message, TO BE REMOVED"""
+
     TYPE: ClassVar[int] = 2
     text: str
 
@@ -86,13 +103,15 @@ class ChatText(Message):
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> ChatText:
-        return cls(payload.decode("utf-8", errors="replace"))
+        obj = cls(payload.decode("utf-8", errors="replace"))
+        return obj
 
 
 @register_message
 @dataclass(frozen=True)
 class RawBytes(Message):
     """This is test type message, TO BE REMOVED"""
+
     TYPE: ClassVar[int] = 3
     data: bytes
 
@@ -101,7 +120,8 @@ class RawBytes(Message):
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> RawBytes:
-        return cls(payload)
+        obj = cls(payload)
+        return obj
 
 
 @register_message
@@ -111,6 +131,7 @@ class Discover(Message):
     This is UDP discovery signal from client to look for servers.
     UDP scanner sends this and waits Announce reply from the server.
     """
+
     TYPE: ClassVar[int] = 4
 
     def to_bytes(self) -> bytes:
@@ -118,7 +139,8 @@ class Discover(Message):
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> RawBytes:
-        return cls()
+        obj = cls()
+        return obj
 
 
 _MAGIC = b"BMBR"
@@ -132,6 +154,7 @@ class Announce(Message):
     This is UDP server reply signal to the client
     UDP scanner sends this as the reply to Discovery query.
     """
+
     TYPE: ClassVar[int] = 5
     port: int
     name: str
@@ -164,6 +187,47 @@ class Announce(Message):
         if len(payload) != 8 + name_len:
             raise ValueError("Announce name length mismatch")
 
-        name_b = payload[8:8 + name_len]
+        name_b = payload[8 : 8 + name_len]
         name = name_b.decode("utf-8", errors="strict")
         return cls(port=port, name=name)
+
+
+@register_message
+@dataclass(frozen=True)
+class Ping(Message):
+    """
+    Network Ping test
+    """
+
+    TYPE: ClassVar[int] = 6
+    UUID: str
+
+    def to_bytes(self) -> bytes:
+        return self.UUID.encode("utf-8")
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> Ping:
+        obj = cls(UUID=payload.decode("utf-8", errors="replace"))
+        return obj
+
+
+@register_message
+@dataclass(frozen=True)
+class Pong(Message):
+    """
+    Network Pong test
+    """
+
+    TYPE: ClassVar[int] = 7
+    ping_UUID: str
+    received: int
+
+    def to_bytes(self) -> bytes:
+        return self.received.to_bytes(8, "big") + self.ping_UUID.encode("utf-8")
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> Pong:
+        received = int.from_bytes(payload[0:8], "big")
+        ping_UUID = payload[8:].decode("utf-8", errors="replace")
+        obj = cls(ping_UUID=ping_UUID, received=received)
+        return obj

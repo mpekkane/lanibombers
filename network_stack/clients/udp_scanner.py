@@ -13,14 +13,20 @@ from network_stack.messages.messages import Message, Discover, Announce
 from network_stack.clients.transport_scanner import TransportScanner
 
 
-def _local_broadcast_addr(subnet: int) -> str:
-    return f"192.168.{subnet}.255"
+def _local_broadcast_addr(base_addr: str, subnet: int) -> str:
+    return f"{base_addr}.{subnet}.255"
 
 
 class UDPScanner(TransportScanner):
+
     def __init__(
-        self, subnet: Optional[int], port: int, timeout_s: Optional[float] = 1.0
+        self,
+        base_addr: str,
+        subnet: Optional[int],
+        port: int,
+        timeout_s: Optional[float] = 1.0,
     ) -> None:
+        self.base_addr = base_addr
         self.subnet = subnet
         self.port = port
         self.timeout_s = timeout_s
@@ -33,7 +39,7 @@ class UDPScanner(TransportScanner):
             # fallback: global broadcast; may be blocked on some LANs
             bcast = "255.255.255.255"
         else:
-            bcast = _local_broadcast_addr(self.subnet)
+            bcast = _local_broadcast_addr(self.base_addr, self.subnet)
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         try:

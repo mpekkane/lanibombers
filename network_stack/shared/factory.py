@@ -53,6 +53,7 @@ def get_client(
 
 def get_scanner(
     protocol: str,
+    base_addr: str,
     subnet: Optional[int],
     port: Optional[int],
     host: Optional[int],
@@ -60,7 +61,7 @@ def get_scanner(
 ) -> TransportScanner:
     if protocol == "udp":
         assert port, "UDP scanning required a known port"
-        return UDPScanner(subnet, port, timeout)
+        return UDPScanner(base_addr, subnet, port, timeout)
     if protocol == "tcp":
-        return TCPScanner(subnet, port, host)
+        return TCPScanner(base_addr, subnet, port, host)
     raise ValueError(protocol)

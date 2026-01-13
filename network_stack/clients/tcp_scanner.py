@@ -16,16 +16,17 @@ from network_stack.clients.transport_scanner import TransportScanner
 
 
 class TCPScanner(TransportScanner):
-    def __init__(self, subnet: Optional[int], port: Optional[int], host: Optional[int]) -> None:
+    def __init__(self, base_addr: str, subnet: Optional[int], port: Optional[int], host: Optional[int]) -> None:
+        self.base_addr = base_addr
         self.scan_subnets = False
         self.scan_ports = False
-        if subnet:
+        if subnet is not None:
             self.subnet = subnet
         else:
             self.subnet = -1
             self.scan_subnets = True
             print("WARNING: missing subnet config")
-        if port:
+        if port is not None:
             self.port = port
         else:
             self.port = -1
@@ -37,7 +38,7 @@ class TCPScanner(TransportScanner):
             self.host = -1
 
     def _scan_port(self, ip: int, port: int) -> Tuple[bool, str, int]:
-        tgt = f"192.168.{self.subnet}.{ip}"
+        tgt = f"{self.base_addr}.{self.subnet}.{ip}"
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(1)

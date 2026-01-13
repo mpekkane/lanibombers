@@ -1,6 +1,7 @@
 ---
-  subnet: 101
+  base_addr: "127.0"
+  subnet: 0
   port: 8888
   host: 104
-  protocol: "udp"
+  protocol: "tcp"
   timeout: 10.0
