@@ -5,11 +5,11 @@ and handles registry of the message types, encoding and decoding.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import ClassVar, Dict, Type, Iterable
-import struct
 import time
-
+import struct
+from dataclasses import dataclass
+from typing import ClassVar, Dict, Type, Iterable, List, Union
+from game_engine.agent_state import Action
 
 class Message:
     """Abstract class for message objects"""
@@ -231,3 +231,30 @@ class Pong(Message):
         ping_UUID = payload[8:].decode("utf-8", errors="replace")
         obj = cls(ping_UUID=ping_UUID, received=received)
         return obj
+
+
+@register_message
+@dataclass(frozen=True)
+class ClientControl(Message):
+    """
+    Client control msg
+    """
+
+    TYPE: ClassVar[int] = 8
+    commands: List[Action]
+
+    def to_bytes(self) -> bytes:
+        data = bytes()
+        for cmd in self.commands:
+            data += int(cmd).to_bytes(1, "big")
+        return data
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ClientControl:
+        cmd: List[Action] = []
+        l = len(payload)
+        for i in range(l):
+            byte = payload[i]
+            action = Action(byte)
+            cmd.append(action)
+        return cls(cmd)

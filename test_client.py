@@ -4,12 +4,24 @@ Test code for client-side
 
 import time
 from argparse import ArgumentParser
-from network_stack.messages.messages import ChatText, Ping, Pong
+from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl
+from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
+from pynput import keyboard
+from common.config_reader import ConfigReader
 
 
 class BomberClient:
-    def __init__(self, cfg_path: str) -> None:
+    def __init__(self, cfg_path: str, key_path: str) -> None:
+        # TODO: how to map
+        config = ConfigReader(key_path)
+        self.up = config.get_config_mandatory("up")
+        self.down = config.get_config_mandatory("down")
+        self.left = config.get_config_mandatory("left")
+        self.right = config.get_config_mandatory("right")
+        self.fire = config.get_config_mandatory("fire")
+        self.stop = config.get_config_mandatory("stop")
+
         self.client = BomberNetworkClient(cfg_path)
         server_found = self.client.find_host()
         if not server_found:
@@ -21,12 +33,12 @@ class BomberClient:
 
     def start(self) -> None:
         self.client.start()
-        name = input("Name: ")
-        self.client.set_name(name)
-        while True:
-            msg = input(": ")
-            self.client.send(ChatText(msg))
-            time.sleep(0.1)
+        # name = input("Name: ")
+        # self.client.set_name(name)
+
+        # Create and start the listener
+        with keyboard.Listener(on_press=self.on_press) as listener:
+            listener.join()
 
     def on_chattxt(self, msg: ChatText):
         print(f"{msg.timestamp}: {msg.text}")
@@ -36,13 +48,35 @@ class BomberClient:
         pong = Pong(ping_UUID=msg.UUID, received=received)
         self.client.send(pong)
 
+    def on_press(self, key: keyboard.Key):
+        # FIXME: test with static keys, fix to key_config.yaml
+        if key == keyboard.Key.space:
+            action = Action.FIRE
+        elif key == keyboard.Key.ctrl_r:
+            action = Action.STOP
+        elif key == keyboard.Key.up:
+            action = Action.UP
+        elif key == keyboard.Key.down:
+            action = Action.DOWN
+        elif key == keyboard.Key.left:
+            action = Action.LEFT
+        elif key == keyboard.Key.right:
+            action = Action.RIGHT
+        else:
+            action = None
+        if action:
+            self.client.send(ClientControl([int(action)]))
+
 
 def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/client_config.yaml")
+    parser.add_argument("--key_cfg", "-k", type=str, default="cfg/key_map.yaml")
     args = parser.parse_args()
     cfg_path = args.cfg
-    client = BomberClient(cfg_path)
+    key_path = args.key_cfg
+
+    client = BomberClient(cfg_path, key_path)
     client.start()
 
 

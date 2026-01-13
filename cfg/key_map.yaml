@@ -1,0 +1,7 @@
+---
+  up: KEY.up
+  down: KEY.down
+  left: KEY.left
+  right: KEY.right
+  fire: KEY.space
+  stop: KEY.ctrl_r
