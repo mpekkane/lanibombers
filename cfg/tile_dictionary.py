@@ -1,4 +1,4 @@
-from game_engine.entities import Direction, EntityType
+from game_engine.entities import Direction, EntityType, TreasureType, ToolType
 
 
 # Tile names grouped by type
@@ -92,6 +92,18 @@ TILE_DICTIONARY = {
     180: 'doorswitch_red',
 }
 
+# Tile ID groupings by type
+BEDROCK_TILES = {55, 56, 57, 65, 67, 68, 69, 70}
+DIRT_TILES = {50, 51, 52, 53, 54}  # Includes gravel
+CONCRETE_TILES = {49}
+URETHANE_TILES = {155}
+BIOSLIME_TILES = {111}
+BOULDER_TILES = {66, 112, 113}
+BRICKS_TILES = {172}
+SWITCH_TILES = {180}
+SECURITY_DOOR_TILES = {108}
+TUNNEL_TILES = {156}
+
 # Get the tile ID for 'empty' from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
 
@@ -114,4 +126,25 @@ MONSTER_SPAWN_TILES = {
     84: (EntityType.ALIEN, Direction.LEFT),
     85: (EntityType.ALIEN, Direction.UP),
     86: (EntityType.ALIEN, Direction.DOWN),
+}
+
+# Treasure tile definitions
+TREASURE_TILES = {
+    146: TreasureType.GOLD_SHIELD,
+    147: TreasureType.GOLD_EGG,
+    148: TreasureType.GOLD_COINS,
+    149: TreasureType.GOLD_BRACELET,
+    150: TreasureType.GOLD_BAR,
+    151: TreasureType.GOLD_CROSS,
+    152: TreasureType.GOLD_SCEPTRE,
+    153: TreasureType.GOLD_RUBY,
+    154: TreasureType.GOLD_CROWN,
+}
+
+# Tool tile definitions
+TOOL_TILES = {
+    143: ToolType.SMALL_PICK,
+    144: ToolType.BIG_PICK,
+    145: ToolType.DRILL,
+    109: ToolType.MEDPACK,
 }

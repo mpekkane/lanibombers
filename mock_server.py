@@ -154,5 +154,7 @@ class MockServer:
             height=self.height,
             tilemap=self.grid,
             players=self.players,
-            monsters=self.monsters
+            monsters=self.monsters,
+            pickups=[],
+            bombs=[]
         )

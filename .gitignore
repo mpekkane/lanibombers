@@ -1,6 +1,8 @@
 assets/
 *.zip
 .claude/
+CLAUDE.md
+tmpclaude-*
 **/__pycache__/
 build/
 dist/

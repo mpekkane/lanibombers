@@ -2,7 +2,7 @@ import array
 from dataclasses import dataclass, field
 from typing import List
 
-from game_engine.entities import DynamicEntity
+from game_engine.entities import DynamicEntity, Pickup, Bomb
 
 
 @dataclass
@@ -13,3 +13,5 @@ class RenderState:
     tilemap: array.array
     players: List[DynamicEntity] = field(default_factory=list)
     monsters: List[DynamicEntity] = field(default_factory=list)
+    pickups: List[Pickup] = field(default_factory=list)
+    bombs: List[Bomb] = field(default_factory=list)
