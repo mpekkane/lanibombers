@@ -23,7 +23,7 @@ class BomberServer:
         self.average_ping: int = -1
         self.ping_count = 0
         self.pong_count = 0
-        self.MAX_PING_BUFFER = 100
+        self.MAX_PING_BUFFER = 1
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:
@@ -37,11 +37,12 @@ class BomberServer:
         self.ping_count += 1
         self.pings[ping.UUID] = ping
 
-        if len(self.pings) > self.MAX_PING_BUFFER:
-            drop_n = self.MAX_PING_BUFFER // 2  # e.g. 50 when MAX=100
-            oldest_keys = sorted(self.pings, key=lambda k: self.pings[k].timestamp)[:drop_n]
-            for k in oldest_keys:
-                self.pings.pop(k, None)
+        if self.MAX_PING_BUFFER > 1:
+            if len(self.pings) > self.MAX_PING_BUFFER:
+                drop_n = self.MAX_PING_BUFFER // 2  # e.g. 50 when MAX=100
+                oldest_keys = sorted(self.pings, key=lambda k: self.pings[k].timestamp)[:drop_n]
+                for k in oldest_keys:
+                    self.pings.pop(k, None)
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
         ctx.name = msg.name
@@ -52,8 +53,23 @@ class BomberServer:
         ctx.broadcast(ChatText(text=f"<{sender}> {msg.text}"), exclude_self=True)
 
     def on_pong(self, msg: Pong, ctx: ClientContext) -> None:
+        received = time.time_ns()
+        version = 3
         ping = self.pings[msg.ping_UUID]
-        dt = msg.received - ping.timestamp
+        # send time
+        if version == 1:
+            dt = msg.received - ping.timestamp
+        # receive time
+        elif version == 2:
+            dt = received - msg.timestamp
+        # roundtrip
+        elif version == 3:
+            dt = received - ping.timestamp
+        else:
+            dt = 0
+
+        if self.MAX_PING_BUFFER == 1:
+            self.pings.pop(msg.ping_UUID, None)
 
         self.pong_count += 1
 
