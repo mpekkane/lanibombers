@@ -1,7 +1,17 @@
 ---
-  base_addr: "127.0"
-  subnet: 0
+  # aalto
+  #########
+  #base_addr: "127.0"
+  #subnet: 0
+  #port: 8888
+  #host: 104
+  #########
+  # koti
+  #########
+  base_addr: "192.168"
+  subnet: 101
   port: 8888
-  host: 104
+  host: 119
+
   protocol: "tcp"
   timeout: 10.0

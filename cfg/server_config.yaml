@@ -1,3 +1,4 @@
 ---
   port: 8888
   protocol: "tcp"
+  sprites_path: "assets/sprites"
