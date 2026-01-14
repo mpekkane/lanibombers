@@ -1,6 +1,3 @@
-from game_engine.entities import Direction, EntityType, TreasureType, ToolType
-
-
 # Tile names grouped by type
 EMPTY_TILE_NAMES = {
     'empty',
@@ -107,44 +104,43 @@ TUNNEL_TILES = {156}
 # Get the tile ID for 'empty' from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
 
-# Monster spawn tile definitions
-# Each monster type has 4 consecutive tile IDs for directions: right, left, up, down
+# Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {
-    71: (EntityType.FURRYMAN, Direction.RIGHT),
-    72: (EntityType.FURRYMAN, Direction.LEFT),
-    73: (EntityType.FURRYMAN, Direction.UP),
-    74: (EntityType.FURRYMAN, Direction.DOWN),
-    75: (EntityType.GRENADEMONSTER, Direction.RIGHT),
-    76: (EntityType.GRENADEMONSTER, Direction.LEFT),
-    77: (EntityType.GRENADEMONSTER, Direction.UP),
-    78: (EntityType.GRENADEMONSTER, Direction.DOWN),
-    79: (EntityType.SLIME, Direction.RIGHT),
-    80: (EntityType.SLIME, Direction.LEFT),
-    81: (EntityType.SLIME, Direction.UP),
-    82: (EntityType.SLIME, Direction.DOWN),
-    83: (EntityType.ALIEN, Direction.RIGHT),
-    84: (EntityType.ALIEN, Direction.LEFT),
-    85: (EntityType.ALIEN, Direction.UP),
-    86: (EntityType.ALIEN, Direction.DOWN),
+    71: ('furryman', 'right'),
+    72: ('furryman', 'left'),
+    73: ('furryman', 'up'),
+    74: ('furryman', 'down'),
+    75: ('grenademonster', 'right'),
+    76: ('grenademonster', 'left'),
+    77: ('grenademonster', 'up'),
+    78: ('grenademonster', 'down'),
+    79: ('slime', 'right'),
+    80: ('slime', 'left'),
+    81: ('slime', 'up'),
+    82: ('slime', 'down'),
+    83: ('alien', 'right'),
+    84: ('alien', 'left'),
+    85: ('alien', 'up'),
+    86: ('alien', 'down'),
 }
 
-# Treasure tile definitions
+# Treasure tile definitions (tile_id -> treasure_type)
 TREASURE_TILES = {
-    146: TreasureType.GOLD_SHIELD,
-    147: TreasureType.GOLD_EGG,
-    148: TreasureType.GOLD_COINS,
-    149: TreasureType.GOLD_BRACELET,
-    150: TreasureType.GOLD_BAR,
-    151: TreasureType.GOLD_CROSS,
-    152: TreasureType.GOLD_SCEPTRE,
-    153: TreasureType.GOLD_RUBY,
-    154: TreasureType.GOLD_CROWN,
+    146: 'gold_shield',
+    147: 'gold_egg',
+    148: 'gold_coins',
+    149: 'gold_bracelet',
+    150: 'gold_bar',
+    151: 'gold_cross',
+    152: 'gold_sceptre',
+    153: 'gold_ruby',
+    154: 'gold_crown',
 }
 
-# Tool tile definitions
+# Tool tile definitions (tile_id -> tool_type)
 TOOL_TILES = {
-    143: ToolType.SMALL_PICK,
-    144: ToolType.BIG_PICK,
-    145: ToolType.DRILL,
-    109: ToolType.MEDPACK,
+    143: 'smallpick',
+    144: 'bigpick',
+    145: 'drill',
+    109: 'medpack',
 }

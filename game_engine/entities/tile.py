@@ -22,7 +22,6 @@ class TileType(Enum):
 @dataclass
 class Tile(GameObject):
     """Static tile in the game world. Position is implicit from array index."""
-    tile_id: int = 0
     tile_type: TileType = TileType.EMPTY
     solid: bool = False
     interactable: bool = False

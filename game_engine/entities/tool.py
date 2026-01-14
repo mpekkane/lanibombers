@@ -28,4 +28,3 @@ class Tool(Pickup):
     def __post_init__(self):
         self.pickup_type = PickupType.TOOL
         self.dig_power = TOOL_DIG_POWER[self.tool_type]
-        self.visual_id = self.tool_type.value

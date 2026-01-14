@@ -13,17 +13,19 @@ from cfg.tile_dictionary import (
     DIRT_TILE_NAMES,
     PLAYER_DEATH_SPRITE,
     MONSTER_DEATH_SPRITE,
+    TREASURE_TILES,
+    TOOL_TILES,
 )
 from game_engine.entities import Direction, EntityType
-from renderer.sprites import PlayerSprite, MonsterSprite
-from mock_server import MockServer
+from game_engine.entities.bomb import BombType
+from renderer.sprites import PlayerSprite, MonsterSprite, PickupSprite, BombSprite
 
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
-SPRITES_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'sprites')
+SPRITES_PATH = os.path.join(os.path.dirname(__file__), '..', 'assets', 'sprites')
 
 TARGET_FPS = 60
 VSYNC = True
@@ -234,7 +236,7 @@ class GameRenderer(arcade.Window):
         for player in state.players:
             sprite = PlayerSprite(
                 sprite_id=player.sprite_id,
-                colour=player.colour,
+                color_variant=player.color,
                 player_textures=self.player_textures,
                 transparent_texture=self.transparent_texture,
                 blood_texture=self.blood_texture,
@@ -264,6 +266,60 @@ class GameRenderer(arcade.Window):
 
         self.monster_sprite_list.extend(self.monster_sprites)
 
+        # Pickup textures: visual_id -> texture (for treasures and tools)
+        self.pickup_textures = {}
+        pickup_tile_ids = set(TREASURE_TILES.keys()) | set(TOOL_TILES.keys())
+        for tile_id in pickup_tile_ids:
+            sprite_name = TILE_DICTIONARY.get(tile_id)
+            if sprite_name:
+                path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
+                self.pickup_textures[tile_id] = arcade.load_texture(path)
+
+        # Pickup sprite list (dynamic length)
+        self.pickup_sprite_list = arcade.SpriteList()
+        self.pickup_sprite_list.initialize()
+        self.pickup_sprite_list.preload_textures(self.pickup_textures.values())
+        self.pickup_sprites = []
+
+        for pickup in state.pickups:
+            sprite = PickupSprite(
+                pickup_textures=self.pickup_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height
+            )
+            sprite.update_from_pickup(pickup)
+            self.pickup_sprites.append(sprite)
+
+        self.pickup_sprite_list.extend(self.pickup_sprites)
+
+        # Bomb textures: (bomb_type, state, frame) -> texture
+        self.bomb_textures = {}
+        # Big bomb (NORMAL type) - active frames 1-3 and defused
+        for frame in range(1, 4):
+            path = os.path.join(SPRITES_PATH, f"bigbomb{frame}.png")
+            self.bomb_textures[(BombType.NORMAL, 'active', frame)] = arcade.load_texture(path)
+        path = os.path.join(SPRITES_PATH, "bigbomb_defused.png")
+        self.bomb_textures[(BombType.NORMAL, 'defused', 0)] = arcade.load_texture(path)
+
+        # Bomb sprite list (dynamic length)
+        self.bomb_sprite_list = arcade.SpriteList()
+        self.bomb_sprite_list.initialize()
+        self.bomb_sprite_list.preload_textures(self.bomb_textures.values())
+        self.bomb_sprites = []
+
+        for bomb in state.bombs:
+            sprite = BombSprite(
+                bomb_textures=self.bomb_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height
+            )
+            sprite.update_from_bomb(bomb)
+            self.bomb_sprites.append(sprite)
+
+        self.bomb_sprite_list.extend(self.bomb_sprites)
+
         # Performance graph
         arcade.enable_timings()
 
@@ -278,16 +334,19 @@ class GameRenderer(arcade.Window):
         # Create the FPS performance graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="FPS")
         graph.position = starting_x, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
         # Create the on_update graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="on_update")
         graph.position = starting_x + step_x, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
         # Create the on_draw graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="on_draw")
         graph.position = starting_x + step_x * 2, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
     def on_update(self, delta_time):
@@ -321,6 +380,53 @@ class GameRenderer(arcade.Window):
                 texture = self.vertical_tile_pair_to_texture.get((top_tile, bottom_tile), self.transparent_texture)
                 self.vertical_transition_sprites[i].texture = texture
 
+        # Update pickups (dynamic list)
+        pickup_count = len(state.pickups)
+        current_count = len(self.pickup_sprites)
+
+        # Add new sprites if needed
+        while len(self.pickup_sprites) < pickup_count:
+            sprite = PickupSprite(
+                pickup_textures=self.pickup_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height
+            )
+            self.pickup_sprites.append(sprite)
+            self.pickup_sprite_list.append(sprite)
+
+        # Remove excess sprites if needed
+        while len(self.pickup_sprites) > pickup_count:
+            sprite = self.pickup_sprites.pop()
+            self.pickup_sprite_list.remove(sprite)
+
+        # Update existing sprites
+        for i, pickup in enumerate(state.pickups):
+            self.pickup_sprites[i].update_from_pickup(pickup)
+
+        # Update bombs (dynamic list)
+        bomb_count = len(state.bombs)
+
+        # Add new sprites if needed
+        while len(self.bomb_sprites) < bomb_count:
+            sprite = BombSprite(
+                bomb_textures=self.bomb_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height
+            )
+            self.bomb_sprites.append(sprite)
+            self.bomb_sprite_list.append(sprite)
+
+        # Remove excess sprites if needed
+        while len(self.bomb_sprites) > bomb_count:
+            sprite = self.bomb_sprites.pop()
+            self.bomb_sprite_list.remove(sprite)
+
+        # Update existing sprites
+        for i, bomb in enumerate(state.bombs):
+            self.bomb_sprites[i].update_from_bomb(bomb)
+
         # Update monsters
         for i, monster in enumerate(state.monsters):
             self.monster_sprites[i].update_from_entity(monster, delta_time)
@@ -335,24 +441,8 @@ class GameRenderer(arcade.Window):
         self.background_tile_sprite_list.draw(pixelated=True)
         self.vertical_transition_sprite_list.draw(pixelated=True)
         self.horizontal_transition_sprite_list.draw(pixelated=True)
+        self.pickup_sprite_list.draw(pixelated=True)
+        self.bomb_sprite_list.draw(pixelated=True)
         self.monster_sprite_list.draw(pixelated=True)
         self.player_sprite_list.draw(pixelated=True)
         self.perf_graph_list.draw()
-
-
-# ============================================================================
-# Main
-# ============================================================================
-
-def main():
-    server = MockServer()
-    state = server.get_render_state()
-    print(f"Loaded map: {state.width}x{state.height}")
-    print(f"Sprites: {SPRITES_PATH}")
-
-    renderer = GameRenderer(server)
-    arcade.run()
-
-
-if __name__ == '__main__':
-    main()

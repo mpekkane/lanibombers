@@ -11,7 +11,7 @@ from cfg.tile_dictionary import (
     BEDROCK_TILES, DIRT_TILES, CONCRETE_TILES, URETHANE_TILES,
     BIOSLIME_TILES, BOULDER_TILES, BRICKS_TILES, SWITCH_TILES, SECURITY_DOOR_TILES, TUNNEL_TILES
 )
-from game_engine.entities import DynamicEntity, Tile, TileType, Treasure, Tool
+from game_engine.entities import DynamicEntity, Direction, EntityType, Tile, TileType, Treasure, TreasureType, Tool, ToolType
 
 
 @dataclass
@@ -60,12 +60,12 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
 
             # Check for monster spawn tile
             if tile_id in MONSTER_SPAWN_TILES:
-                entity_type, direction = MONSTER_SPAWN_TILES[tile_id]
+                entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
                 monster = DynamicEntity(
                     x=float(x),
                     y=float(y),
-                    direction=direction,
-                    entity_type=entity_type,
+                    direction=Direction(direction_str),
+                    entity_type=EntityType(entity_type_str),
                     state='walk'
                 )
                 monsters.append(monster)
@@ -75,12 +75,12 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
 
             # Check for treasure tile
             elif tile_id in TREASURE_TILES:
-                treasure_type = TREASURE_TILES[tile_id]
+                treasure_type_str = TREASURE_TILES[tile_id]
                 treasure = Treasure(
                     x=x,
                     y=y,
-                    treasure_type=treasure_type,
-                    visual_id=treasure_type.value
+                    treasure_type=TreasureType(treasure_type_str),
+                    visual_id=tile_id
                 )
                 treasures.append(treasure)
                 # Replace treasure tile with empty in tilemap
@@ -89,11 +89,12 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
 
             # Check for tool tile
             elif tile_id in TOOL_TILES:
-                tool_type = TOOL_TILES[tile_id]
+                tool_type_str = TOOL_TILES[tile_id]
                 tool = Tool(
                     x=x,
                     y=y,
-                    tool_type=tool_type
+                    tool_type=ToolType(tool_type_str),
+                    visual_id=tile_id
                 )
                 tools.append(tool)
                 # Replace tool tile with empty in tilemap
@@ -102,7 +103,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
 
             # Create tile object
             tile = Tile(
-                tile_id=tile_id,
+                visual_id=tile_id,
                 tile_type=_get_tile_type(tile_id),
                 solid=_is_solid(tile_id),
                 interactable=_is_interactable(tile_id)
