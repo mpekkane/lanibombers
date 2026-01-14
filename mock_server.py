@@ -12,9 +12,13 @@ from game_engine.entities import Direction, EntityType, DynamicEntity
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.game_engine import GameEngine
 from game_engine.map_loader import load_map
+from client_simulation import ClientSimulation
 
 
 MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.MNE')
+
+# How many render frames between server state updates
+SERVER_UPDATE_INTERVAL = 10
 
 
 class MockServer:
@@ -34,12 +38,15 @@ class MockServer:
         # Player 2 movement pattern: start position
         self.player2_start_x = 8
         self.player2_start_y = 18
+        # Client simulator for client-side extrapolation
+        self.client_simulation = ClientSimulation()
+        self.frame_count = 0
 
     def _init_players(self):
         """Initialize mock players"""
         self.engine.players = [
             DynamicEntity(x=9, y=9, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player1', color=(255, 0, 0), sprite_id=1, state='dig'),
-            DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', color=(0, 255, 0), sprite_id=2, state='walk'),
+            DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', color=(0, 255, 0), sprite_id=2, state='walk', speed=1.5),
         ]
 
     def _update_player2_movement(self):
@@ -139,14 +146,18 @@ class MockServer:
             self.engine.plant_bomb(bomb)
 
     def get_render_state(self):
-        """Returns RenderState from game engine"""
-        # TODO: this is not needed once the network layer is implemented
-        #self.engine.cleanup_render_state()
+        """Returns extrapolated RenderState, polling server every N frames"""
+        self.frame_count += 1
 
-        self._update_player2_movement()
-        self._update_random_damage()
-        self._spawn_random_bomb()
-        return self.engine.get_render_state()
+        # Only poll actual server state every SERVER_UPDATE_INTERVAL frames
+        if self.frame_count % SERVER_UPDATE_INTERVAL == 1:
+            self._update_player2_movement()
+            self._update_random_damage()
+            self._spawn_random_bomb()
+            server_state = self.engine.get_render_state()
+            self.client_simulation.receive_state(server_state)
+
+        return self.client_simulation.get_render_state()
 
 
 def main():

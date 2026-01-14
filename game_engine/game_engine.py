@@ -2,6 +2,8 @@ import array
 import time
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
 
+import numpy as np
+
 from game_engine.entities.tile import Tile
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.pickup import Pickup
@@ -135,3 +137,13 @@ class GameEngine:
         # clean explosions byte array (0=none)
         for i in range(self.height * self.width):
             self.explosions[i] = 0
+
+    def get_solid_map(self) -> np.ndarray:
+        """Return a numpy boolean array where True indicates a solid tile."""
+        # solid_map[y, x] is True if tile at (x, y) is solid
+        # #This can be used directly with pathfinding algorithms like A* or for collision checking in monster AI.
+        solid_map = np.zeros((self.height, self.width), dtype=bool)
+        for y in range(self.height):
+            for x in range(self.width):
+                solid_map[y, x] = self.tiles[y][x].solid
+        return solid_map
