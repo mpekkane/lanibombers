@@ -9,7 +9,7 @@ from typing import List
 from cfg.tile_dictionary import (
     EMPTY_TILE_ID, ROCK1_TILE_ID, ROCK2_TILE_ID,
     MONSTER_SPAWN_TILES, TREASURE_TILES, TOOL_TILES,
-    BEDROCK_TILES, DIRT_TILES, CONCRETE_TILES, URETHANE_TILES,
+    BEDROCK_TILES, BEDROCK_CORNER_TILES, DIRT_TILES, CONCRETE_TILES, URETHANE_TILES,
     BIOSLIME_TILES, BOULDER_TILES, BRICKS_TILES, SWITCH_TILES, SECURITY_DOOR_TILES, TUNNEL_TILES
 )
 from game_engine.entities import DynamicEntity, Direction, EntityType, Tile, TileType, Treasure, TreasureType, Tool, ToolType
@@ -110,7 +110,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=33
+                    health=25
                 )
             elif tile_id == ROCK2_TILE_ID:
                 tile = Tile(
@@ -118,7 +118,15 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=66
+                    health=50
+                )
+            elif tile_id in BEDROCK_CORNER_TILES:
+                tile = Tile(
+                    visual_id=tile_id,
+                    tile_type=TileType.BEDROCK,
+                    solid=True,
+                    interactable=False,
+                    health=60
                 )
             else:
                 tile = Tile(

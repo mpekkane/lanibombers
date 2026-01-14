@@ -93,6 +93,7 @@ TILE_DICTIONARY = {
 
 # Tile ID groupings by type
 BEDROCK_TILES = {55, 56, 57, 65, 67, 68, 69, 70}
+BEDROCK_CORNER_TILES = {55, 56, 57, 65}
 DIRT_TILES = {50, 51, 52, 53, 54}  # Includes gravel
 CONCRETE_TILES = {49}
 URETHANE_TILES = {155}

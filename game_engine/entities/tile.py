@@ -41,14 +41,14 @@ class Tile(GameObject):
 
         # Update bedrock visual based on damage state
         if self.tile_type == TileType.BEDROCK:
-            if self.health <= 33:
+            if self.health <= 25:
                 self.visual_id = ROCK1_TILE_ID
-            elif self.health <= 66:
+            elif self.health <= 50:
                 self.visual_id = ROCK2_TILE_ID
 
         # Update bricks visual based on damage state
         elif self.tile_type == TileType.BRICKS:
-            if self.health <= 33:
+            if self.health <= 25:
                 self.visual_id = BRICS3_TILE_ID
-            elif self.health <= 66:
+            elif self.health <= 50:
                 self.visual_id = BRICS2_TILE_ID
