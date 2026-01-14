@@ -1,5 +1,6 @@
 import array
-from typing import Any, Optional, List, TYPE_CHECKING
+import time
+from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
 
 from game_engine.entities.tile import Tile
 from game_engine.entities.dynamic_entity import DynamicEntity
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
+    explosions = array.array('B')
+
     def __init__(self, width: int = 64, height: int = 45):
         self.width = width
         self.height = height
@@ -23,10 +26,12 @@ class GameEngine:
             [Tile() for _ in range(width)]
             for _ in range(height)
         ]
+        self.explosions = array.array('B', [0]) * self.width*self.height
         self.players: List[DynamicEntity] = []
         self.monsters: List[DynamicEntity] = []
         self.pickups: List[Pickup] = []
         self.bombs: List[Bomb] = []
+        self.explosion_times: Dict[Tuple[int, int], Tuple[float, int]] = {}  # (x, y) -> (start_time, type)
         self.event_resolver = EventResolver(resolve=self.resolve)
 
     def load_map(self, map_data: "MapData") -> None:
@@ -86,15 +91,34 @@ class GameEngine:
         """
         # Handle bomb explosion
         if isinstance(target, Bomb) and event.event_type == 'explode':
+            current_time = time.time()
+
+            # Damage tiles and create explosions within blast radius
+            for dy in range(-target.blast_radius, target.blast_radius + 1):
+                for dx in range(-target.blast_radius, target.blast_radius + 1):
+                    tx, ty = target.x + dx, target.y + dy
+                    tile = self.get_tile(tx, ty)
+                    if tile:
+                        tile.take_damage(target.damage)
+                        # Record explosion start time and type at this tile (type 1 = big bomb)
+                        self.explosions[tx + ty * self.width] = 1 # for normal big bomb
+
+            # Remove bomb from list
             if target in self.bombs:
                 self.bombs.remove(target)
 
     def get_render_state(self) -> RenderState:
         """Build and return a RenderState for the renderer."""
+
+        # Build tilemap
         tilemap = array.array('B')
         for row in self.tiles:
             for tile in row:
                 tilemap.append(tile.visual_id)
+
+        explosions_copy = self.explosions[:]
+
+        self.cleanup_render_state()
 
         return RenderState(
             width=self.width,
@@ -103,5 +127,11 @@ class GameEngine:
             players=self.players,
             monsters=self.monsters,
             pickups=self.pickups,
-            bombs=self.bombs
+            bombs=self.bombs,
+            explosions=explosions_copy
         )
+    
+    def cleanup_render_state(self):
+        # clean explosions byte array (0=none)
+        for i in range(self.height * self.width):
+            self.explosions[i] = 0

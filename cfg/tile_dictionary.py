@@ -84,6 +84,8 @@ TILE_DICTIONARY = {
     #
     #
     172: 'brics1',
+    173: 'brics2',
+    174: 'brics3',
     #
     #
     180: 'doorswitch_red',
@@ -101,8 +103,12 @@ SWITCH_TILES = {180}
 SECURITY_DOOR_TILES = {108}
 TUNNEL_TILES = {156}
 
-# Get the tile ID for 'empty' from the dictionary
+# Get tile IDs from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
+ROCK1_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock1')
+ROCK2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock2')
+BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics2')
+BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
 
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {

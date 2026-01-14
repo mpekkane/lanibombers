@@ -18,7 +18,7 @@ from cfg.tile_dictionary import (
 )
 from game_engine.entities import Direction, EntityType
 from game_engine.entities.bomb import BombType
-from renderer.sprites import PlayerSprite, MonsterSprite, PickupSprite, BombSprite
+from renderer.sprites import PlayerSprite, MonsterSprite, PickupSprite, BombSprite, ExplosionSprite
 
 
 # ============================================================================
@@ -295,12 +295,12 @@ class GameRenderer(arcade.Window):
 
         # Bomb textures: (bomb_type, state, frame) -> texture
         self.bomb_textures = {}
-        # Big bomb (NORMAL type) - active frames 1-3 and defused
+        # Big bomb - active frames 1-3 and defused
         for frame in range(1, 4):
             path = os.path.join(SPRITES_PATH, f"bigbomb{frame}.png")
-            self.bomb_textures[(BombType.NORMAL, 'active', frame)] = arcade.load_texture(path)
+            self.bomb_textures[(BombType.BIG_BOMB, 'active', frame)] = arcade.load_texture(path)
         path = os.path.join(SPRITES_PATH, "bigbomb_defused.png")
-        self.bomb_textures[(BombType.NORMAL, 'defused', 0)] = arcade.load_texture(path)
+        self.bomb_textures[(BombType.BIG_BOMB, 'defused', 0)] = arcade.load_texture(path)
 
         # Bomb sprite list (dynamic length)
         self.bomb_sprite_list = arcade.SpriteList()
@@ -319,6 +319,36 @@ class GameRenderer(arcade.Window):
             self.bomb_sprites.append(sprite)
 
         self.bomb_sprite_list.extend(self.bomb_sprites)
+
+        # Explosion textures indexed by frame (0=transparent, 1=explosion, 2=smoke1, 3=smoke2)
+        self.explosion_frame_textures = [
+            self.transparent_texture,
+            arcade.load_texture(os.path.join(SPRITES_PATH, "explosion.png")),
+            arcade.load_texture(os.path.join(SPRITES_PATH, "smoke1.png")),
+            arcade.load_texture(os.path.join(SPRITES_PATH, "smoke2.png")),
+        ]
+
+        # Explosion sprite list (static, one sprite per tile)
+        self.explosion_sprite_list = arcade.SpriteList()
+        self.explosion_sprite_list.initialize()
+        self.explosion_sprite_list.preload_textures(self.explosion_frame_textures)
+
+        sprite_idx = 0
+        for y in range(state.height):
+            center_y = self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            for x in range(state.width):
+                sprite = ExplosionSprite(
+                    explosion_textures=self.explosion_frame_textures,
+                    transparent_texture=self.transparent_texture,
+                    zoom=self.zoom,
+                    screen_height=self.height
+                )
+                sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+                sprite.center_y = center_y
+                sprite.scale = self.zoom
+                sprite.texture = self.transparent_texture
+                sprite_idx += 1
+                self.explosion_sprite_list.append(sprite)
 
         # Performance graph
         arcade.enable_timings()
@@ -427,6 +457,11 @@ class GameRenderer(arcade.Window):
         for i, bomb in enumerate(state.bombs):
             self.bomb_sprites[i].update_from_bomb(bomb)
 
+        # Update explosions (static list, texture based on byte array)
+        for i in range(state.height * state.width):
+            type = state.explosions[i]
+            self.explosion_sprite_list[i].update_from_type(type)
+
         # Update monsters
         for i, monster in enumerate(state.monsters):
             self.monster_sprites[i].update_from_entity(monster, delta_time)
@@ -445,4 +480,5 @@ class GameRenderer(arcade.Window):
         self.bomb_sprite_list.draw(pixelated=True)
         self.monster_sprite_list.draw(pixelated=True)
         self.player_sprite_list.draw(pixelated=True)
+        self.explosion_sprite_list.draw(pixelated=True)
         self.perf_graph_list.draw()

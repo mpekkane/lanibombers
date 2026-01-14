@@ -1,5 +1,5 @@
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from uuid import UUID
 
@@ -7,22 +7,40 @@ from game_engine.entities.game_object import GameObject
 
 
 class BombType(Enum):
-    NORMAL = 'normal'
+    BIG_BOMB = 'big_bomb'
     C4 = 'c4'
     LANDMINE = 'landmine'
 
 
-@dataclass
+# Bomb properties by type: (fuse_duration, blast_radius, damage)
+BOMB_PROPERTIES = {
+    BombType.BIG_BOMB: (3.0, 4, 40),
+    BombType.C4: (5.0, 3, 100),
+    BombType.LANDMINE: (0.5, 1, 50),
+}
+
+
+@dataclass(kw_only=True)
 class Bomb(GameObject):
     """Timed/event-driven explosive."""
-    x: int = 0
-    y: int = 0
-    bomb_type: BombType = BombType.NORMAL
-    fuse_duration: float = 3.0  # Seconds until explosion
-    blast_radius: int = 1       # Tiles affected
-    placed_at: float = 0.0      # Timestamp when placed
-    owner_id: UUID = None       # Who placed it
-    state: str = 'active'       # 'active' or 'defused'
+    # Mandatory fields
+    x: int
+    y: int
+    bomb_type: BombType
+    placed_at: float
+    owner_id: UUID
+
+    # Auto-set fields based on bomb_type
+    fuse_duration: float = field(default=0.0, init=False)
+    blast_radius: int = field(default=0, init=False)
+    damage: int = field(default=0, init=False)
+    state: str = field(default='active', init=False)
+
+    def __post_init__(self):
+        fuse, radius, damage = BOMB_PROPERTIES[self.bomb_type]
+        self.fuse_duration = fuse
+        self.blast_radius = radius
+        self.damage = damage
 
     def get_fuse_percentage(self, current_time: float = None) -> float:
         """

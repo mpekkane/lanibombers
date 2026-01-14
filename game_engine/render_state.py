@@ -15,3 +15,4 @@ class RenderState:
     monsters: List[DynamicEntity] = field(default_factory=list)
     pickups: List[Pickup] = field(default_factory=list)
     bombs: List[Bomb] = field(default_factory=list)
+    explosions: array.array = field(default_factory=lambda: array.array('B'))  # 0=none, 1=explosion, 2=smoke1, 3=smoke2

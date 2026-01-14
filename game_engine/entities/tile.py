@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from cfg.tile_dictionary import EMPTY_TILE_ID, ROCK1_TILE_ID, ROCK2_TILE_ID, BRICS2_TILE_ID, BRICS3_TILE_ID
 from game_engine.entities.game_object import GameObject
 
 
@@ -25,3 +26,29 @@ class Tile(GameObject):
     tile_type: TileType = TileType.EMPTY
     solid: bool = False
     interactable: bool = False
+
+    def take_damage(self, amount: int) -> None:
+        """Take damage and update visual for bedrock tiles based on health."""
+        self.health = max(0, self.health - amount)
+
+        # Tile destroyed - become empty
+        if self.health == 0:
+            self.tile_type = TileType.EMPTY
+            self.visual_id = EMPTY_TILE_ID
+            self.solid = False
+            self.interactable = False
+            return
+
+        # Update bedrock visual based on damage state
+        if self.tile_type == TileType.BEDROCK:
+            if self.health <= 33:
+                self.visual_id = ROCK1_TILE_ID
+            elif self.health <= 66:
+                self.visual_id = ROCK2_TILE_ID
+
+        # Update bricks visual based on damage state
+        elif self.tile_type == TileType.BRICKS:
+            if self.health <= 33:
+                self.visual_id = BRICS3_TILE_ID
+            elif self.health <= 66:
+                self.visual_id = BRICS2_TILE_ID

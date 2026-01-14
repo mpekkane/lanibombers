@@ -4,6 +4,7 @@ Simulates a game server returning sprite index arrays.
 """
 
 import os
+import sys
 import time
 import random
 
@@ -19,8 +20,10 @@ MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.M
 class MockServer:
     """Simulates a game server returning sprite index arrays"""
 
-    def __init__(self, map_path=MAP_PATH):
+    def __init__(self, map_path=None):
         self.engine = GameEngine()
+        if map_path == None:
+            map_path = MAP_PATH
         map_data = load_map(map_path)
         self.engine.load_map(map_data)
         self.engine.start()
@@ -116,28 +119,30 @@ class MockServer:
                 monster.take_damage(100)
 
     def _spawn_random_bomb(self):
-        """Spawn a bomb at a random location every 5 seconds"""
+        """Spawn a bomb at a random location every .5 seconds"""
         current_time = time.time()
-        if current_time - self.last_bomb_time >= 5.0:
+        if current_time - self.last_bomb_time >= 0.5:
             self.last_bomb_time = current_time
 
             # Random position in playable area
             x = random.randint(5, 58)
             y = random.randint(5, 40)
 
-            # Create bomb with 3 second fuse
+            # Create bomb
             bomb = Bomb(
                 x=x,
                 y=y,
-                bomb_type=BombType.NORMAL,
-                fuse_duration=3.0,
+                bomb_type=BombType.BIG_BOMB,
                 placed_at=current_time,
-                state='active'
+                owner_id=None
             )
             self.engine.plant_bomb(bomb)
 
     def get_render_state(self):
         """Returns RenderState from game engine"""
+        # TODO: this is not needed once the network layer is implemented
+        #self.engine.cleanup_render_state()
+
         self._update_player2_movement()
         self._update_random_damage()
         self._spawn_random_bomb()
@@ -148,7 +153,11 @@ def main():
     import arcade
     from renderer.game_renderer import GameRenderer
 
-    server = MockServer()
+    filename = None
+    if len(sys.argv) > 1: 
+        filename = sys.argv[1]
+
+    server = MockServer(filename)
     state = server.get_render_state()
     print(f"Loaded map: {state.width}x{state.height}")
 
