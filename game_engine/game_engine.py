@@ -1,6 +1,7 @@
 import array
 import time
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
+from collections import deque
 
 import numpy as np
 
@@ -147,3 +148,38 @@ class GameEngine:
             for x in range(self.width):
                 solid_map[y, x] = self.tiles[y][x].solid
         return solid_map
+
+    def flood_fill(mask, start, max_dist):
+        """takes the sold map (boolean numpy array), starting location, and max distance 
+        and returns a uint8 numpy array with the cells stating the distance travelled
+        within the boundaries of the solid blocks."""
+        rows, cols = mask.shape
+        r, c = start
+        
+        if not mask[r, c]:
+            return np.zeros_like(mask, dtype=bool)
+        
+        result = np.zeros_like(mask, dtype=np.uint8)
+        result[r, c] = 1
+        
+        queue = deque()
+        queue.append((r, c, 0))
+        
+        dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        
+        while queue:
+            r, c, d = queue.popleft()
+            
+            if d >= max_dist:
+                continue
+            
+            nd = d + 1
+            for dr, dc in dirs:
+                nr, nc = r + dr, c + dc
+                
+                if 0 <= nr < rows and 0 <= nc < cols:
+                    if mask[nr, nc] and result[nr, nc] == 0:
+                        result[nr, nc] = 1
+                        queue.append((nr, nc, nd))
+        
+        return result.astype(bool)
