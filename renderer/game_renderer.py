@@ -1,8 +1,20 @@
+"""
+Renderer for lanibombers.
+Main graphics processing and display loop.
+"""
+
 import os
 import arcade
 
+from game_engine.entities.bomb import BombType
 from game_engine.entities import Direction, EntityType
-from renderer.sprites import PlayerSprite, MonsterSprite
+from renderer.sprites import (
+    PlayerSprite,
+    MonsterSprite,
+    PickupSprite,
+    BombSprite,
+    ExplosionSprite,
+)
 from dataclasses import dataclass
 
 
@@ -15,6 +27,8 @@ class RendererConfig:
     PLAYER_DEATH_SPRITE: str
     MONSTER_DEATH_SPRITE: str
     SPRITES_PATH: str
+    TREASURE_TILES: dict[int, str]
+    TOOL_TILES: dict[int, str]
 
 
 # ============================================================================
@@ -34,18 +48,18 @@ GRAPH_MARGIN = 5
 
 # Horizontal transition textures (8x10 pixels, between columns)
 HORIZONTAL_TRANSITION_TEXTURES = {
-    'empty_bedrock': 'transition_horizontal_empty_bedrock',
-    'bedrock_empty': 'transition_horizontal_bedrock_empty',
-    'empty_dirt': 'transition_horizontal_empty_dirt',
-    'dirt_empty': 'transition_horizontal_dirt_empty',
+    "empty_bedrock": "transition_horizontal_empty_bedrock",
+    "bedrock_empty": "transition_horizontal_bedrock_empty",
+    "empty_dirt": "transition_horizontal_empty_dirt",
+    "dirt_empty": "transition_horizontal_dirt_empty",
 }
 
 # Vertical transition textures (10x6 pixels, between rows)
 VERTICAL_TRANSITION_TEXTURES = {
-    'empty_bedrock': 'transition_vertical_empty_bedrock',
-    'bedrock_empty': 'transition_vertical_bedrock_empty',
-    'empty_dirt': 'transition_vertical_empty_dirt',
-    'dirt_empty': 'transition_vertical_dirt_empty',
+    "empty_bedrock": "transition_vertical_empty_bedrock",
+    "bedrock_empty": "transition_vertical_bedrock_empty",
+    "empty_dirt": "transition_vertical_empty_dirt",
+    "dirt_empty": "transition_vertical_dirt_empty",
 }
 
 
@@ -53,14 +67,27 @@ VERTICAL_TRANSITION_TEXTURES = {
 # Renderer
 # ============================================================================
 
+
 class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
     def __init__(self, server, config: RendererConfig, width=1280, height=960):
         super().__init__(width, height, "lanibombers", vsync=VSYNC)
-        EMPTY_TILE_IDS = {tile_id for tile_id, name in config.TILE_DICTIONARY.items() if name in config.EMPTY_TILE_NAMES}
-        BEDROCK_TILE_IDS = {tile_id for tile_id, name in config.TILE_DICTIONARY.items() if name in config.BEDROCK_TILE_NAMES}
-        DIRT_TILE_IDS = {tile_id for tile_id, name in config.TILE_DICTIONARY.items() if name in config.DIRT_TILE_NAMES}
+        EMPTY_TILE_IDS = {
+            tile_id
+            for tile_id, name in config.TILE_DICTIONARY.items()
+            if name in config.EMPTY_TILE_NAMES
+        }
+        BEDROCK_TILE_IDS = {
+            tile_id
+            for tile_id, name in config.TILE_DICTIONARY.items()
+            if name in config.BEDROCK_TILE_NAMES
+        }
+        DIRT_TILE_IDS = {
+            tile_id
+            for tile_id, name in config.TILE_DICTIONARY.items()
+            if name in config.DIRT_TILE_NAMES
+        }
 
         self.set_update_rate(1 / TARGET_FPS)
         self.set_draw_rate(1 / TARGET_FPS)
@@ -77,12 +104,17 @@ class GameRenderer(arcade.Window):
 
         # Create transparent texture for empty transitions
         from PIL import Image
-        transparent_image = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+
+        transparent_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
         self.transparent_texture = arcade.Texture(transparent_image)
 
         # Load death textures
-        self.blood_texture = arcade.load_texture(os.path.join(config.SPRITES_PATH, f"{config.PLAYER_DEATH_SPRITE}.png"))
-        self.blood_green_texture = arcade.load_texture(os.path.join(config.SPRITES_PATH, f"{config.MONSTER_DEATH_SPRITE}.png"))
+        self.blood_texture = arcade.load_texture(
+            os.path.join(config.SPRITES_PATH, f"{config.PLAYER_DEATH_SPRITE}.png")
+        )
+        self.blood_green_texture = arcade.load_texture(
+            os.path.join(config.SPRITES_PATH, f"{config.MONSTER_DEATH_SPRITE}.png")
+        )
 
         # Load horizontal transition textures
         self.horizontal_transition_textures = {}
@@ -105,23 +137,29 @@ class GameRenderer(arcade.Window):
                     sprite_name = f"player{sprite_id}_{direction.value}_{frame}"
                     path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
                     walk_texture = arcade.load_texture(path)
-                    self.player_textures[(sprite_id, 'walk', direction, frame)] = walk_texture
+                    self.player_textures[(sprite_id, "walk", direction, frame)] = (
+                        walk_texture
+                    )
 
                     # Idle sprites (same as walk, but won't animate)
-                    self.player_textures[(sprite_id, 'idle', direction, frame)] = walk_texture
+                    self.player_textures[(sprite_id, "idle", direction, frame)] = (
+                        walk_texture
+                    )
 
                     # Digging sprites
                     sprite_name = f"player{sprite_id}_dig_{direction.value}_{frame}"
                     path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
-                    self.player_textures[(sprite_id, 'dig', direction, frame)] = arcade.load_texture(path)
+                    self.player_textures[(sprite_id, "dig", direction, frame)] = (
+                        arcade.load_texture(path)
+                    )
 
         # Load monster textures: (entity_type, direction, frame) -> texture
         self.monster_textures = {}
         monster_types = [
-            (EntityType.SLIME, 'slime'),
-            (EntityType.FURRYMAN, 'furryman'),
-            (EntityType.ALIEN, 'alien'),
-            (EntityType.GRENADEMONSTER, 'grenademonster'),
+            (EntityType.SLIME, "slime"),
+            (EntityType.FURRYMAN, "furryman"),
+            (EntityType.ALIEN, "alien"),
+            (EntityType.GRENADEMONSTER, "grenademonster"),
         ]
         for entity_type, sprite_prefix in monster_types:
             for direction in Direction:
@@ -139,18 +177,34 @@ class GameRenderer(arcade.Window):
         # Empty <-> Bedrock transitions
         for empty_id in EMPTY_TILE_IDS:
             for bedrock_id in BEDROCK_TILE_IDS:
-                self.horizontal_tile_pair_to_texture[(empty_id, bedrock_id)] = self.horizontal_transition_textures['empty_bedrock']
-                self.horizontal_tile_pair_to_texture[(bedrock_id, empty_id)] = self.horizontal_transition_textures['bedrock_empty']
-                self.vertical_tile_pair_to_texture[(empty_id, bedrock_id)] = self.vertical_transition_textures['empty_bedrock']
-                self.vertical_tile_pair_to_texture[(bedrock_id, empty_id)] = self.vertical_transition_textures['bedrock_empty']
+                self.horizontal_tile_pair_to_texture[(empty_id, bedrock_id)] = (
+                    self.horizontal_transition_textures["empty_bedrock"]
+                )
+                self.horizontal_tile_pair_to_texture[(bedrock_id, empty_id)] = (
+                    self.horizontal_transition_textures["bedrock_empty"]
+                )
+                self.vertical_tile_pair_to_texture[(empty_id, bedrock_id)] = (
+                    self.vertical_transition_textures["empty_bedrock"]
+                )
+                self.vertical_tile_pair_to_texture[(bedrock_id, empty_id)] = (
+                    self.vertical_transition_textures["bedrock_empty"]
+                )
 
         # Empty <-> Dirt transitions
         for empty_id in EMPTY_TILE_IDS:
             for dirt_id in DIRT_TILE_IDS:
-                self.horizontal_tile_pair_to_texture[(empty_id, dirt_id)] = self.horizontal_transition_textures['empty_dirt']
-                self.horizontal_tile_pair_to_texture[(dirt_id, empty_id)] = self.horizontal_transition_textures['dirt_empty']
-                self.vertical_tile_pair_to_texture[(empty_id, dirt_id)] = self.vertical_transition_textures['empty_dirt']
-                self.vertical_tile_pair_to_texture[(dirt_id, empty_id)] = self.vertical_transition_textures['dirt_empty']
+                self.horizontal_tile_pair_to_texture[(empty_id, dirt_id)] = (
+                    self.horizontal_transition_textures["empty_dirt"]
+                )
+                self.horizontal_tile_pair_to_texture[(dirt_id, empty_id)] = (
+                    self.horizontal_transition_textures["dirt_empty"]
+                )
+                self.vertical_tile_pair_to_texture[(empty_id, dirt_id)] = (
+                    self.vertical_transition_textures["empty_dirt"]
+                )
+                self.vertical_tile_pair_to_texture[(dirt_id, empty_id)] = (
+                    self.vertical_transition_textures["dirt_empty"]
+                )
 
         # Map tile IDs to textures
         self.tile_id_to_texture_dictionary = list()
@@ -159,8 +213,9 @@ class GameRenderer(arcade.Window):
             self.tile_id_to_texture_dictionary.insert(j, self.transparent_texture)
 
         for tile_id, sprite_name in config.TILE_DICTIONARY.items():
-            self.tile_id_to_texture_dictionary.insert(tile_id, self.textures[sprite_name])
-
+            self.tile_id_to_texture_dictionary.insert(
+                tile_id, self.textures[sprite_name]
+            )
 
         # Background tile sprite pool
         self.background_tile_sprite_list = arcade.SpriteList()
@@ -172,7 +227,9 @@ class GameRenderer(arcade.Window):
 
         sprite_idx = 0
         for y in range(state.height):
-            SPRITE_CENTER_Y = self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            SPRITE_CENTER_Y = (
+                self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            )
             for x in range(state.width):
                 sprite = self.sprites[sprite_idx]
                 sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
@@ -180,17 +237,25 @@ class GameRenderer(arcade.Window):
                 sprite.scale = self.zoom
                 sprite_idx += 1
 
-        self.background_tile_sprite_list.extend(self.sprites[:state.height * state.width])
+        self.background_tile_sprite_list.extend(
+            self.sprites[: state.height * state.width]
+        )
 
         # Horizontal transition sprite pool (between columns)
         self.horizontal_transition_sprite_list = arcade.SpriteList()
         self.horizontal_transition_sprite_list.initialize()
-        self.horizontal_transition_sprite_list.preload_textures(self.horizontal_transition_textures.values())
-        self.horizontal_transition_sprites = [arcade.Sprite() for _ in range(max_sprites)]
+        self.horizontal_transition_sprite_list.preload_textures(
+            self.horizontal_transition_textures.values()
+        )
+        self.horizontal_transition_sprites = [
+            arcade.Sprite() for _ in range(max_sprites)
+        ]
 
         sprite_idx = 0
         for y in range(state.height):
-            center_y = self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            center_y = (
+                self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            )
             for x in range(state.width):
                 sprite = self.horizontal_transition_sprites[sprite_idx]
                 # Position at midpoint between tile x and tile x+1 (offset by 1)
@@ -199,12 +264,16 @@ class GameRenderer(arcade.Window):
                 sprite.scale = self.zoom
                 sprite_idx += 1
 
-        self.horizontal_transition_sprite_list.extend(self.horizontal_transition_sprites[:max_sprites])
+        self.horizontal_transition_sprite_list.extend(
+            self.horizontal_transition_sprites[:max_sprites]
+        )
 
         # Vertical transition sprite pool (between rows)
         self.vertical_transition_sprite_list = arcade.SpriteList()
         self.vertical_transition_sprite_list.initialize()
-        self.vertical_transition_sprite_list.preload_textures(self.vertical_transition_textures.values())
+        self.vertical_transition_sprite_list.preload_textures(
+            self.vertical_transition_textures.values()
+        )
         self.vertical_transition_sprites = [arcade.Sprite() for _ in range(max_sprites)]
 
         sprite_idx = 0
@@ -218,7 +287,9 @@ class GameRenderer(arcade.Window):
                 sprite.scale = self.zoom
                 sprite_idx += 1
 
-        self.vertical_transition_sprite_list.extend(self.vertical_transition_sprites[:max_sprites])
+        self.vertical_transition_sprite_list.extend(
+            self.vertical_transition_sprites[:max_sprites]
+        )
 
         # Player sprite pool
         self.player_sprite_list = arcade.SpriteList()
@@ -229,12 +300,12 @@ class GameRenderer(arcade.Window):
         for player in state.players:
             sprite = PlayerSprite(
                 sprite_id=player.sprite_id,
-                colour=player.colour,
+                color_variant=player.color,
                 player_textures=self.player_textures,
                 transparent_texture=self.transparent_texture,
                 blood_texture=self.blood_texture,
                 zoom=self.zoom,
-                screen_height=self.height
+                screen_height=self.height,
             )
             self.player_sprites.append(sprite)
 
@@ -253,11 +324,101 @@ class GameRenderer(arcade.Window):
                 transparent_texture=self.transparent_texture,
                 blood_green_texture=self.blood_green_texture,
                 zoom=self.zoom,
-                screen_height=self.height
+                screen_height=self.height,
             )
             self.monster_sprites.append(sprite)
 
         self.monster_sprite_list.extend(self.monster_sprites)
+
+        # Pickup textures: visual_id -> texture (for treasures and tools)
+        self.pickup_textures = {}
+        pickup_tile_ids = set(config.TREASURE_TILES.keys()) | set(config.TOOL_TILES.keys())
+        for tile_id in pickup_tile_ids:
+            sprite_name = config.TILE_DICTIONARY.get(tile_id)
+            if sprite_name:
+                path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                self.pickup_textures[tile_id] = arcade.load_texture(path)
+
+        # Pickup sprite list (dynamic length)
+        self.pickup_sprite_list = arcade.SpriteList()
+        self.pickup_sprite_list.initialize()
+        self.pickup_sprite_list.preload_textures(self.pickup_textures.values())
+        self.pickup_sprites = []
+
+        for pickup in state.pickups:
+            sprite = PickupSprite(
+                pickup_textures=self.pickup_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height,
+            )
+            sprite.update_from_pickup(pickup)
+            self.pickup_sprites.append(sprite)
+
+        self.pickup_sprite_list.extend(self.pickup_sprites)
+
+        # Bomb textures: (bomb_type, state, frame) -> texture
+        self.bomb_textures = {}
+        # Big bomb - active frames 1-3 and defused
+        for frame in range(1, 4):
+            path = os.path.join(config.SPRITES_PATH, f"bigbomb{frame}.png")
+            self.bomb_textures[(BombType.BIG_BOMB, "active", frame)] = (
+                arcade.load_texture(path)
+            )
+        path = os.path.join(config.SPRITES_PATH, "bigbomb_defused.png")
+        self.bomb_textures[(BombType.BIG_BOMB, "defused", 0)] = arcade.load_texture(
+            path
+        )
+
+        # Bomb sprite list (dynamic length)
+        self.bomb_sprite_list = arcade.SpriteList()
+        self.bomb_sprite_list.initialize()
+        self.bomb_sprite_list.preload_textures(self.bomb_textures.values())
+        self.bomb_sprites = []
+
+        for bomb in state.bombs:
+            sprite = BombSprite(
+                bomb_textures=self.bomb_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height,
+            )
+            sprite.update_from_bomb(bomb)
+            self.bomb_sprites.append(sprite)
+
+        self.bomb_sprite_list.extend(self.bomb_sprites)
+
+        # Explosion textures indexed by frame (0=transparent, 1=explosion, 2=smoke1, 3=smoke2)
+        self.explosion_frame_textures = [
+            self.transparent_texture,
+            arcade.load_texture(os.path.join(config.SPRITES_PATH, "explosion.png")),
+            arcade.load_texture(os.path.join(config.SPRITES_PATH, "smoke1.png")),
+            arcade.load_texture(os.path.join(config.SPRITES_PATH, "smoke2.png")),
+        ]
+
+        # Explosion sprite list (static, one sprite per tile)
+        self.explosion_sprite_list = arcade.SpriteList()
+        self.explosion_sprite_list.initialize()
+        self.explosion_sprite_list.preload_textures(self.explosion_frame_textures)
+
+        sprite_idx = 0
+        for y in range(state.height):
+            center_y = (
+                self.height - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+            )
+            for x in range(state.width):
+                sprite = ExplosionSprite(
+                    explosion_textures=self.explosion_frame_textures,
+                    transparent_texture=self.transparent_texture,
+                    zoom=self.zoom,
+                    screen_height=self.height,
+                )
+                sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
+                sprite.center_y = center_y
+                sprite.scale = self.zoom
+                sprite.texture = self.transparent_texture
+                sprite_idx += 1
+                self.explosion_sprite_list.append(sprite)
 
         # Performance graph
         arcade.enable_timings()
@@ -273,16 +434,19 @@ class GameRenderer(arcade.Window):
         # Create the FPS performance graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="FPS")
         graph.position = starting_x, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
         # Create the on_update graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="on_update")
         graph.position = starting_x + step_x, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
         # Create the on_draw graph
         graph = arcade.PerfGraph(GRAPH_WIDTH, GRAPH_HEIGHT, graph_data="on_draw")
         graph.position = starting_x + step_x * 2, row_y
+        graph.alpha = 128
         self.perf_graph_list.append(graph)
 
     def on_update(self, delta_time):
@@ -291,7 +455,9 @@ class GameRenderer(arcade.Window):
 
         # Update background tiles
         for i in range(state.height * state.width):
-            self.sprites[i].texture = self.tile_id_to_texture_dictionary[state.tilemap[i]]
+            self.sprites[i].texture = self.tile_id_to_texture_dictionary[
+                state.tilemap[i]
+            ]
 
         # Update horizontal transitions
         for i in range(state.height * state.width):
@@ -301,7 +467,9 @@ class GameRenderer(arcade.Window):
             else:
                 left_tile = state.tilemap[i]
                 right_tile = state.tilemap[i + 1]
-                texture = self.horizontal_tile_pair_to_texture.get((left_tile, right_tile), self.transparent_texture)
+                texture = self.horizontal_tile_pair_to_texture.get(
+                    (left_tile, right_tile), self.transparent_texture
+                )
                 self.horizontal_transition_sprites[i].texture = texture
 
         # Update vertical transitions
@@ -313,8 +481,62 @@ class GameRenderer(arcade.Window):
             else:
                 top_tile = state.tilemap[i]
                 bottom_tile = state.tilemap[i + state.width]
-                texture = self.vertical_tile_pair_to_texture.get((top_tile, bottom_tile), self.transparent_texture)
+                texture = self.vertical_tile_pair_to_texture.get(
+                    (top_tile, bottom_tile), self.transparent_texture
+                )
                 self.vertical_transition_sprites[i].texture = texture
+
+        # Update pickups (dynamic list)
+        pickup_count = len(state.pickups)
+        current_count = len(self.pickup_sprites)
+
+        # Add new sprites if needed
+        while len(self.pickup_sprites) < pickup_count:
+            sprite = PickupSprite(
+                pickup_textures=self.pickup_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height,
+            )
+            self.pickup_sprites.append(sprite)
+            self.pickup_sprite_list.append(sprite)
+
+        # Remove excess sprites if needed
+        while len(self.pickup_sprites) > pickup_count:
+            sprite = self.pickup_sprites.pop()
+            self.pickup_sprite_list.remove(sprite)
+
+        # Update existing sprites
+        for i, pickup in enumerate(state.pickups):
+            self.pickup_sprites[i].update_from_pickup(pickup)
+
+        # Update bombs (dynamic list)
+        bomb_count = len(state.bombs)
+
+        # Add new sprites if needed
+        while len(self.bomb_sprites) < bomb_count:
+            sprite = BombSprite(
+                bomb_textures=self.bomb_textures,
+                transparent_texture=self.transparent_texture,
+                zoom=self.zoom,
+                screen_height=self.height,
+            )
+            self.bomb_sprites.append(sprite)
+            self.bomb_sprite_list.append(sprite)
+
+        # Remove excess sprites if needed
+        while len(self.bomb_sprites) > bomb_count:
+            sprite = self.bomb_sprites.pop()
+            self.bomb_sprite_list.remove(sprite)
+
+        # Update existing sprites
+        for i, bomb in enumerate(state.bombs):
+            self.bomb_sprites[i].update_from_bomb(bomb)
+
+        # Update explosions (static list, texture based on byte array)
+        for i in range(state.height * state.width):
+            type = state.explosions[i]
+            self.explosion_sprite_list[i].update_from_type(type)
 
         # Update monsters
         for i, monster in enumerate(state.monsters):
@@ -330,8 +552,11 @@ class GameRenderer(arcade.Window):
         self.background_tile_sprite_list.draw(pixelated=True)
         self.vertical_transition_sprite_list.draw(pixelated=True)
         self.horizontal_transition_sprite_list.draw(pixelated=True)
+        self.pickup_sprite_list.draw(pixelated=True)
+        self.bomb_sprite_list.draw(pixelated=True)
         self.monster_sprite_list.draw(pixelated=True)
         self.player_sprite_list.draw(pixelated=True)
+        self.explosion_sprite_list.draw(pixelated=True)
         self.perf_graph_list.draw()
 
     def run(self):

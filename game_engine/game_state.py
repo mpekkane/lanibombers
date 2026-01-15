@@ -55,14 +55,7 @@ class Game:
 
     def create_player(self, name: str) -> None:
         num_players = len(self.players)
-        if num_players == 0:
-            col = (0, 255, 0)
-        elif num_players == 1:
-            col = (255, 0, 0)
-        elif num_players == 2:
-            col = (0, 0, 255)
-        else:
-            col = (255, 255, 0)
+
         # FIXME: sensible positions
         ix = random.randint(10, 20)
         iy = random.randint(10, 20)
@@ -72,7 +65,6 @@ class Game:
             direction=Direction.RIGHT,
             entity_type=EntityType.PLAYER,
             name=name,
-            colour=col,
             sprite_id=num_players+1,
             state="idle",
         )

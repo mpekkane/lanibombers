@@ -4,48 +4,50 @@ Simulates a game server returning sprite index arrays.
 """
 
 import os
+import sys
 import time
-import array
 import random
 
-from cfg.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
 from game_engine.entities import Direction, EntityType, DynamicEntity
-from game_engine.render_state import RenderState
+from game_engine.entities.bomb import Bomb, BombType
+from game_engine.game_engine import GameEngine
+from game_engine.map_loader import load_map
+from client_simulation import ClientSimulation
 
 
 MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.MNE')
+
+# How many render frames between server state updates
+SERVER_UPDATE_INTERVAL = 10
 
 
 class MockServer:
     """Simulates a game server returning sprite index arrays"""
 
-    def __init__(self, map_path=MAP_PATH):
-        self._load_map(map_path)
+    def __init__(self, map_path=None):
+        self.engine = GameEngine()
+        if map_path == None:
+            map_path = MAP_PATH
+        map_data = load_map(map_path)
+        self.engine.load_map(map_data)
+        self.engine.start()
         self._init_players()
-        self._init_monsters()
-
-    def _load_map(self, path):
-        """Load map from ASCII file, sprite indices are ASCII values"""
-        self.grid = array.array('B')
-        with open(path, 'rb') as f:
-            for line in f:
-                line = line.rstrip(b'\r\n')
-                for char in line:
-                    self.grid.append(char)
-        self.height = 45
-        self.width = 64
-
-    def _init_players(self):
-        """Initialize mock players"""
-        self.players = [
-            DynamicEntity(x=9, y=9, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player1', colour=(255, 0, 0), sprite_id=1, state='dig'),
-            DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', colour=(0, 255, 0), sprite_id=2, state='walk'),
-        ]
         self.start_time = time.time()
         self.last_damage_time = self.start_time
+        self.last_bomb_time = self.start_time
         # Player 2 movement pattern: start position
         self.player2_start_x = 8
         self.player2_start_y = 18
+        # Client simulator for client-side extrapolation
+        self.client_simulation = ClientSimulation()
+        self.frame_count = 0
+
+    def _init_players(self):
+        """Initialize mock players"""
+        self.engine.players = [
+            DynamicEntity(x=9, y=9, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player1', color=(255, 0, 0), sprite_id=1, state='dig'),
+            DynamicEntity(x=8, y=18, direction=Direction.RIGHT, entity_type=EntityType.PLAYER, name='Player2', color=(0, 255, 0), sprite_id=2, state='walk', speed=1.5),
+        ]
 
     def _update_player2_movement(self):
         """Move player 2 in a square pattern"""
@@ -53,7 +55,7 @@ class MockServer:
         # Pattern: 4s right, 1s stop, 4s down, 1s stop, 4s left, 1s stop, 4s up, 1s stop = 20s cycle
         # Speed: 1.5 blocks/second (6 blocks in 4 seconds)
         cycle_time = elapsed % 20.0
-        player = self.players[1]
+        player = self.engine.players[1]
         speed = 1.5  # blocks per second
 
         if cycle_time < 4.0:
@@ -105,28 +107,6 @@ class MockServer:
             player.direction = Direction.UP
             player.state = 'idle'
 
-    def _init_monsters(self):
-        """Initialize monsters from spawn tiles in the map"""
-        self.monsters = []
-
-        for i, tile_id in enumerate(self.grid):
-            if tile_id in MONSTER_SPAWN_TILES:
-                entity_type, direction = MONSTER_SPAWN_TILES[tile_id]
-                x = i % self.width
-                y = i // self.width
-
-                monster = DynamicEntity(
-                    x=x,
-                    y=y,
-                    direction=direction,
-                    entity_type=entity_type,
-                    state='walk'
-                )
-                self.monsters.append(monster)
-
-                # Replace spawn tile with empty
-                self.grid[i] = EMPTY_TILE_ID
-
     def _update_random_damage(self):
         """Deal damage to a random player and monster every 10 seconds"""
         current_time = time.time()
@@ -134,25 +114,67 @@ class MockServer:
             self.last_damage_time = current_time
 
             # Damage a random alive player
-            alive_players = [p for p in self.players if p.state != 'dead']
+            alive_players = [p for p in self.engine.players if p.state != 'dead']
             if alive_players:
                 player = random.choice(alive_players)
                 player.take_damage(100)
 
             # Damage a random alive monster
-            alive_monsters = [m for m in self.monsters if m.state != 'dead']
+            alive_monsters = [m for m in self.engine.monsters if m.state != 'dead']
             if alive_monsters:
                 monster = random.choice(alive_monsters)
                 monster.take_damage(100)
 
+    def _spawn_random_bomb(self):
+        """Spawn a bomb at a random location every .5 seconds"""
+        current_time = time.time()
+        if current_time - self.last_bomb_time >= 0.5:
+            self.last_bomb_time = current_time
+
+            # Random position in playable area
+            x = random.randint(5, 58)
+            y = random.randint(5, 40)
+
+            # Create bomb
+            bomb = Bomb(
+                x=x,
+                y=y,
+                bomb_type=BombType.BIG_BOMB,
+                placed_at=current_time,
+                owner_id=None
+            )
+            self.engine.plant_bomb(bomb)
+
     def get_render_state(self):
-        """Returns RenderState with dimensions and sprite indices"""
-        self._update_player2_movement()
-        self._update_random_damage()
-        return RenderState(
-            width=self.width,
-            height=self.height,
-            tilemap=self.grid,
-            players=self.players,
-            monsters=self.monsters
-        )
+        """Returns extrapolated RenderState, polling server every N frames"""
+        self.frame_count += 1
+
+        # Only poll actual server state every SERVER_UPDATE_INTERVAL frames
+        if self.frame_count % SERVER_UPDATE_INTERVAL == 1:
+            self._update_player2_movement()
+            self._update_random_damage()
+            self._spawn_random_bomb()
+            server_state = self.engine.get_render_state()
+            self.client_simulation.receive_state(server_state)
+
+        return self.client_simulation.get_render_state()
+
+
+def main():
+    import arcade
+    from renderer.game_renderer import GameRenderer
+
+    filename = None
+    if len(sys.argv) > 1: 
+        filename = sys.argv[1]
+
+    server = MockServer(filename)
+    state = server.get_render_state()
+    print(f"Loaded map: {state.width}x{state.height}")
+
+    renderer = GameRenderer(server)
+    arcade.run()
+
+
+if __name__ == '__main__':
+    main()

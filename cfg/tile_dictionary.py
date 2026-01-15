@@ -1,6 +1,3 @@
-from game_engine.entities import Direction, EntityType
-
-
 # Tile names grouped by type
 EMPTY_TILE_NAMES = {
     'empty',
@@ -87,31 +84,70 @@ TILE_DICTIONARY = {
     #
     #
     172: 'brics1',
+    173: 'brics2',
+    174: 'brics3',
     #
     #
     180: 'doorswitch_red',
 }
 
-# Get the tile ID for 'empty' from the dictionary
-EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
+# Tile ID groupings by type
+BEDROCK_TILES = {55, 56, 57, 65, 67, 68, 69, 70}
+BEDROCK_CORNER_TILES = {55, 56, 57, 65}
+DIRT_TILES = {50, 51, 52, 53, 54}  # Includes gravel
+CONCRETE_TILES = {49}
+URETHANE_TILES = {155}
+BIOSLIME_TILES = {111}
+BOULDER_TILES = {66, 112, 113}
+BRICKS_TILES = {172}
+SWITCH_TILES = {180}
+SECURITY_DOOR_TILES = {108}
+TUNNEL_TILES = {156}
 
-# Monster spawn tile definitions
-# Each monster type has 4 consecutive tile IDs for directions: right, left, up, down
+# Get tile IDs from the dictionary
+EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
+ROCK1_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock1')
+ROCK2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock2')
+BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics2')
+BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
+
+# Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {
-    71: (EntityType.FURRYMAN, Direction.RIGHT),
-    72: (EntityType.FURRYMAN, Direction.LEFT),
-    73: (EntityType.FURRYMAN, Direction.UP),
-    74: (EntityType.FURRYMAN, Direction.DOWN),
-    75: (EntityType.GRENADEMONSTER, Direction.RIGHT),
-    76: (EntityType.GRENADEMONSTER, Direction.LEFT),
-    77: (EntityType.GRENADEMONSTER, Direction.UP),
-    78: (EntityType.GRENADEMONSTER, Direction.DOWN),
-    79: (EntityType.SLIME, Direction.RIGHT),
-    80: (EntityType.SLIME, Direction.LEFT),
-    81: (EntityType.SLIME, Direction.UP),
-    82: (EntityType.SLIME, Direction.DOWN),
-    83: (EntityType.ALIEN, Direction.RIGHT),
-    84: (EntityType.ALIEN, Direction.LEFT),
-    85: (EntityType.ALIEN, Direction.UP),
-    86: (EntityType.ALIEN, Direction.DOWN),
+    71: ('furryman', 'right'),
+    72: ('furryman', 'left'),
+    73: ('furryman', 'up'),
+    74: ('furryman', 'down'),
+    75: ('grenademonster', 'right'),
+    76: ('grenademonster', 'left'),
+    77: ('grenademonster', 'up'),
+    78: ('grenademonster', 'down'),
+    79: ('slime', 'right'),
+    80: ('slime', 'left'),
+    81: ('slime', 'up'),
+    82: ('slime', 'down'),
+    83: ('alien', 'right'),
+    84: ('alien', 'left'),
+    85: ('alien', 'up'),
+    86: ('alien', 'down'),
+}
+
+# Treasure tile definitions (tile_id -> treasure_type)
+TREASURE_TILES = {
+    146: 'gold_shield',
+    147: 'gold_egg',
+    148: 'gold_coins',
+    149: 'gold_bracelet',
+    150: 'gold_bar',
+    151: 'gold_cross',
+    152: 'gold_sceptre',
+    153: 'gold_ruby',
+    154: 'gold_crown',
+}
+
+# Tool tile definitions (tile_id -> tool_type)
+TOOL_TILES = {
+    143: 'smallpick',
+    144: 'bigpick',
+    145: 'drill',
+    109: 'medpack',
 }

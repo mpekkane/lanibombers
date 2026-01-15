@@ -17,8 +17,9 @@ class MonsterSprite(arcade.Sprite):
         self.zoom = zoom
         self.screen_height = screen_height
 
-        # Animation state
-        self.current_frame = 1
+        # Animation state - ping-pong pattern: 1,2,3,4,3,2,1,2,3,4...
+        self.frame_sequence = [1, 2, 3, 4, 3, 2]
+        self.frame_index = 0
         self.frame_timer = 0.0
         self.frames_per_second = 4  # Animation speed
 
@@ -40,21 +41,22 @@ class MonsterSprite(arcade.Sprite):
             self.texture = self.blood_green_texture
             return
 
-        # Update animation frame if walking
+        # Update animation frame if walking (ping-pong: 1,2,3,4,3,2...)
         if monster.state == 'walk':
             self.frame_timer += delta_time
             frame_duration = 1.0 / self.frames_per_second
             if self.frame_timer >= frame_duration:
                 self.frame_timer -= frame_duration
-                self.current_frame = (self.current_frame % 4) + 1
+                self.frame_index = (self.frame_index + 1) % len(self.frame_sequence)
             self.last_direction = monster.direction
-            self.last_frame = self.current_frame
+            self.last_frame = self.frame_sequence[self.frame_index]
         else:
             # Idle: keep last frame
             self.frame_timer = 0.0
 
         # Get texture based on state
-        frame_to_use = self.current_frame if monster.state == 'walk' else self.last_frame
+        current_frame = self.frame_sequence[self.frame_index]
+        frame_to_use = current_frame if monster.state == 'walk' else self.last_frame
         texture = self.monster_textures.get(
             (monster.entity_type, monster.direction, frame_to_use),
             self.transparent_texture

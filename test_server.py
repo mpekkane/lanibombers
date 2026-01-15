@@ -6,8 +6,9 @@ import os
 import time
 import uuid
 import threading
+import array
 from enum import IntEnum
-from typing import Dict, Union
+from typing import Dict
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
@@ -16,6 +17,7 @@ from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.game_state import Game
+from game_engine import GameEngine
 from renderer.game_renderer import GameRenderer, RendererConfig
 from common.keymapper import check_input
 from cfg.tile_dictionary import (
@@ -25,6 +27,8 @@ from cfg.tile_dictionary import (
     DIRT_TILE_NAMES,
     PLAYER_DEATH_SPRITE,
     MONSTER_DEATH_SPRITE,
+    TREASURE_TILES,
+    TOOL_TILES
 )
 
 
@@ -43,7 +47,9 @@ class BomberServer:
     def __init__(self, cfg: str, map_path: str) -> None:
         self.state = ServerState.STARTING
         # game engine
+        # FIXME: this is a merge conflict
         self.game = Game(map_path)
+        self.engine = GameEngine()
 
         # networking
         self.server = BomberNetworkServer(cfg)
@@ -102,6 +108,9 @@ class BomberServer:
             tilemap=grid,
             players=players,
             monsters=monsters,
+            pickups=[],
+            bombs=[],
+            explosions=self.engine.explosions[:]
         )
 
     def update_state(self):
@@ -250,6 +259,8 @@ def main() -> None:
         PLAYER_DEATH_SPRITE,
         MONSTER_DEATH_SPRITE,
         SPRITES_PATH,
+        TREASURE_TILES,
+        TOOL_TILES
     )
 
     server.start_game()
