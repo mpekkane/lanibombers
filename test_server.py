@@ -18,18 +18,8 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.game_state import Game
 from game_engine import GameEngine
-from renderer.game_renderer import GameRenderer, RendererConfig
-from common.keymapper import check_input
-from cfg.tile_dictionary import (
-    TILE_DICTIONARY,
-    EMPTY_TILE_NAMES,
-    BEDROCK_TILE_NAMES,
-    DIRT_TILE_NAMES,
-    PLAYER_DEATH_SPRITE,
-    MONSTER_DEATH_SPRITE,
-    TREASURE_TILES,
-    TOOL_TILES
-)
+from renderer.game_renderer import GameRenderer
+
 
 
 class ServerState(IntEnum):
@@ -250,21 +240,10 @@ def main() -> None:
 
     # state = server.get_render_state()
     # FIXME: refactor
-    SPRITES_PATH = os.path.join(os.path.dirname(__file__), "assets", "sprites")
-    renderer_config = RendererConfig(
-        TILE_DICTIONARY,
-        EMPTY_TILE_NAMES,
-        BEDROCK_TILE_NAMES,
-        DIRT_TILE_NAMES,
-        PLAYER_DEATH_SPRITE,
-        MONSTER_DEATH_SPRITE,
-        SPRITES_PATH,
-        TREASURE_TILES,
-        TOOL_TILES
-    )
+
 
     server.start_game()
-    renderer = GameRenderer(server, renderer_config)
+    renderer = GameRenderer(server)
     renderer.run()
 
 

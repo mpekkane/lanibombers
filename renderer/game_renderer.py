@@ -15,25 +15,23 @@ from renderer.sprites import (
     BombSprite,
     ExplosionSprite,
 )
-from dataclasses import dataclass
-
-
-@dataclass
-class RendererConfig:
-    TILE_DICTIONARY: dict[int, str]
-    EMPTY_TILE_NAMES: set[str]
-    BEDROCK_TILE_NAMES: set[str]
-    DIRT_TILE_NAMES: set[str]
-    PLAYER_DEATH_SPRITE: str
-    MONSTER_DEATH_SPRITE: str
-    SPRITES_PATH: str
-    TREASURE_TILES: dict[int, str]
-    TOOL_TILES: dict[int, str]
+from cfg.tile_dictionary import (
+    TILE_DICTIONARY,
+    EMPTY_TILE_NAMES,
+    BEDROCK_TILE_NAMES,
+    DIRT_TILE_NAMES,
+    PLAYER_DEATH_SPRITE,
+    MONSTER_DEATH_SPRITE,
+    TREASURE_TILES,
+    TOOL_TILES,
+)
 
 
 # ============================================================================
 # Configuration
 # ============================================================================
+
+SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 
 TARGET_FPS = 60
 VSYNC = True
@@ -71,22 +69,22 @@ VERTICAL_TRANSITION_TEXTURES = {
 class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
-    def __init__(self, server, config: RendererConfig, width=1280, height=960):
+    def __init__(self, server, width=1280, height=960):
         super().__init__(width, height, "lanibombers", vsync=VSYNC)
         EMPTY_TILE_IDS = {
             tile_id
-            for tile_id, name in config.TILE_DICTIONARY.items()
-            if name in config.EMPTY_TILE_NAMES
+            for tile_id, name in TILE_DICTIONARY.items()
+            if name in EMPTY_TILE_NAMES
         }
         BEDROCK_TILE_IDS = {
             tile_id
-            for tile_id, name in config.TILE_DICTIONARY.items()
-            if name in config.BEDROCK_TILE_NAMES
+            for tile_id, name in TILE_DICTIONARY.items()
+            if name in BEDROCK_TILE_NAMES
         }
         DIRT_TILE_IDS = {
             tile_id
-            for tile_id, name in config.TILE_DICTIONARY.items()
-            if name in config.DIRT_TILE_NAMES
+            for tile_id, name in TILE_DICTIONARY.items()
+            if name in DIRT_TILE_NAMES
         }
 
         self.set_update_rate(1 / TARGET_FPS)
@@ -97,9 +95,9 @@ class GameRenderer(arcade.Window):
 
         # Load sprite textures from files
         self.textures = {}
-        for tile_id, sprite_name in config.TILE_DICTIONARY.items():
+        for tile_id, sprite_name in TILE_DICTIONARY.items():
             if sprite_name not in self.textures:
-                path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                 self.textures[sprite_name] = arcade.load_texture(path)
 
         # Create transparent texture for empty transitions
@@ -110,22 +108,22 @@ class GameRenderer(arcade.Window):
 
         # Load death textures
         self.blood_texture = arcade.load_texture(
-            os.path.join(config.SPRITES_PATH, f"{config.PLAYER_DEATH_SPRITE}.png")
+            os.path.join(SPRITES_PATH, f"{PLAYER_DEATH_SPRITE}.png")
         )
         self.blood_green_texture = arcade.load_texture(
-            os.path.join(config.SPRITES_PATH, f"{config.MONSTER_DEATH_SPRITE}.png")
+            os.path.join(SPRITES_PATH, f"{MONSTER_DEATH_SPRITE}.png")
         )
 
         # Load horizontal transition textures
         self.horizontal_transition_textures = {}
         for key, sprite_name in HORIZONTAL_TRANSITION_TEXTURES.items():
-            path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+            path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
             self.horizontal_transition_textures[key] = arcade.load_texture(path)
 
         # Load vertical transition textures
         self.vertical_transition_textures = {}
         for key, sprite_name in VERTICAL_TRANSITION_TEXTURES.items():
-            path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+            path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
             self.vertical_transition_textures[key] = arcade.load_texture(path)
 
         # Load player textures: (sprite_id, state, direction, frame) -> texture
@@ -135,7 +133,7 @@ class GameRenderer(arcade.Window):
                 for frame in range(1, 5):
                     # Walking sprites
                     sprite_name = f"player{sprite_id}_{direction.value}_{frame}"
-                    path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                    path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                     walk_texture = arcade.load_texture(path)
                     self.player_textures[(sprite_id, "walk", direction, frame)] = (
                         walk_texture
@@ -148,7 +146,7 @@ class GameRenderer(arcade.Window):
 
                     # Digging sprites
                     sprite_name = f"player{sprite_id}_dig_{direction.value}_{frame}"
-                    path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                    path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                     self.player_textures[(sprite_id, "dig", direction, frame)] = (
                         arcade.load_texture(path)
                     )
@@ -165,7 +163,7 @@ class GameRenderer(arcade.Window):
             for direction in Direction:
                 for frame in range(1, 5):
                     sprite_name = f"{sprite_prefix}_{direction.value}_{frame}"
-                    path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                    path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                     texture = arcade.load_texture(path)
                     self.monster_textures[(entity_type, direction, frame)] = texture
 
@@ -212,7 +210,7 @@ class GameRenderer(arcade.Window):
         for j in range(255):
             self.tile_id_to_texture_dictionary.insert(j, self.transparent_texture)
 
-        for tile_id, sprite_name in config.TILE_DICTIONARY.items():
+        for tile_id, sprite_name in TILE_DICTIONARY.items():
             self.tile_id_to_texture_dictionary.insert(
                 tile_id, self.textures[sprite_name]
             )
@@ -332,11 +330,11 @@ class GameRenderer(arcade.Window):
 
         # Pickup textures: visual_id -> texture (for treasures and tools)
         self.pickup_textures = {}
-        pickup_tile_ids = set(config.TREASURE_TILES.keys()) | set(config.TOOL_TILES.keys())
+        pickup_tile_ids = set(TREASURE_TILES.keys()) | set(TOOL_TILES.keys())
         for tile_id in pickup_tile_ids:
-            sprite_name = config.TILE_DICTIONARY.get(tile_id)
+            sprite_name = TILE_DICTIONARY.get(tile_id)
             if sprite_name:
-                path = os.path.join(config.SPRITES_PATH, f"{sprite_name}.png")
+                path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
                 self.pickup_textures[tile_id] = arcade.load_texture(path)
 
         # Pickup sprite list (dynamic length)
@@ -361,11 +359,11 @@ class GameRenderer(arcade.Window):
         self.bomb_textures = {}
         # Big bomb - active frames 1-3 and defused
         for frame in range(1, 4):
-            path = os.path.join(config.SPRITES_PATH, f"bigbomb{frame}.png")
+            path = os.path.join(SPRITES_PATH, f"bigbomb{frame}.png")
             self.bomb_textures[(BombType.BIG_BOMB, "active", frame)] = (
                 arcade.load_texture(path)
             )
-        path = os.path.join(config.SPRITES_PATH, "bigbomb_defused.png")
+        path = os.path.join(SPRITES_PATH, "bigbomb_defused.png")
         self.bomb_textures[(BombType.BIG_BOMB, "defused", 0)] = arcade.load_texture(
             path
         )
@@ -391,9 +389,9 @@ class GameRenderer(arcade.Window):
         # Explosion textures indexed by frame (0=transparent, 1=explosion, 2=smoke1, 3=smoke2)
         self.explosion_frame_textures = [
             self.transparent_texture,
-            arcade.load_texture(os.path.join(config.SPRITES_PATH, "explosion.png")),
-            arcade.load_texture(os.path.join(config.SPRITES_PATH, "smoke1.png")),
-            arcade.load_texture(os.path.join(config.SPRITES_PATH, "smoke2.png")),
+            arcade.load_texture(os.path.join(SPRITES_PATH, "explosion.png")),
+            arcade.load_texture(os.path.join(SPRITES_PATH, "smoke1.png")),
+            arcade.load_texture(os.path.join(SPRITES_PATH, "smoke2.png")),
         ]
 
         # Explosion sprite list (static, one sprite per tile)
