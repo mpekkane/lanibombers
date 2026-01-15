@@ -13,7 +13,16 @@ from game_engine.entities.bomb import Bomb, BombType
 from game_engine.game_engine import GameEngine
 from game_engine.map_loader import load_map
 from client_simulation import ClientSimulation
-
+from cfg.tile_dictionary import (
+    TILE_DICTIONARY,
+    EMPTY_TILE_NAMES,
+    BEDROCK_TILE_NAMES,
+    DIRT_TILE_NAMES,
+    PLAYER_DEATH_SPRITE,
+    MONSTER_DEATH_SPRITE,
+    TREASURE_TILES,
+    TOOL_TILES,
+)
 
 MAP_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'maps', 'ANZULABY.MNE')
 
@@ -162,17 +171,29 @@ class MockServer:
 
 def main():
     import arcade
-    from renderer.game_renderer import GameRenderer
+    from renderer.game_renderer import GameRenderer, RendererConfig
 
     filename = None
-    if len(sys.argv) > 1: 
+    if len(sys.argv) > 1:
         filename = sys.argv[1]
 
     server = MockServer(filename)
     state = server.get_render_state()
     print(f"Loaded map: {state.width}x{state.height}")
+    SPRITES_PATH = os.path.join(os.path.dirname(__file__), "assets", "sprites")
+    renderer_config = RendererConfig(
+        TILE_DICTIONARY,
+        EMPTY_TILE_NAMES,
+        BEDROCK_TILE_NAMES,
+        DIRT_TILE_NAMES,
+        PLAYER_DEATH_SPRITE,
+        MONSTER_DEATH_SPRITE,
+        SPRITES_PATH,
+        TREASURE_TILES,
+        TOOL_TILES,
+    )
 
-    renderer = GameRenderer(server)
+    renderer = GameRenderer(server, renderer_config)
     arcade.run()
 
 
