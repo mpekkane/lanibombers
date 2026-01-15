@@ -25,7 +25,7 @@ def get_key(key: str) -> keyboard.Key:
         return key
 
 
-def validate(pressed: Union[keyboard.Key, keyboard.KeyCode], mapped: str):
+def check_input(pressed: Union[keyboard.Key, keyboard.KeyCode], mapped: str):
     if isinstance(pressed, keyboard.Key):
         return pressed == get_key(mapped)
     else:

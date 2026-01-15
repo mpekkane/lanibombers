@@ -10,7 +10,7 @@ from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
 from common.config_reader import ConfigReader
-from common.keymapper import validate
+from common.keymapper import check_input
 
 
 class BomberClient:
@@ -52,17 +52,17 @@ class BomberClient:
 
     def on_press(self, key: Union[keyboard.Key, keyboard.KeyCode]):
         # FIXME: test with static keys, fix to key_config.yaml
-        if validate(key, self.fire):
+        if check_input(key, self.fire):
             action = Action.FIRE
-        elif validate(key, self.stop):
+        elif check_input(key, self.stop):
             action = Action.STOP
-        elif validate(key, self.up):
+        elif check_input(key, self.up):
             action = Action.UP
-        elif validate(key, self.down):
+        elif check_input(key, self.down):
             action = Action.DOWN
-        elif validate(key, self.left):
+        elif check_input(key, self.left):
             action = Action.LEFT
-        elif validate(key, self.right):
+        elif check_input(key, self.right):
             action = Action.RIGHT
         else:
             action = None

@@ -6,7 +6,8 @@ import os
 import time
 import uuid
 import threading
-from typing import Dict
+from enum import IntEnum
+from typing import Dict, Union
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
@@ -16,6 +17,7 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.game_state import Game
 from renderer.game_renderer import GameRenderer, RendererConfig
+from common.keymapper import check_input
 from cfg.tile_dictionary import (
     TILE_DICTIONARY,
     EMPTY_TILE_NAMES,
@@ -26,8 +28,20 @@ from cfg.tile_dictionary import (
 )
 
 
+class ServerState(IntEnum):
+    STARTING = 1
+    LOBBY = 2
+    SHOP = 3
+    GAME = 4
+    END = 5
+
+    def running(self) -> bool:
+        return int(self) > 2
+
+
 class BomberServer:
     def __init__(self, cfg: str, map_path: str) -> None:
+        self.state = ServerState.STARTING
         # game engine
         self.game = Game(map_path)
 
@@ -45,11 +59,28 @@ class BomberServer:
         self.ping_count = 0
         self.pong_count = 0
         self.MAX_PING_BUFFER = 1
-        self.started = False
+        self.players = []
 
-    def start_game(self):
+    def run_lobby(self) -> bool:
+        self.state = ServerState.LOBBY
+        while self.state == ServerState.LOBBY:
+            print("")
+            print("Hosting a LAN server")
+            if len(self.players) > 0:
+                print("Players in the lobby")
+                for i, player in enumerate(self.players):
+                    print(f"{i+1}: {player}")
+                inp = input("start game? y/n")
+                if inp == "y":
+                    self.state = ServerState.GAME
+            else:
+                print("No players in the lobby")
+                time.sleep(1)
+        return self.state == ServerState.GAME
+
+    def start_game(self) -> None:
         # FIXME: temp to check logic
-        self.started = True
+        self.state = ServerState.GAME
         update_thread = threading.Thread(target=self.update_state, daemon=True)
         update_thread.start()
 
@@ -59,7 +90,7 @@ class BomberServer:
 
     def get_render_state(self):
         """Returns RenderState with dimensions and sprite indices"""
-        if not self.started:
+        if not self.state.running():
             return
         players = self.game.get_player_list()
         monsters = self.game.get_monsters()
@@ -74,7 +105,7 @@ class BomberServer:
         )
 
     def update_state(self):
-        if not self.started:
+        if not self.state.running():
             return
         while True:
             self.game.update_state()
@@ -86,7 +117,7 @@ class BomberServer:
 
     def on_control(self, msg: ClientControl, ctx: ClientContext):
         """test contolling"""
-        if not self.started:
+        if not self.state.running():
             return
 
         player = self.game.get_player(ctx.state.name)
@@ -133,6 +164,7 @@ class BomberServer:
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
         ctx.name = msg.name
+        self.players.append(msg.name)
         self.game.create_player(msg.name)
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:
@@ -199,7 +231,9 @@ def main() -> None:
     cfg = args.cfg
     map_path = args.map
     server = BomberServer(cfg, map_path)
-
+    ready = server.run_lobby()
+    if not ready:
+        exit(0)
     # ping_thread = threading.Thread(
     #     target=ping, daemon=True, kwargs={"server": server}
     # )
@@ -218,11 +252,9 @@ def main() -> None:
         SPRITES_PATH,
     )
 
-    inp = input("start?")
-    if inp == "y":
-        server.start_game()
-        renderer = GameRenderer(server, renderer_config)
-        renderer.run()
+    server.start_game()
+    renderer = GameRenderer(server, renderer_config)
+    renderer.run()
 
 
 if __name__ == "__main__":
