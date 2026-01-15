@@ -1,7 +1,14 @@
 ---
-  up: KEY.up
-  down: KEY.down
-  left: KEY.left
-  right: KEY.right
-  fire: KEY.space
-  stop: KEY.ctrl_r
+  up: up
+  down: down
+  left: left
+  right: right
+  fire: space
+  stop: ctrl_r
+
+  # up: w
+  # down: s
+  # left: a
+  # right: d
+  # fire: ctrl_l
+  # stop: shift_l

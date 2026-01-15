@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Tuple
 
 
 class Direction(Enum):
@@ -24,7 +25,7 @@ class DynamicEntity:
     direction: Direction
     entity_type: EntityType
     name: str = ''
-    colour: tuple = (255, 255, 255)
+    colour: Tuple[int, int, int] = (255, 255, 255)
     speed: float = 0.0
     state: str = 'idle'
     sprite_id: int = 1  # Used for player entities (1-4)

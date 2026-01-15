@@ -8,8 +8,9 @@ from __future__ import annotations
 import time
 import struct
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Type, Iterable, List, Union
+from typing import ClassVar, Dict, Type, Iterable, List
 from game_engine.agent_state import Action
+
 
 class Message:
     """Abstract class for message objects"""
@@ -187,7 +188,7 @@ class Announce(Message):
         if len(payload) != 8 + name_len:
             raise ValueError("Announce name length mismatch")
 
-        name_b = payload[8 : 8 + name_len]
+        name_b = payload[8:8 + name_len]
         name = name_b.decode("utf-8", errors="strict")
         return cls(port=port, name=name)
 
@@ -241,20 +242,11 @@ class ClientControl(Message):
     """
 
     TYPE: ClassVar[int] = 8
-    commands: List[Action]
+    command: Action
 
     def to_bytes(self) -> bytes:
-        data = bytes()
-        for cmd in self.commands:
-            data += int(cmd).to_bytes(1, "big")
-        return data
+        return int(self.command).to_bytes(1, "big")
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> ClientControl:
-        cmd: List[Action] = []
-        l = len(payload)
-        for i in range(l):
-            byte = payload[i]
-            action = Action(byte)
-            cmd.append(action)
-        return cls(cmd)
+        return cls(Action(int.from_bytes(payload, "big")))

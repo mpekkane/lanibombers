@@ -3,12 +3,14 @@ Test code for client-side
 """
 
 import time
+from typing import Union
 from argparse import ArgumentParser
 from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl
 from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
 from common.config_reader import ConfigReader
+from common.keymapper import validate
 
 
 class BomberClient:
@@ -33,8 +35,8 @@ class BomberClient:
 
     def start(self) -> None:
         self.client.start()
-        # name = input("Name: ")
-        # self.client.set_name(name)
+        name = input("Name: ")
+        self.client.set_name(name)
 
         # Create and start the listener
         with keyboard.Listener(on_press=self.on_press) as listener:
@@ -48,24 +50,24 @@ class BomberClient:
         pong = Pong(ping_UUID=msg.UUID, received=received)
         self.client.send(pong)
 
-    def on_press(self, key: keyboard.Key):
+    def on_press(self, key: Union[keyboard.Key, keyboard.KeyCode]):
         # FIXME: test with static keys, fix to key_config.yaml
-        if key == keyboard.Key.space:
+        if validate(key, self.fire):
             action = Action.FIRE
-        elif key == keyboard.Key.ctrl_r:
+        elif validate(key, self.stop):
             action = Action.STOP
-        elif key == keyboard.Key.up:
+        elif validate(key, self.up):
             action = Action.UP
-        elif key == keyboard.Key.down:
+        elif validate(key, self.down):
             action = Action.DOWN
-        elif key == keyboard.Key.left:
+        elif validate(key, self.left):
             action = Action.LEFT
-        elif key == keyboard.Key.right:
+        elif validate(key, self.right):
             action = Action.RIGHT
         else:
             action = None
         if action:
-            self.client.send(ClientControl([int(action)]))
+            self.client.send(ClientControl(int(action)))
 
 
 def main() -> None:
