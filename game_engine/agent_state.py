@@ -10,3 +10,12 @@ class Action(IntEnum):
     FIRE = 6
     CHOOSE = 7
     REMOTE = 8
+
+    def is_move(self) -> bool:
+        return (
+            self == Action.UP
+            or self == Action.DOWN
+            or self == Action.RIGHT
+            or self == Action.LEFT
+            or self == Action.STOP
+        )

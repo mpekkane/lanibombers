@@ -75,8 +75,8 @@ class BomberServer:
         # FIXME: temp to check logic
         self.state = ServerState.GAME
         self.engine.start()
-        update_thread = threading.Thread(target=self.update_state, daemon=True)
-        update_thread.start()
+        # update_thread = threading.Thread(target=self.update_state, daemon=True)
+        # update_thread.start()
 
     ##################
     # game engine
@@ -108,28 +108,41 @@ class BomberServer:
         if player is None:
             return
 
-        cmd = msg.command
-        if cmd == Action.RIGHT:
-            player.direction = Direction.RIGHT
-            player.state = "walk"
-        elif cmd == Action.LEFT:
-            player.direction = Direction.LEFT
-            player.state = "walk"
-        elif cmd == Action.UP:
-            player.direction = Direction.UP
-            player.state = "walk"
-        elif cmd == Action.DOWN:
-            player.direction = Direction.DOWN
-            player.state = "walk"
-        elif cmd == Action.STOP:
-            player.state = "idle"
-        elif cmd == Action.FIRE:
-            bomb = player.plant_bomb()
-            self.engine.plant_bomb(bomb)
-        elif cmd == Action.CHOOSE:
-            bomb = player.choose()
-        elif cmd == Action.REMOTE:
-            pass
+        cmd: Action = msg.command
+        if cmd.is_move():
+            if cmd == Action.RIGHT:
+                if player.direction == Direction.RIGHT and player.state == "walk":
+                    return
+                player.direction = Direction.RIGHT
+                player.state = "walk"
+            elif cmd == Action.LEFT:
+                if player.direction == Direction.LEFT and player.state == "walk":
+                    return
+                player.direction = Direction.LEFT
+                player.state = "walk"
+            elif cmd == Action.UP:
+                if player.direction == Direction.UP and player.state == "walk":
+                    return
+                player.direction = Direction.UP
+                player.state = "walk"
+            elif cmd == Action.DOWN:
+                if player.direction == Direction.DOWN and player.state == "walk":
+                    return
+                player.direction = Direction.DOWN
+                player.state = "walk"
+            elif cmd == Action.STOP:
+                player.state = "idle"
+
+            self.engine.change_player_direction(player)
+        else:
+            if cmd == Action.FIRE:
+                bomb = player.plant_bomb()
+                self.engine.plant_bomb(bomb)
+            elif cmd == Action.CHOOSE:
+                bomb = player.choose()
+            elif cmd == Action.REMOTE:
+                # TODO: trigger remote bomb
+                pass
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:

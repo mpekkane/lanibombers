@@ -122,6 +122,38 @@ class GameEngine:
         )
         self.event_resolver.schedule_event(explosion_event)
 
+    def clear_player_move_events(self, player: Player) -> None:
+        self.event_resolver.cancel_object_events(player.id, "move")
+
+    def change_player_direction(self, player: Player) -> None:
+        """Create and handle player movement events"""
+        self.clear_player_move_events(player)
+        if player.state == "walk":
+            if player.direction == Direction.RIGHT:
+                d = 1 - (player.x - (int)(player.x))
+            elif player.direction == Direction.LEFT:
+                d = player.x - (int)(player.x)
+            elif player.direction == Direction.UP:
+                d = player.y - (int)(player.y)
+            elif player.direction == Direction.DOWN:
+                d = 1 - (player.y - (int)(player.y))
+            else:
+                return
+
+            # this is the boundary condition
+            if d == 0:
+                d = 1
+
+            dt = d / player.speed
+            movement_event = Event(
+                trigger_at=time.time() + dt,
+                target=player,
+                event_type="move",
+                created_at=time.time(),
+                created_by=player.id
+            )
+            self.event_resolver.schedule_event(movement_event)
+
     def schedule_event(self, event: Event) -> None:
         """Schedule an event for later execution."""
         self.event_resolver.schedule_event(event)
@@ -141,8 +173,12 @@ class GameEngine:
         # Handle bomb explosion
         if isinstance(target, Bomb) and event.event_type == "explode":
             self.resolve_bomb(target, event)
+        elif isinstance(target, Player) and event.event_type == "move":
+            self.resolve_movement(target, event)
 
     def resolve_bomb(self, target: Bomb, event: Event) -> None:
+        """Resolve explosion events"""
+        # FIXME: ?
         current_time = time.time()
 
         # Damage tiles and create explosions within blast radius
@@ -158,6 +194,24 @@ class GameEngine:
         # Remove bomb from list
         if target in self.bombs:
             self.bombs.remove(target)
+
+    def resolve_movement(self, target: Player, event: Event) -> None:
+        """Resolve move events"""
+
+        # FIXME: now there is a conflict with the big and small grid
+        # Dynamic entities should have two variables from pose?
+        if target.direction == Direction.RIGHT:
+            target.x += 1
+        elif target.direction == Direction.LEFT:
+            target.x -= 1
+        elif target.direction == Direction.UP:
+            target.y -= 1
+        elif target.direction == Direction.DOWN:
+            target.y += 1
+        else:
+            return
+
+        self.change_player_direction(target)
 
     def update_player_state(self):
         if self.prev_time < 0:

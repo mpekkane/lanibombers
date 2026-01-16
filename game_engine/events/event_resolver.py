@@ -1,10 +1,10 @@
 import threading
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, List
 
 from game_engine.events.event import Event
 from game_engine.events.event_queue import EventQueue
-
+from uuid import UUID
 
 class EventResolver:
     """Timer-based event resolver that fires events at their scheduled times."""
@@ -42,10 +42,18 @@ class EventResolver:
             if self._running:
                 self._schedule_next_wakeup()
 
-    def cancel_event(self, event_id) -> bool:
+    def cancel_event(self, event_id: UUID) -> bool:
         """Cancel a scheduled event."""
         with self._lock:
             return self.queue.cancel_event(event_id)
+
+    def get_object_events(self, creator: UUID, event_type: str = "") -> List[Event]:
+        with self._lock:
+            return self.queue.get_object_events(creator, event_type)
+
+    def cancel_object_events(self, creator: UUID, type: str = "") -> None:
+        with self._lock:
+            self.queue.cancel_object_events(creator, type)
 
     def _schedule_next_wakeup(self) -> None:
         """Internal: schedule timer for next event."""
@@ -62,22 +70,24 @@ class EventResolver:
 
     def _process_due_events(self) -> None:
         """Internal: fire all events whose time has come."""
-        with self._lock:
+        while True:
+            event = None
+
             if not self._running:
                 return
-
             current_time = time.time()
-            while True:
+
+            with self._lock:
                 next_time = self.queue.get_next_trigger_time()
                 if next_time is None or next_time > current_time:
                     break
-
                 event = self.queue.pop_next()
-                if event and self._resolve:
-                    try:
-                        self._resolve(event.target, event)
-                    except Exception as e:
-                        # Log but don't crash the resolver
-                        print(f"Event resolve error: {e}")
+
+            if event and self._resolve:
+                try:
+                    self._resolve(event.target, event)
+                except Exception as e:
+                    # Log but don't crash the resolver
+                    print(f"Event resolve error: {e}")
 
             self._schedule_next_wakeup()

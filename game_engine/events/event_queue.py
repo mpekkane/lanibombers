@@ -1,5 +1,5 @@
 import heapq
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from game_engine.events.event import Event
@@ -39,6 +39,20 @@ class EventQueue:
             del self._event_map[event_id]
             return True
         return False
+
+    def get_object_events(self, creator: UUID, event_type: str = "") -> List[Event]:
+        found: List[Event] = []
+        for event in self._events:
+            if event.created_by == creator:
+                if not event_type or event_type == event.event_type:
+                    found.append(event)
+        return found
+
+    def cancel_object_events(self, creator: UUID, event_type: str = "") -> None:
+        for event in self._events:
+            if event.created_by == creator:
+                if not event_type or event_type == event.event_type:
+                    self.cancel_event(event.id)
 
     def get_next_trigger_time(self) -> Optional[float]:
         """Return the trigger time of the next event, or None if queue is empty."""
