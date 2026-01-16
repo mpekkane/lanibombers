@@ -23,6 +23,8 @@ class BomberClient:
         self.right = config.get_config_mandatory("right")
         self.fire = config.get_config_mandatory("fire")
         self.stop = config.get_config_mandatory("stop")
+        self.choose = config.get_config_mandatory("choose")
+        self.remote = config.get_config_mandatory("remote")
 
         self.client = BomberNetworkClient(cfg_path)
         server_found = self.client.find_host()
@@ -64,6 +66,10 @@ class BomberClient:
             action = Action.LEFT
         elif check_input(key, self.right):
             action = Action.RIGHT
+        elif check_input(key, self.choose):
+            action = Action.CHOOSE
+        elif check_input(key, self.remote):
+            action = Action.REMOTE
         else:
             action = None
         if action:

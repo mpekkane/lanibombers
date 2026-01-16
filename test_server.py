@@ -105,29 +105,31 @@ class BomberServer:
             return
 
         player = self.engine.get_player_by_name(ctx.state.name)
+        if player is None:
+            return
+
         cmd = msg.command
         if cmd == Action.RIGHT:
-            # Moving right
             player.direction = Direction.RIGHT
             player.state = "walk"
         elif cmd == Action.LEFT:
-            # Moving right
             player.direction = Direction.LEFT
             player.state = "walk"
         elif cmd == Action.UP:
-            # Moving right
             player.direction = Direction.UP
             player.state = "walk"
         elif cmd == Action.DOWN:
             player.direction = Direction.DOWN
             player.state = "walk"
         elif cmd == Action.STOP:
-            # Stopped after right
             player.state = "idle"
         elif cmd == Action.FIRE:
-            # Stopped after right
             bomb = player.plant_bomb()
             self.engine.plant_bomb(bomb)
+        elif cmd == Action.CHOOSE:
+            bomb = player.choose()
+        elif cmd == Action.REMOTE:
+            pass
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:

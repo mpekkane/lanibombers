@@ -8,3 +8,5 @@ class Action(IntEnum):
     RIGHT = 4
     STOP = 5
     FIRE = 6
+    CHOOSE = 7
+    REMOTE = 8

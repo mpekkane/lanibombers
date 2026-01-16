@@ -11,8 +11,19 @@ class Player(DynamicEntity):
     inventory: List[Tuple[BombType, int]] = field(default_factory=lambda: [])
     selected = 0
 
-    def _test_inventory(self):
+    def _test_inventory(self) -> None:
         self.inventory.append((BombType.BIG_BOMB, 100))
+        self.inventory.append((BombType.C4, 3))
+        self.inventory.append((BombType.LANDMINE, 100))
+
+    def choose(self) -> None:
+        self.selected += 1
+        if self.selected >= len(self.inventory):
+            self.selected = 0
+
+        # FIXME: debug print
+        selected_bomb_type, bomb_count = self.inventory[self.selected]
+        print(selected_bomb_type, bomb_count)
 
     def plant_bomb(self) -> Bomb:
         selected_bomb_type, bomb_count = self.inventory[self.selected]
@@ -28,5 +39,7 @@ class Player(DynamicEntity):
 
         if new_count <= 0:
             del self.inventory[self.selected]
+        else:
+            self.inventory[self.selected] = selected_bomb_type, new_count
 
         return bomb

@@ -5,10 +5,5 @@
   right: right
   fire: space
   stop: ctrl_r
-
-  # up: w
-  # down: s
-  # left: a
-  # right: d
-  # fire: ctrl_l
-  # stop: shift_l
+  choose: shift_r
+  remote: enter
