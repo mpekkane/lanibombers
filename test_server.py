@@ -2,13 +2,11 @@
 Test code for server-side
 """
 
-import os
 import time
 import uuid
 import threading
-import array
 from enum import IntEnum
-from typing import Dict
+from typing import Dict, List
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
@@ -16,10 +14,9 @@ from network_stack.messages.messages import Name, ChatText, Ping, Pong, ClientCo
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
-from game_engine.game_state import Game
+from game_engine.map_loader import load_map
 from game_engine import GameEngine
 from renderer.game_renderer import GameRenderer
-
 
 
 class ServerState(IntEnum):
@@ -37,9 +34,9 @@ class BomberServer:
     def __init__(self, cfg: str, map_path: str) -> None:
         self.state = ServerState.STARTING
         # game engine
-        # FIXME: this is a merge conflict
-        self.game = Game(map_path)
         self.engine = GameEngine()
+        map_data = load_map(map_path)
+        self.engine.load_map(map_data)
 
         # networking
         self.server = BomberNetworkServer(cfg)
@@ -55,7 +52,7 @@ class BomberServer:
         self.ping_count = 0
         self.pong_count = 0
         self.MAX_PING_BUFFER = 1
-        self.players = []
+        self.players: List[str] = []
 
     def run_lobby(self) -> bool:
         self.state = ServerState.LOBBY
@@ -77,6 +74,7 @@ class BomberServer:
     def start_game(self) -> None:
         # FIXME: temp to check logic
         self.state = ServerState.GAME
+        self.engine.start()
         update_thread = threading.Thread(target=self.update_state, daemon=True)
         update_thread.start()
 
@@ -88,26 +86,13 @@ class BomberServer:
         """Returns RenderState with dimensions and sprite indices"""
         if not self.state.running():
             return
-        players = self.game.get_player_list()
-        monsters = self.game.get_monsters()
-        grid = self.game.get_grid()
-        width, height = self.game.get_size()
-        return RenderState(
-            width=width,
-            height=height,
-            tilemap=grid,
-            players=players,
-            monsters=monsters,
-            pickups=[],
-            bombs=[],
-            explosions=self.engine.explosions[:]
-        )
+        return self.engine.get_render_state()
 
     def update_state(self):
         if not self.state.running():
             return
         while True:
-            self.game.update_state()
+            self.engine.update_player_state()
             time.sleep(0.1)
 
     ##################
@@ -119,7 +104,7 @@ class BomberServer:
         if not self.state.running():
             return
 
-        player = self.game.get_player(ctx.state.name)
+        player = self.engine.get_player_by_name(ctx.state.name)
         cmd = msg.command
         if cmd == Action.RIGHT:
             # Moving right
@@ -139,6 +124,10 @@ class BomberServer:
         elif cmd == Action.STOP:
             # Stopped after right
             player.state = "idle"
+        elif cmd == Action.FIRE:
+            # Stopped after right
+            bomb = player.plant_bomb()
+            self.engine.plant_bomb(bomb)
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:
@@ -164,7 +153,10 @@ class BomberServer:
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
         ctx.name = msg.name
         self.players.append(msg.name)
-        self.game.create_player(msg.name)
+        self.engine.create_player(msg.name)
+        # FIXME: debug testing
+        player = self.engine.get_player_by_name(msg.name)
+        player._test_inventory()
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:
         sender = ctx.name or "?"

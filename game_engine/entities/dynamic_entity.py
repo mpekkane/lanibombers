@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple
-
 from game_engine.entities.game_object import GameObject
 
 

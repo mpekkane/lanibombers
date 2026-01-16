@@ -1,3 +1,4 @@
+from typing import Tuple
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
@@ -8,4 +9,4 @@ class GameObject:
     id: UUID = field(default_factory=uuid4)
     health: int = 100
     visual_id: int = 0
-    color: tuple = (255, 255, 255)
+    color: Tuple[int, int, int] = (255, 255, 255)
