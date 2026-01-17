@@ -1,6 +1,5 @@
-import time
 import arcade
-
+from game_engine.clock import Clock
 SPRITE_SIZE = 10
 
 # Animation timing (seconds per frame)
@@ -26,7 +25,7 @@ class ExplosionSprite(arcade.Sprite):
     def update_from_type(self, explosion_type: int, current_time: float = None):
         """Update sprite based on explosion type from byte array"""
         if current_time is None:
-            current_time = time.time()
+            current_time = Clock.now()
 
         # New explosion started
         if explosion_type != 0:

@@ -2,7 +2,7 @@
 Test code for server-side
 """
 
-import time
+
 import uuid
 import threading
 from enum import IntEnum
@@ -11,6 +11,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
 from network_stack.messages.messages import Name, ChatText, Ping, Pong, ClientControl
+from game_engine.clock import Clock
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
@@ -68,7 +69,7 @@ class BomberServer:
                     self.state = ServerState.GAME
             else:
                 print("No players in the lobby")
-                time.sleep(1)
+                Clock.sleep(1)
         return self.state == ServerState.GAME
 
     def start_game(self) -> None:
@@ -93,7 +94,7 @@ class BomberServer:
             return
         while True:
             self.engine.update_player_state()
-            time.sleep(0.1)
+            Clock.sleep(0.1)
 
     ##################
     # networking
@@ -146,7 +147,7 @@ class BomberServer:
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:
-            object.__setattr__(msg, "timestamp", time.time_ns())
+            object.__setattr__(msg, "timestamp", Clock.now_ns())
 
     def ping(self) -> None:
         uid = str(uuid.uuid4())
@@ -219,13 +220,13 @@ class BomberServer:
 
 def ping(server: BomberServer) -> None:
     print("ping thread")
-    last_ping = time.time()
+    last_ping = Clock.now()
     tick = 0.1
     while True:
-        if time.time() - last_ping > tick:
+        if Clock.now() - last_ping > tick:
             server.ping()
-            last_ping = time.time()
-        time.sleep(tick / 2)
+            last_ping = Clock.now()
+        Clock.sleep(tick / 2)
 
 
 def main() -> None:

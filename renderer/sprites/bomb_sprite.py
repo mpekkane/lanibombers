@@ -1,6 +1,6 @@
-import time
 import arcade
 
+from game_engine.clock import Clock
 from game_engine.entities.bomb import Bomb, BombType
 
 SPRITE_SIZE = 10
@@ -21,7 +21,7 @@ class BombSprite(arcade.Sprite):
     def update_from_bomb(self, bomb: Bomb, current_time: float = None):
         """Update sprite position and texture from bomb entity data"""
         if current_time is None:
-            current_time = time.time()
+            current_time = Clock.now()
 
         # Update position (grid-aligned, integer coordinates)
         self.center_x = (bomb.x + 0.5) * SPRITE_SIZE * self.zoom

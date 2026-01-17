@@ -5,9 +5,9 @@ and handles registry of the message types, encoding and decoding.
 """
 
 from __future__ import annotations
-import time
 import struct
 from dataclasses import dataclass
+from game_engine.clock import Clock
 from typing import ClassVar, Dict, Type, Iterable, List
 from game_engine.agent_state import Action
 
@@ -16,7 +16,7 @@ class Message:
     """Abstract class for message objects"""
 
     def __init__(self) -> None:
-        self.timestamp = time.time_ns()
+        self.timestamp = Clock.now_ns()
 
     TYPE: ClassVar[int] = -1  # override
     timestamp: int
@@ -52,7 +52,7 @@ def encode_message(msg: Message) -> bytes:
     t = msg.TYPE
     stamp = getattr(msg, "timestamp", None)
     if stamp is None:
-        stamp = time.time_ns()
+        stamp = Clock.now_ns()
         object.__setattr__(msg, "timestamp", stamp)
     stamp = msg.timestamp.to_bytes(8, "big")  # 64 bits, 8 bytes
     if not (0 <= t <= 255):

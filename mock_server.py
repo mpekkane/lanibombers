@@ -5,9 +5,9 @@ Simulates a game server returning sprite index arrays.
 
 import os
 import sys
-import time
 import random
 
+from game_engine.clock import Clock
 from game_engine.entities import Direction, EntityType, DynamicEntity
 from game_engine.entities.player import Player
 from game_engine.entities.bomb import Bomb, BombType
@@ -32,7 +32,7 @@ class MockServer:
         self.engine.load_map(map_data)
         self.engine.start()
         self._init_players()
-        self.start_time = time.time()
+        self.start_time = Clock.now()
         self.last_damage_time = self.start_time
         self.last_bomb_time = self.start_time
         # Player 2 movement pattern: start position
@@ -71,7 +71,7 @@ class MockServer:
 
     def _update_player2_movement(self):
         """Move player 2 in a square pattern"""
-        elapsed = time.time() - self.start_time
+        elapsed = Clock.now() - self.start_time
         # Pattern: 4s right, 1s stop, 4s down, 1s stop, 4s left, 1s stop, 4s up, 1s stop = 20s cycle
         # Speed: 1.5 blocks/second (6 blocks in 4 seconds)
         cycle_time = elapsed % 20.0
@@ -129,7 +129,7 @@ class MockServer:
 
     def _update_random_damage(self):
         """Deal damage to a random player and monster every 10 seconds"""
-        current_time = time.time()
+        current_time = Clock.now()
         if current_time - self.last_damage_time >= 10.0:
             self.last_damage_time = current_time
 
@@ -147,7 +147,7 @@ class MockServer:
 
     def _spawn_random_bomb(self):
         """Spawn a bomb at a random location every .5 seconds"""
-        current_time = time.time()
+        current_time = Clock.now()
         if current_time - self.last_bomb_time >= 0.5:
             self.last_bomb_time = current_time
 

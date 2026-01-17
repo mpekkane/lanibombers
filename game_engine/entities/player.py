@@ -1,6 +1,5 @@
-import time
-import math
 from typing import List, Tuple
+from game_engine.clock import Clock
 from game_engine.entities import DynamicEntity
 from game_engine.entities import Bomb, BombType
 from dataclasses import dataclass, field
@@ -38,7 +37,7 @@ class Player(DynamicEntity):
             x=vx,
             y=vy,
             bomb_type=selected_bomb_type,
-            placed_at=time.time(),
+            placed_at=Clock.now(),
             owner_id=self.id,
         )
         new_count = bomb_count - 1

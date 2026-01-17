@@ -6,8 +6,8 @@ This is used with UDP clients to discover UDP servers via Discovery/Announce.
 from __future__ import annotations
 from typing import List, Tuple, Optional
 import socket
-import time
 
+from game_engine.clock import Clock
 from network_stack.messages.messages import encode_message, decode_message
 from network_stack.messages.messages import Message, Discover, Announce
 from network_stack.clients.transport_scanner import TransportScanner
@@ -58,8 +58,8 @@ class UDPScanner(TransportScanner):
 
             found: dict[Tuple[str, int], None] = {}
 
-            deadline = time.time() + self.timeout_s
-            while time.time() < deadline:
+            deadline = Clock.now() + self.timeout_s
+            while Clock.now() < deadline:
                 try:
                     data, (ip, port) = sock.recvfrom(65535)
                 except socket.timeout:

@@ -1,5 +1,5 @@
 import array
-import time
+from game_engine.clock import Clock
 from typing import List, Tuple, Dict
 from cfg.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
 from game_engine.entities import Direction, EntityType, DynamicEntity
@@ -106,7 +106,7 @@ class Game:
                 state="idle",
             ),
         }
-        self.start_time = time.time()
+        self.start_time = Clock.now()
         self.last_damage_time = self.start_time
 
     def _init_monsters(self):
@@ -134,8 +134,8 @@ class Game:
 
     def update_state(self):
         if self.prev_time < 0:
-            self.prev_time = time.time()
-        elapsed = time.time() - self.prev_time
+            self.prev_time = Clock.now()
+        elapsed = Clock.now() - self.prev_time
         # Speed: 1.5 blocks/second (6 blocks in 4 seconds)
 
         speed = 1.5  # blocks per second
@@ -156,4 +156,4 @@ class Game:
 
             player.x += dx
             player.y += dy
-        self.prev_time = time.time()
+        self.prev_time = Clock.now()

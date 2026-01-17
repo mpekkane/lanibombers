@@ -2,10 +2,10 @@
 Test code for client-side
 """
 
-import time
 from typing import Union
 from argparse import ArgumentParser
 from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl
+from game_engine.clock import Clock
 from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
@@ -48,7 +48,7 @@ class BomberClient:
         print(f"{msg.timestamp}: {msg.text}")
 
     def on_ping(self, msg: Ping):
-        received = time.time_ns()
+        received = Clock.now_ns()
         pong = Pong(ping_UUID=msg.UUID, received=received)
         self.client.send(pong)
 

@@ -1,7 +1,7 @@
 import array
-import time
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
 
+from game_engine.clock import Clock
 from game_engine.entities.tile import Tile
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
@@ -132,7 +132,7 @@ class GameEngine:
         for bomb in self.bombs:
             if bomb.bomb_type == BombType.REMOTE and bomb.owner_id == player.id:
                 explosion_event = Event(
-                    trigger_at=time.time() + 0,
+                    trigger_at=Clock.now() + 0,
                     target=bomb,
                     event_type="explode",
                 )
@@ -194,10 +194,10 @@ class GameEngine:
             # this is the required time to cross the thershold
             dt = d / entity.speed
             movement_event = MoveEvent(
-                trigger_at=time.time() + dt,
+                trigger_at=Clock.now() + dt,
                 target=entity,
                 event_type="move",
-                created_at=time.time(),
+                created_at=Clock.now(),
                 created_by=entity.id,
                 direction=str(entity.direction.value)
             )
@@ -228,7 +228,7 @@ class GameEngine:
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
         # FIXME: ?
-        current_time = time.time()
+        current_time = Clock.now()
 
         # Damage tiles and create explosions within blast radius
         for dy in range(-target.blast_radius, target.blast_radius + 1):
@@ -250,10 +250,9 @@ class GameEngine:
         """Resolve move events"""
         # because events might have been cleared, i.e., triggered at times
         # other than planned, calculate actual traveled distance
-        current_time = time.time()
+        current_time = Clock.now()
         dt = current_time - event.created_at
         d = dt * target.speed
-        prev_vx, prev_vy = xy_to_tile(target.x, target.y)
 
         # move target to the stored direction, not the current one!
         # this is due to the fact that when changing direction, the target (pointer)
@@ -303,7 +302,7 @@ class GameEngine:
             if bomb.bomb_type == BombType.LANDMINE:
                 if bomb.x == px and bomb.y == py:
                     explosion_event = Event(
-                        trigger_at=time.time() + 0,
+                        trigger_at=Clock.now() + 0,
                         target=bomb,
                         event_type="explode",
                     )
@@ -317,8 +316,8 @@ class GameEngine:
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
         if self.prev_time < 0:
-            self.prev_time = time.time()
-        elapsed = time.time() - self.prev_time
+            self.prev_time = Clock.now()
+        elapsed = Clock.now() - self.prev_time
 
         for player in self.players:
             dt = elapsed * player.speed  # blocks per second
@@ -336,7 +335,7 @@ class GameEngine:
 
             player.x += dx
             player.y += dy
-        self.prev_time = time.time()
+        self.prev_time = Clock.now()
 
     def get_render_state(self) -> RenderState:
         """Build and return a RenderState for the renderer."""

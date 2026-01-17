@@ -1,7 +1,7 @@
 import threading
-import time
-from typing import Any, Callable, Optional, List
 
+from typing import Any, Callable, Optional, List
+from game_engine.clock import Clock
 from game_engine.events.event import Event, ResolveFlags
 from game_engine.events.event_queue import EventQueue
 from uuid import UUID
@@ -76,7 +76,7 @@ class EventResolver:
 
         next_time = self.queue.get_next_trigger_time()
         if next_time is not None:
-            delay = max(0, next_time - time.time())
+            delay = max(0, next_time - Clock.now())
             self._timer = threading.Timer(delay, self._process_due_events)
             self._timer.daemon = True
             self._timer.start()
@@ -96,7 +96,7 @@ class EventResolver:
 
             if not self._running:
                 return
-            current_time = time.time()
+            current_time = Clock.now()
 
             with self._lock:
                 next_time = self.queue.get_next_trigger_time()

@@ -1,8 +1,8 @@
-import time
 from dataclasses import dataclass, field
 from enum import Enum
 from uuid import UUID
-
+from typing import Optional
+from game_engine.clock import Clock
 from game_engine.entities.game_object import GameObject
 
 
@@ -47,18 +47,18 @@ class Bomb(GameObject):
         self.blast_radius = radius
         self.damage = damage
 
-    def get_fuse_percentage(self, current_time: float = None) -> float:
+    def get_fuse_percentage(self, current_time: Optional[float] = None) -> float:
         """
         Get the percentage of fuse remaining (1.0 = full, 0.0 = exploded).
 
         Args:
-            current_time: Current timestamp. If None, uses time.time()
+            current_time: Current timestamp. If None, uses Clock.now()
 
         Returns:
             Float between 0.0 and 1.0 representing fuse remaining
         """
         if current_time is None:
-            current_time = time.time()
+            current_time = Clock.now()
 
         elapsed = current_time - self.placed_at
         remaining = max(0.0, 1.0 - (elapsed / self.fuse_duration))

@@ -3,10 +3,10 @@ Client-side simulation for state extrapolation.
 Receives RenderState from server and extrapolates between updates.
 """
 
-import time
 from dataclasses import replace
 from typing import Optional
 
+from game_engine.clock import Clock
 from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import Direction
 
@@ -40,7 +40,7 @@ class ClientSimulation:
             state: The authoritative state from the game server
         """
         self._server_state = state
-        self._server_state_time = time.time()
+        self._server_state_time = Clock.now()
 
     def get_render_state(self) -> Optional[RenderState]:
         """
@@ -52,7 +52,7 @@ class ClientSimulation:
         if self._server_state is None:
             return None
 
-        current_time = time.time()
+        current_time = Clock.now()
         delta_time = current_time - self._server_state_time
 
         # Create extrapolated copies of dynamic entities
