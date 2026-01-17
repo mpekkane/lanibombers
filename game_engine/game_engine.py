@@ -190,6 +190,10 @@ class GameEngine:
 
             # this is the required time to cross the thershold
             dt = d / entity.speed
+            # HACK: since the movement is calculated with actual time, add some bonus
+            # time to cross the threshold properly, to make tile transition logic
+            # nicee
+            dt += 0.01
             movement_event = MoveEvent(
                 trigger_at=Clock.now() + dt,
                 target=entity,
@@ -271,14 +275,14 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
 
-        tolerance = 0.01
+        tolerance = 0.05
         # FIXME: debug print for bug fix, something remains on negative movement
         # print("-" * 20)
         # print(target.x, target.y)
         # print("1:", abs(moved - int(moved)))
         # print("2:", abs(moved - int(moved) - 1))
+        # px, py = xy_to_tile(target.x, target.y)
         # enter tile
-        px, py = xy_to_tile(target.x, target.y)
         if abs(moved - int(moved)) < tolerance or abs(moved - int(moved) - 1) < tolerance:
             # print(f"enter tile   {px} {py}")
             self.entity_enter_tile(target)
