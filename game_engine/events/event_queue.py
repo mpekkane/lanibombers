@@ -53,6 +53,7 @@ class EventQueue:
             if event.created_by == creator:
                 if not event_type or event_type == event.event_type:
                     self.cancel_event(event.id)
+        self._cleanup_cancelled()
 
     def get_next_trigger_time(self) -> Optional[float]:
         """Return the trigger time of the next event, or None if queue is empty."""

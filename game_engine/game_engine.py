@@ -134,10 +134,6 @@ class GameEngine:
 
     def change_entity_direction(self, player: DynamicEntity) -> None:
         """Create and handle player movement events"""
-        # FIXME: dbg
-        # print("*" * 80)
-        # print("CHANGE DIR")
-        # print("*" * 80)
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
         # Create new movement
@@ -158,11 +154,6 @@ class GameEngine:
                 d = 1 - (entity.y - (int)(entity.y))
             else:
                 return
-
-            # FIXME: dbg
-            # print(f"pose ({entity.x}, {entity.y})")
-            # print(f"d: {d}")
-            # print(f"{entity.direction}")
 
             # this is the boundary condition
             if d == 0:
@@ -225,13 +216,6 @@ class GameEngine:
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
     ) -> None:
         """Resolve move events"""
-
-        # FIXME: dbg
-        # print("-" * 40)
-        # print("resolve")
-        # print(event)
-        # print("-" * 40)
-
         # because events might have been cleared, i.e., triggered at times
         # other than planned, calculate actual traveled distance
         current_time = time.time()
@@ -253,13 +237,8 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
 
-        # FIXME: dbg
-        # print(f"pose ({target.x}, {target.y})")
-
         # spawn in by default true, but when clearing, do not spawn new ones
         if flags.spawn:
-            # FIXME: dbg
-            # print("continue moving")
             self.move_entity(target)
 
     def update_player_state(self):
