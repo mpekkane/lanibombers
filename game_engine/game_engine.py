@@ -258,11 +258,11 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
 
+        tolerance = 0.01
         # enter tile
         if abs(moved - int(moved)) < tolerance:
             self.entity_enter_tile(target)
         # middle
-        tolerance = 0.01
         if abs(moved - int(moved) - 0.5) < tolerance:
             self.entity_reach_tile_center(target)
 
