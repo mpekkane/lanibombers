@@ -258,22 +258,25 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
 
+        # enter tile
+        if abs(moved - int(moved)) < tolerance:
+            self.entity_enter_tile(target)
         # middle
         tolerance = 0.01
         if abs(moved - int(moved) - 0.5) < tolerance:
-            self.entity_enter_tile_center(target)
-        if abs(moved - int(moved)) < tolerance:
-            self.entity_enter_tile(target)
+            self.entity_reach_tile_center(target)
 
         # spawn in by default true, but when clearing, do not spawn new ones
         if flags.spawn:
             self.move_entity(target)
 
+    # TODO: tile entering logic
     def entity_enter_tile(self, target: DynamicEntity) -> None:
         """Events that happen when entity enters a tile"""
         pass
 
-    def entity_enter_tile_center(self, target: DynamicEntity) -> None:
+    # TODO: tile center reached logic
+    def entity_reach_tile_center(self, target: DynamicEntity) -> None:
         """Events that happen when entity enters a tile center"""
         pass
 
