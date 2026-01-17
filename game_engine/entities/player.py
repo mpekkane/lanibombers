@@ -29,10 +29,6 @@ class Player(DynamicEntity):
         selected_bomb_type, bomb_count = self.inventory[self.selected]
         vx, vy = xy_to_tile(self.x, self.y)
 
-        print("plating")
-        print(self.x, self.y)
-        print(vx, vy)
-
         bomb = Bomb(
             x=vx,
             y=vy,

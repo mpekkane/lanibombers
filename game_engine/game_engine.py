@@ -118,15 +118,12 @@ class GameEngine:
         self.bombs.append(bomb)
 
         if bomb.bomb_type.is_timed():
-            print("plant timed bomb")
             explosion_event = Event(
                 trigger_at=bomb.placed_at + bomb.fuse_duration,
                 target=bomb,
                 event_type="explode",
             )
             self.event_resolver.schedule_event(explosion_event)
-        else:
-            print(f"plant untimed bomb ({bomb.x}, {bomb.y})")
 
     def detonate_remotes(self, player: Player) -> None:
         for bomb in self.bombs:
@@ -275,6 +272,7 @@ class GameEngine:
             raise ValueError("Invalid move direction")
 
         tolerance = 0.01
+        # FIXME: debug print for bug fix, something remains on negative movement
         # print("-" * 20)
         # print(target.x, target.y)
         # print("1:", abs(moved - int(moved)))
@@ -282,11 +280,11 @@ class GameEngine:
         # enter tile
         px, py = xy_to_tile(target.x, target.y)
         if abs(moved - int(moved)) < tolerance or abs(moved - int(moved) - 1) < tolerance:
-            print(f"enter tile   {px} {py}")
+            # print(f"enter tile   {px} {py}")
             self.entity_enter_tile(target)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
-            print(f"enter center {px} {py}")
+            # print(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
         # spawn in by default true, but when clearing, do not spawn new ones
