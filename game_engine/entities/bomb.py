@@ -10,6 +10,7 @@ class BombType(Enum):
     BIG_BOMB = 'big_bomb'
     C4 = 'c4'
     LANDMINE = 'landmine'
+    REMOTE = 'remote'
 
 
 # Bomb properties by type: (fuse_duration, blast_radius, damage)
@@ -17,6 +18,7 @@ BOMB_PROPERTIES = {
     BombType.BIG_BOMB: (3.0, 4, 40),
     BombType.C4: (5.0, 3, 100),
     BombType.LANDMINE: (0.5, 1, 50),
+    BombType.REMOTE: (-1.0, 3, 50),  # TODO: real values
 }
 
 

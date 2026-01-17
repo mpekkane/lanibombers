@@ -145,19 +145,35 @@ class GameEngine:
         # When walking, calculate distance
         if entity.state == "walk":
             if entity.direction == Direction.RIGHT:
-                d = 1 - (entity.x - (int)(entity.x))
+                decimal = (entity.x - (int)(entity.x))
+                if decimal > 0.5:
+                    d = 1 - decimal
+                else:
+                    d = 0.5 - decimal
             elif entity.direction == Direction.LEFT:
-                d = entity.x - (int)(entity.x)
+                decimal = (entity.x - (int)(entity.x))
+                if decimal < 0.5:
+                    d = decimal
+                else:
+                    d = decimal - 0.5
             elif entity.direction == Direction.UP:
-                d = entity.y - (int)(entity.y)
+                decimal = entity.y - (int)(entity.y)
+                if decimal < 0.5:
+                    d = decimal
+                else:
+                    d = decimal - 0.5
             elif entity.direction == Direction.DOWN:
-                d = 1 - (entity.y - (int)(entity.y))
+                decimal = entity.y - (int)(entity.y)
+                if decimal > 0.5:
+                    d = 1 - decimal
+                else:
+                    d = 0.5 - decimal
             else:
                 return
 
             # this is the boundary condition
             if d == 0:
-                d = 1
+                d = 0.5
 
             # this is the required time to cross the thershold
             dt = d / entity.speed
@@ -226,20 +242,40 @@ class GameEngine:
         # this is due to the fact that when changing direction, the target (pointer)
         # has different direction than in the move command
         dir = Direction(event.direction)
+        moved: float
         if dir == Direction.RIGHT:
             target.x += d
+            moved = target.x
         elif dir == Direction.LEFT:
             target.x -= d
+            moved = target.x
         elif dir == Direction.UP:
             target.y -= d
+            moved = target.y
         elif dir == Direction.DOWN:
             target.y += d
+            moved = target.y
         else:
             raise ValueError("Invalid move direction")
+
+        # middle
+        tolerance = 0.01
+        if abs(moved - int(moved) - 0.5) < tolerance:
+            self.entity_enter_tile_center(target)
+        if abs(moved - int(moved)) < tolerance:
+            self.entity_enter_tile(target)
 
         # spawn in by default true, but when clearing, do not spawn new ones
         if flags.spawn:
             self.move_entity(target)
+
+    def entity_enter_tile(self, target: DynamicEntity) -> None:
+        """Events that happen when entity enters a tile"""
+        pass
+
+    def entity_enter_tile_center(self, target: DynamicEntity) -> None:
+        """Events that happen when entity enters a tile center"""
+        pass
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
