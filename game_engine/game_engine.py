@@ -3,11 +3,11 @@ import time
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
 
 from game_engine.entities.tile import Tile
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup
 from game_engine.entities.bomb import Bomb
-from game_engine.events.event import Event
+from game_engine.events.event import Event, ResolveFlags, MoveEvent
 from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState
 
@@ -71,7 +71,7 @@ class GameEngine:
             name=name,
             sprite_id=num_players + 1,
             state="idle",
-            speed=1
+            speed=1,
         )
         return self._create_player(player)
 
@@ -122,35 +122,61 @@ class GameEngine:
         )
         self.event_resolver.schedule_event(explosion_event)
 
-    def clear_player_move_events(self, player: Player) -> None:
+    def clear_entity_move_events(self, player: DynamicEntity) -> None:
+        """Clear all move actions by the player"""
+        # First resolve undergoing events, i.e., stop to the place the entity
+        # has already made progress to
+        self.event_resolver.resolve_object_events(
+            player.id, "move", ResolveFlags(spawn=False)
+        )
+        # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
 
-    def change_player_direction(self, player: Player) -> None:
+    def change_entity_direction(self, player: DynamicEntity) -> None:
         """Create and handle player movement events"""
-        self.clear_player_move_events(player)
-        if player.state == "walk":
-            if player.direction == Direction.RIGHT:
-                d = 1 - (player.x - (int)(player.x))
-            elif player.direction == Direction.LEFT:
-                d = player.x - (int)(player.x)
-            elif player.direction == Direction.UP:
-                d = player.y - (int)(player.y)
-            elif player.direction == Direction.DOWN:
-                d = 1 - (player.y - (int)(player.y))
+        # FIXME: dbg
+        # print("*" * 80)
+        # print("CHANGE DIR")
+        # print("*" * 80)
+        # When changing dir, all previous movement events are cleared
+        self.clear_entity_move_events(player)
+        # Create new movement
+        self.move_entity(player)
+
+    def move_entity(self, entity: DynamicEntity):
+        """Main movement generator function from dynamic entities"""
+
+        # When walking, calculate distance
+        if entity.state == "walk":
+            if entity.direction == Direction.RIGHT:
+                d = 1 - (entity.x - (int)(entity.x))
+            elif entity.direction == Direction.LEFT:
+                d = entity.x - (int)(entity.x)
+            elif entity.direction == Direction.UP:
+                d = entity.y - (int)(entity.y)
+            elif entity.direction == Direction.DOWN:
+                d = 1 - (entity.y - (int)(entity.y))
             else:
                 return
+
+            # FIXME: dbg
+            # print(f"pose ({entity.x}, {entity.y})")
+            # print(f"d: {d}")
+            # print(f"{entity.direction}")
 
             # this is the boundary condition
             if d == 0:
                 d = 1
 
-            dt = d / player.speed
-            movement_event = Event(
+            # this is the required time to cross the thershold
+            dt = d / entity.speed
+            movement_event = MoveEvent(
                 trigger_at=time.time() + dt,
-                target=player,
+                target=entity,
                 event_type="move",
                 created_at=time.time(),
-                created_by=player.id
+                created_by=entity.id,
+                direction=str(entity.direction.value)
             )
             self.event_resolver.schedule_event(movement_event)
 
@@ -162,7 +188,7 @@ class GameEngine:
         """Cancel a scheduled event."""
         return self.event_resolver.cancel_event(event_id)
 
-    def resolve(self, target: Any, event: Event) -> None:
+    def resolve(self, target: Any, event: Event, flags: ResolveFlags) -> None:
         """
         Called when an event fires. Handles event resolution.
 
@@ -172,11 +198,11 @@ class GameEngine:
         """
         # Handle bomb explosion
         if isinstance(target, Bomb) and event.event_type == "explode":
-            self.resolve_bomb(target, event)
+            self.resolve_bomb(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "move":
-            self.resolve_movement(target, event)
+            self.resolve_movement(target, event, flags)
 
-    def resolve_bomb(self, target: Bomb, event: Event) -> None:
+    def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
         # FIXME: ?
         current_time = time.time()
@@ -195,25 +221,49 @@ class GameEngine:
         if target in self.bombs:
             self.bombs.remove(target)
 
-    def resolve_movement(self, target: Player, event: Event) -> None:
+    def resolve_movement(
+        self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
+    ) -> None:
         """Resolve move events"""
 
-        # FIXME: now there is a conflict with the big and small grid
-        # Dynamic entities should have two variables from pose?
-        if target.direction == Direction.RIGHT:
-            target.x += 1
-        elif target.direction == Direction.LEFT:
-            target.x -= 1
-        elif target.direction == Direction.UP:
-            target.y -= 1
-        elif target.direction == Direction.DOWN:
-            target.y += 1
-        else:
-            return
+        # FIXME: dbg
+        # print("-" * 40)
+        # print("resolve")
+        # print(event)
+        # print("-" * 40)
 
-        self.change_player_direction(target)
+        # because events might have been cleared, i.e., triggered at times
+        # other than planned, calculate actual traveled distance
+        current_time = time.time()
+        dt = current_time - event.created_at
+        d = dt * target.speed
+
+        # move target to the stored direction, not the current one!
+        # this is due to the fact that when changing direction, the target (pointer)
+        # has different direction than in the move command
+        dir = Direction(event.direction)
+        if dir == Direction.RIGHT:
+            target.x += d
+        elif dir == Direction.LEFT:
+            target.x -= d
+        elif dir == Direction.UP:
+            target.y -= d
+        elif dir == Direction.DOWN:
+            target.y += d
+        else:
+            raise ValueError("Invalid move direction")
+
+        # FIXME: dbg
+        # print(f"pose ({target.x}, {target.y})")
+
+        # spawn in by default true, but when clearing, do not spawn new ones
+        if flags.spawn:
+            # FIXME: dbg
+            # print("continue moving")
+            self.move_entity(target)
 
     def update_player_state(self):
+        """OBSOLETE: used for tick-rendering"""
         if self.prev_time < 0:
             self.prev_time = time.time()
         elapsed = time.time() - self.prev_time

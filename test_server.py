@@ -133,7 +133,7 @@ class BomberServer:
             elif cmd == Action.STOP:
                 player.state = "idle"
 
-            self.engine.change_player_direction(player)
+            self.engine.change_entity_direction(player)
         else:
             if cmd == Action.FIRE:
                 bomb = player.plant_bomb()

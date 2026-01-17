@@ -4,6 +4,12 @@ from uuid import UUID, uuid4
 
 
 @dataclass
+class ResolveFlags:
+    """This enables message passing from forced resolvation"""
+    spawn: bool = True
+
+
+@dataclass
 class Event:
     """Scheduled event in the game."""
     trigger_at: float                       # When to fire (time.time())
@@ -16,3 +22,9 @@ class Event:
     def __lt__(self, other: 'Event') -> bool:
         """Comparison for heapq ordering."""
         return self.trigger_at < other.trigger_at
+
+
+@dataclass
+class MoveEvent(Event):
+    """Movement event"""
+    direction: str = ""
