@@ -12,6 +12,9 @@ class BombType(Enum):
     LANDMINE = 'landmine'
     REMOTE = 'remote'
 
+    def is_timed(self) -> bool:
+        return self != BombType.LANDMINE and self != BombType.REMOTE
+
 
 # Bomb properties by type: (fuse_duration, blast_radius, damage)
 BOMB_PROPERTIES = {

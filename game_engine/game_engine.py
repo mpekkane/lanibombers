@@ -6,10 +6,11 @@ from game_engine.entities.tile import Tile
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup
-from game_engine.entities.bomb import Bomb
+from game_engine.entities.bomb import Bomb, BombType
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState
+from game_engine.utils import xy_to_tile
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -115,12 +116,27 @@ class GameEngine:
     def plant_bomb(self, bomb: Bomb) -> None:
         """Plant a bomb in the game and schedule its explosion event."""
         self.bombs.append(bomb)
-        explosion_event = Event(
-            trigger_at=bomb.placed_at + bomb.fuse_duration,
-            target=bomb,
-            event_type="explode",
-        )
-        self.event_resolver.schedule_event(explosion_event)
+
+        if bomb.bomb_type.is_timed():
+            print("plant timed bomb")
+            explosion_event = Event(
+                trigger_at=bomb.placed_at + bomb.fuse_duration,
+                target=bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
+        else:
+            print(f"plant untimed bomb ({bomb.x}, {bomb.y})")
+
+    def detonate_remotes(self, player: Player) -> None:
+        for bomb in self.bombs:
+            if bomb.bomb_type == BombType.REMOTE and bomb.owner_id == player.id:
+                explosion_event = Event(
+                    trigger_at=time.time() + 0,
+                    target=bomb,
+                    event_type="explode",
+                )
+                self.event_resolver.schedule_event(explosion_event)
 
     def clear_entity_move_events(self, player: DynamicEntity) -> None:
         """Clear all move actions by the player"""
@@ -237,6 +253,7 @@ class GameEngine:
         current_time = time.time()
         dt = current_time - event.created_at
         d = dt * target.speed
+        prev_vx, prev_vy = xy_to_tile(target.x, target.y)
 
         # move target to the stored direction, not the current one!
         # this is due to the fact that when changing direction, the target (pointer)
@@ -259,11 +276,18 @@ class GameEngine:
             raise ValueError("Invalid move direction")
 
         tolerance = 0.01
+        # print("-" * 20)
+        # print(target.x, target.y)
+        # print("1:", abs(moved - int(moved)))
+        # print("2:", abs(moved - int(moved) - 1))
         # enter tile
-        if abs(moved - int(moved)) < tolerance:
+        px, py = xy_to_tile(target.x, target.y)
+        if abs(moved - int(moved)) < tolerance or abs(moved - int(moved) - 1) < tolerance:
+            print(f"enter tile   {px} {py}")
             self.entity_enter_tile(target)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
+            print(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
         # spawn in by default true, but when clearing, do not spawn new ones
@@ -273,7 +297,17 @@ class GameEngine:
     # TODO: tile entering logic
     def entity_enter_tile(self, target: DynamicEntity) -> None:
         """Events that happen when entity enters a tile"""
-        pass
+        # check for mines
+        px, py = xy_to_tile(target.x, target.y)
+        for bomb in self.bombs:
+            if bomb.bomb_type == BombType.LANDMINE:
+                if bomb.x == px and bomb.y == py:
+                    explosion_event = Event(
+                        trigger_at=time.time() + 0,
+                        target=bomb,
+                        event_type="explode",
+                    )
+                    self.event_resolver.schedule_event(explosion_event)
 
     # TODO: tile center reached logic
     def entity_reach_tile_center(self, target: DynamicEntity) -> None:

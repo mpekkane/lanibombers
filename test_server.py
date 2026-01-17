@@ -142,7 +142,7 @@ class BomberServer:
                 bomb = player.choose()
             elif cmd == Action.REMOTE:
                 # TODO: trigger remote bomb
-                pass
+                self.engine.detonate_remotes(player)
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:

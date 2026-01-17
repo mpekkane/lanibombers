@@ -4,7 +4,7 @@ from typing import List, Tuple
 from game_engine.entities import DynamicEntity
 from game_engine.entities import Bomb, BombType
 from dataclasses import dataclass, field
-
+from game_engine.utils import xy_to_tile
 
 @dataclass
 class Player(DynamicEntity):
@@ -15,6 +15,7 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.BIG_BOMB, 100))
         self.inventory.append((BombType.C4, 3))
         self.inventory.append((BombType.LANDMINE, 100))
+        self.inventory.append((BombType.REMOTE, 100))
 
     def choose(self) -> None:
         self.selected += 1
@@ -27,10 +28,15 @@ class Player(DynamicEntity):
 
     def plant_bomb(self) -> Bomb:
         selected_bomb_type, bomb_count = self.inventory[self.selected]
+        vx, vy = xy_to_tile(self.x, self.y)
+
+        print("plating")
+        print(self.x, self.y)
+        print(vx, vy)
 
         bomb = Bomb(
-            x=math.floor(self.x),
-            y=math.floor(self.y),
+            x=vx,
+            y=vy,
             bomb_type=selected_bomb_type,
             placed_at=time.time(),
             owner_id=self.id,
