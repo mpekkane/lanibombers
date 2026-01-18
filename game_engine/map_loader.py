@@ -105,6 +105,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
+                    diggable=True,
                     health=25
                 )
             elif tile_id == ROCK2_TILE_ID:
@@ -113,7 +114,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=50
+                    diggable=True,
+                    health=50,
                 )
             elif tile_id in BEDROCK_CORNER_TILES:
                 tile = Tile(
@@ -121,7 +123,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=60
+                    diggable=True,
+                    health=60,
                 )
             else:
                 tile = Tile(

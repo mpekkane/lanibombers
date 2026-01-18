@@ -81,7 +81,7 @@ class GameEngine:
             sprite_id=num_players + 1,
             state="idle",
             speed=3,
-            fight_power=20
+            fight_power=20,
         )
         return self._create_player(player)
 
@@ -162,14 +162,24 @@ class GameEngine:
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
 
+        # print("Centralize")
+        # print(player.x, player.y)
+        self.centralize_position(player)
+        # print(player.x, player.y)
+
         # collision check
         next_tile = self.get_neighbor_tile(player)
-        if next_tile.solid and not next_tile.diggable:
-            # print("change entity direction: blocked")
-            return
-
-        # Create new movement
-        self.move_entity(player)
+        if next_tile.solid:
+            if not next_tile.diggable:
+                # print("change entity direction: blocked")
+                # print(player.x, player.y)
+                # print(next_tile)
+                return
+            else:
+                self.dig(player)
+        else:
+            # Create new movement
+            self.move_entity(player)
 
     def move_entity(self, entity: DynamicEntity):
         """Main movement generator function from dynamic entities"""
@@ -284,7 +294,11 @@ class GameEngine:
     def resolve_movement(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
     ) -> None:
-        """Resolve move events"""
+        """
+        Resolve move events.
+
+        There's a lot of printing, as there's a lot to debug, also in future
+        """
         if target.state == "dead":
             return
 
@@ -299,43 +313,44 @@ class GameEngine:
         # has different direction than in the move command
         dir = Direction(event.direction)
         moved: float
-        px, py = xy_to_tile(target.x, target.y)
+
+        # print("-" * 20)
+        # print(f"from: {target.x}, {target.y}")
         if dir == Direction.RIGHT:
             target.x += d
-            target.y = py + 0.5
             moved = target.x
         elif dir == Direction.LEFT:
             target.x -= d
-            target.y = py + 0.5
             moved = target.x
         elif dir == Direction.UP:
             target.y -= d
-            target.x = px + 0.5
             moved = target.y
         elif dir == Direction.DOWN:
             target.y += d
-            target.x = px + 0.5
             moved = target.y
         else:
             raise ValueError("Invalid move direction")
-
+        # print(f"to  : {target.x}, {target.y}")
+        self.round_position(target)
+        # print(f"cntr: {target.x}, {target.y}")
         # print(f"ms: {self.width} {self.height}")
-        # print(target.x, target.y)
+
         # target.x, target.y = self.clamp_to_map_size(target.x, target.y)
         # print(target.x, target.y)
 
         tolerance = 0.05
         blocked = False
+        px, py = xy_to_tile(target.x, target.y)
         # enter tile
         if (
             abs(moved - int(moved)) < tolerance
             or abs(moved - int(moved) - 1) < tolerance
         ):
-            print(f"enter tile   {px} {py}")
+            # print(f"enter tile   {px} {py}")
             self.entity_enter_tile(target)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
-            print(f"enter center {px} {py}")
+            # print(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
             # check the neighboring tiles
@@ -347,10 +362,11 @@ class GameEngine:
                 px, py = xy_to_tile(target.x, target.y)
                 if not next_tile.diggable:
                     target.state = "idle"
-                    print("resolve move blocked")
-                    target.x, target.y = px + 0.5, py + 0.5
+                    # print("resolve move blocked")
+                    # print(target.x, target.y)
+                    # print(next_tile)
                 else:
-                    target.x, target.y = px + 0.5, py + 0.5
+                    # print("dig")
                     self.dig(target)
 
         if flags.spawn and not blocked:
@@ -358,6 +374,14 @@ class GameEngine:
 
         # fight monsters
         self.fight(target)
+
+    def centralize_position(self, entity: DynamicEntity) -> None:
+        entity.x = int(entity.x - 0.5) + 0.5
+        entity.y = int(entity.y - 0.5) + 0.5
+
+    def round_position(self, entity: DynamicEntity) -> None:
+        entity.x = int(round(entity.x * 2)) / 2
+        entity.y = int(round(entity.y * 2)) / 2
 
     def resolve_dig(self, target: Player, event: Event, flags: ResolveFlags) -> None:
         if target.state == "dead":
@@ -430,22 +454,6 @@ class GameEngine:
                 player.pickup_treasure(pickup)
             self.pickups[py][px] = None
 
-        # picked = -1
-        # for i, pickup in enumerate(self.pickups):
-        #     if pickup.x == px and pickup.y == py:
-        #         if pickup.pickup_type == PickupType.TOOL:
-        #             assert isinstance(pickup, Tool)
-        #             player.pickup_tool(pickup)
-        #         else:
-        #             assert isinstance(pickup, Treasure)
-        #             player.pickup_treasure(pickup)
-        #         picked = i
-        #         print(f"picked: {pickup.x} {pickup.y}")
-        #     else:
-        #         print(f"not here {pickup.x} {pickup.y}")
-        # if picked >= 0:
-        #     del self.pickups[picked]
-
     def fight(self, agent: DynamicEntity) -> None:
         entities = self.players + self.monsters
         px, py = xy_to_tile(agent.x, agent.y)
@@ -454,11 +462,11 @@ class GameEngine:
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
                 other.take_damage(agent.fight_power)
                 agent.take_damage(other.fight_power)
-                print("FIGHT!")
-                print(f"Agent deals {agent.fight_power} damage")
-                print(f"Enemy deals {other.fight_power} damage")
-                print(f"Agent health {agent.health}")
-                print(f"Enemy health {other.health}")
+                # print("FIGHT!")
+                # print(f"Agent deals {agent.fight_power} damage")
+                # print(f"Enemy deals {other.fight_power} damage")
+                # print(f"Agent health {agent.health}")
+                # print(f"Enemy health {other.health}")
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
