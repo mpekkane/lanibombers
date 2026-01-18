@@ -33,8 +33,8 @@ class MonsterSprite(arcade.Sprite):
     def update_from_entity(self, monster: DynamicEntity, delta_time: float):
         """Update sprite position, texture and animation from monster entity data"""
         # Update position (rounded to pixel grid before zoom)
-        self.center_x = round((monster.x + 0.5) * SPRITE_SIZE) * self.zoom
-        self.center_y = self.screen_height - round((monster.y + 0.5) * SPRITE_SIZE) * self.zoom
+        self.center_x = round((monster.x) * SPRITE_SIZE) * self.zoom
+        self.center_y = self.screen_height - round((monster.y) * SPRITE_SIZE) * self.zoom
 
         # Handle dead state
         if monster.state == 'dead':
