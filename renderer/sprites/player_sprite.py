@@ -34,8 +34,8 @@ class PlayerSprite(arcade.Sprite):
     def update_from_entity(self, player: DynamicEntity, delta_time: float):
         """Update sprite position, texture and animation from player entity data"""
         # Update position (rounded to pixel grid before zoom)
-        self.center_x = round((player.x + 0.5) * SPRITE_SIZE) * self.zoom
-        self.center_y = self.screen_height - round((player.y + 0.5) * SPRITE_SIZE) * self.zoom
+        self.center_x = round((player.x) * SPRITE_SIZE) * self.zoom
+        self.center_y = self.screen_height - round((player.y) * SPRITE_SIZE) * self.zoom
 
         # Handle dead state
         if player.state == 'dead':

@@ -74,8 +74,8 @@ class GameEngine:
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(
-            x=start_pose[0],
-            y=start_pose[1],
+            x=start_pose[0] + 0.5,
+            y=start_pose[1] + 0.5,
             direction=Direction.RIGHT,
             name=name,
             sprite_id=num_players + 1,
@@ -162,7 +162,7 @@ class GameEngine:
         # collision check
         next_tile = self.get_neighbor_tile(player)
         if next_tile.solid and not next_tile.diggable:
-            print("change entity direction: blocked")
+            # print("change entity direction: blocked")
             return
 
         # Create new movement
@@ -328,7 +328,7 @@ class GameEngine:
                 blocked = True
                 if not next_tile.diggable:
                     target.state = "idle"
-                    print("blocked")
+                    # print("blocked")
                 else:
                     self.dig(target)
 
@@ -342,8 +342,8 @@ class GameEngine:
         target_tile = self.get_neighbor_tile(target)
         dig_power = target.get_dig_power()
         target_tile.take_damage(dig_power)
-        print("DIG!")
-        print(target_tile)
+        # print("DIG!")
+        # print(target_tile)
 
         if target_tile.health > 0:
             self.dig(target)
