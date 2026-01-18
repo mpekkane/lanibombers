@@ -1,16 +1,19 @@
 import array
-from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING
+from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
-from game_engine.entities.pickup import Pickup
+from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState
-from game_engine.utils import xy_to_tile
+from game_engine.entities import Tool, Treasure
+from game_engine.utils import xy_to_tile, clamp
+from itertools import chain
+
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -31,7 +34,9 @@ class GameEngine:
         self.players: List[Player] = []
         self.player_map: Dict[str, int] = {}
         self.monsters: List[DynamicEntity] = []
-        self.pickups: List[Pickup] = []
+        self.pickups: List[List[Optional[Pickup]]] = [
+            [None for _ in range(width)] for _ in range(height)
+        ]
         self.bombs: List[Bomb] = []
         self.explosion_times: Dict[Tuple[int, int], Tuple[float, int]] = (
             {}
@@ -52,7 +57,10 @@ class GameEngine:
         self.height = map_data.height
         self.tiles = map_data.tiles
         self.monsters = map_data.monsters
-        self.pickups = list(map_data.treasures) + list(map_data.tools)
+        for pickup in list(map_data.tools):
+            self.pickups[pickup.y][pickup.x] = pickup
+        for pickup in list(map_data.treasures):
+            self.pickups[pickup.y][pickup.x] = pickup
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -72,7 +80,7 @@ class GameEngine:
             name=name,
             sprite_id=num_players + 1,
             state="idle",
-            speed=1,
+            speed=3,
         )
         return self._create_player(player)
 
@@ -149,6 +157,13 @@ class GameEngine:
         """Create and handle player movement events"""
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
+
+        # collision check
+        next_tile = self.get_neighbor_tile(player)
+        if next_tile.solid and not next_tile.diggable:
+            print("change entity direction: blocked")
+            return
+
         # Create new movement
         self.move_entity(player)
 
@@ -158,13 +173,13 @@ class GameEngine:
         # When walking, calculate distance
         if entity.state == "walk":
             if entity.direction == Direction.RIGHT:
-                decimal = (entity.x - (int)(entity.x))
+                decimal = entity.x - (int)(entity.x)
                 if decimal > 0.5:
                     d = 1 - decimal
                 else:
                     d = 0.5 - decimal
             elif entity.direction == Direction.LEFT:
-                decimal = (entity.x - (int)(entity.x))
+                decimal = entity.x - (int)(entity.x)
                 if decimal < 0.5:
                     d = decimal
                 else:
@@ -200,9 +215,20 @@ class GameEngine:
                 event_type="move",
                 created_at=Clock.now(),
                 created_by=entity.id,
-                direction=str(entity.direction.value)
+                direction=str(entity.direction.value),
             )
             self.event_resolver.schedule_event(movement_event)
+
+    def dig(self, entity: DynamicEntity) -> None:
+        self.clear_entity_move_events(entity)
+        dig_event = Event(
+            trigger_at=Clock.now() + 0.1,
+            target=entity,
+            event_type="dig",
+            created_at=Clock.now(),
+            created_by=entity.id,
+        )
+        self.event_resolver.schedule_event(dig_event)
 
     def schedule_event(self, event: Event) -> None:
         """Schedule an event for later execution."""
@@ -225,6 +251,8 @@ class GameEngine:
             self.resolve_bomb(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "move":
             self.resolve_movement(target, event, flags)
+        elif isinstance(target, Player) and event.event_type == "dig":
+            self.resolve_dig(target, event, flags)
 
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
@@ -275,15 +303,15 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
 
+        target.x, target.y = self.clamp_to_map_size(target.x, target.y)
+
         tolerance = 0.05
-        # FIXME: debug print for bug fix, something remains on negative movement
-        # print("-" * 20)
-        # print(target.x, target.y)
-        # print("1:", abs(moved - int(moved)))
-        # print("2:", abs(moved - int(moved) - 1))
-        # px, py = xy_to_tile(target.x, target.y)
+        blocked = False
         # enter tile
-        if abs(moved - int(moved)) < tolerance or abs(moved - int(moved) - 1) < tolerance:
+        if (
+            abs(moved - int(moved)) < tolerance
+            or abs(moved - int(moved) - 1) < tolerance
+        ):
             # print(f"enter tile   {px} {py}")
             self.entity_enter_tile(target)
         # middle
@@ -291,9 +319,59 @@ class GameEngine:
             # print(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
-        # spawn in by default true, but when clearing, do not spawn new ones
-        if flags.spawn:
+            # check the neighboring tiles
+            # wall
+            # interact
+            next_tile = self.get_neighbor_tile(target)
+            if next_tile.solid:
+                blocked = True
+                if not next_tile.diggable:
+                    target.state = "idle"
+                    print("blocked")
+                else:
+                    self.dig(target)
+
+        if flags.spawn and not blocked:
             self.move_entity(target)
+
+    def resolve_dig(self, target: Player, event: Event, flags: ResolveFlags) -> None:
+        target_tile = self.get_neighbor_tile(target)
+        dig_power = target.get_dig_power()
+        target_tile.take_damage(dig_power)
+        print("DIG!")
+        print(target_tile)
+
+        if target_tile.health > 0:
+            self.dig(target)
+        else:
+            self.move_entity(target)
+
+    def get_neighbor_tile(self, entity: DynamicEntity) -> Tile:
+        px, py = xy_to_tile(entity.x, entity.y)
+        nx, ny = px, py
+        dir = Direction(entity.direction)
+        if dir == Direction.RIGHT:
+            nx += 1
+        elif dir == Direction.LEFT:
+            nx -= 1
+        elif dir == Direction.UP:
+            ny -= 1
+        elif dir == Direction.DOWN:
+            ny += 1
+        else:
+            print(entity)
+            raise ValueError("Invalid move direction")
+
+        nx, ny = self.clamp_to_map_size(nx, ny)
+        next_tile: Tile = self.tiles[ny][nx]
+
+        # print("-" * 20)
+        # print("pp:", entity.x, entity.y)
+        # print("px:", px, py)
+        # print("nx:", nx, ny)
+        # print(next_tile)
+
+        return next_tile
 
     # TODO: tile entering logic
     def entity_enter_tile(self, target: DynamicEntity) -> None:
@@ -311,9 +389,34 @@ class GameEngine:
                     self.event_resolver.schedule_event(explosion_event)
 
     # TODO: tile center reached logic
-    def entity_reach_tile_center(self, target: DynamicEntity) -> None:
+    def entity_reach_tile_center(self, player: Player) -> None:
         """Events that happen when entity enters a tile center"""
-        pass
+        px, py = xy_to_tile(player.x, player.y)
+        pickup = self.pickups[py][px]
+        if pickup:
+            if pickup.pickup_type == PickupType.TOOL:
+                assert isinstance(pickup, Tool)
+                player.pickup_tool(pickup)
+            else:
+                assert isinstance(pickup, Treasure)
+                player.pickup_treasure(pickup)
+            self.pickups[py][px] = None
+
+        # picked = -1
+        # for i, pickup in enumerate(self.pickups):
+        #     if pickup.x == px and pickup.y == py:
+        #         if pickup.pickup_type == PickupType.TOOL:
+        #             assert isinstance(pickup, Tool)
+        #             player.pickup_tool(pickup)
+        #         else:
+        #             assert isinstance(pickup, Treasure)
+        #             player.pickup_treasure(pickup)
+        #         picked = i
+        #         print(f"picked: {pickup.x} {pickup.y}")
+        #     else:
+        #         print(f"not here {pickup.x} {pickup.y}")
+        # if picked >= 0:
+        #     del self.pickups[picked]
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
@@ -358,7 +461,9 @@ class GameEngine:
             tilemap=tilemap,
             players=self.players,
             monsters=self.monsters,
-            pickups=self.pickups,
+            pickups=list(
+                filter(lambda x: x is not None, chain.from_iterable(self.pickups))
+            ),
             bombs=self.bombs,
             explosions=explosions_copy,
         )
@@ -367,3 +472,18 @@ class GameEngine:
         # clean explosions byte array (0=none)
         for i in range(self.height * self.width):
             self.explosions[i] = 0
+
+    def clamp_to_map_size(
+        self, x: Optional[Union[int, float]], y: Optional[Union[int, float]]
+    ) -> Tuple[Union[int, float], Union[int, float]]:
+        if not x:
+            x = 0
+        if not y:
+            y = 0
+        return self.clamp_x(x), self.clamp_y(y)
+
+    def clamp_x(self, x: Union[int, float]):
+        return clamp(x, 0, self.height)
+
+    def clamp_y(self, y: Union[int, float]):
+        return clamp(y, 0, self.width)

@@ -26,6 +26,7 @@ class Tile(GameObject):
     tile_type: TileType = TileType.EMPTY
     solid: bool = False
     interactable: bool = False
+    diggable: bool = False
 
     def take_damage(self, amount: int) -> None:
         """Take damage and update visual for bedrock tiles based on health."""
@@ -37,6 +38,7 @@ class Tile(GameObject):
             self.visual_id = EMPTY_TILE_ID
             self.solid = False
             self.interactable = False
+            self.diggable = False
             return
 
         # Update bedrock visual based on damage state

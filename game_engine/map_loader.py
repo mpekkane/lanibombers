@@ -133,7 +133,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     visual_id=tile_id,
                     tile_type=_get_tile_type(tile_id),
                     solid=_is_solid(tile_id),
-                    interactable=_is_interactable(tile_id)
+                    interactable=_is_interactable(tile_id),
+                    diggable=_is_diggable(tile_id)
                 )
             row.append(tile)
         tiles.append(row)
@@ -176,9 +177,13 @@ def _get_tile_type(tile_id: int) -> TileType:
 
 def _is_solid(tile_id: int) -> bool:
     """Determine if a tile blocks movement."""
-    solid_tiles = BEDROCK_TILES | CONCRETE_TILES | BOULDER_TILES | BRICKS_TILES | SECURITY_DOOR_TILES
+    solid_tiles = BEDROCK_TILES | CONCRETE_TILES | BOULDER_TILES | BRICKS_TILES | SECURITY_DOOR_TILES | DIRT_TILES
     return tile_id in solid_tiles
 
+def _is_diggable(tile_id: int) -> bool:
+    """Determine if a tile can be digged """
+    solid_tiles = BEDROCK_TILES | BRICKS_TILES | DIRT_TILES
+    return tile_id in solid_tiles
 
 def _is_interactable(tile_id: int) -> bool:
     """Determine if a tile can be interacted with."""
