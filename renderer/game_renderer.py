@@ -5,6 +5,7 @@ Main graphics processing and display loop.
 
 import os
 import arcade
+import numpy as np
 
 from game_engine.entities.bomb import BombType
 from game_engine.entities import Direction, EntityType
@@ -167,42 +168,42 @@ class GameRenderer(arcade.Window):
                     texture = arcade.load_texture(path)
                     self.monster_textures[(entity_type, direction, frame)] = texture
 
-        # Build tile pair to transition texture dictionaries
-        # Key: (tile_id_left, tile_id_right) for horizontal, (tile_id_top, tile_id_bottom) for vertical
-        self.horizontal_tile_pair_to_texture = {}
-        self.vertical_tile_pair_to_texture = {}
+        # Build transition texture lookup tables
+        # Index 0 = transparent, other indices map to textures
+        self.horizontal_transition_textures_list = [
+            self.transparent_texture,
+            self.horizontal_transition_textures["empty_bedrock"],
+            self.horizontal_transition_textures["bedrock_empty"],
+            self.horizontal_transition_textures["empty_dirt"],
+            self.horizontal_transition_textures["dirt_empty"],
+        ]
+        self.vertical_transition_textures_list = [
+            self.transparent_texture,
+            self.vertical_transition_textures["empty_bedrock"],
+            self.vertical_transition_textures["bedrock_empty"],
+            self.vertical_transition_textures["empty_dirt"],
+            self.vertical_transition_textures["dirt_empty"],
+        ]
+
+        # Lookup tables: [tile_id_1, tile_id_2] -> texture index
+        self.horizontal_transition_lookup = np.zeros((256, 256), dtype=np.uint8)
+        self.vertical_transition_lookup = np.zeros((256, 256), dtype=np.uint8)
+
+        empty_ids = np.array(list(EMPTY_TILE_IDS))
+        bedrock_ids = np.array(list(BEDROCK_TILE_IDS))
+        dirt_ids = np.array(list(DIRT_TILE_IDS))
 
         # Empty <-> Bedrock transitions
-        for empty_id in EMPTY_TILE_IDS:
-            for bedrock_id in BEDROCK_TILE_IDS:
-                self.horizontal_tile_pair_to_texture[(empty_id, bedrock_id)] = (
-                    self.horizontal_transition_textures["empty_bedrock"]
-                )
-                self.horizontal_tile_pair_to_texture[(bedrock_id, empty_id)] = (
-                    self.horizontal_transition_textures["bedrock_empty"]
-                )
-                self.vertical_tile_pair_to_texture[(empty_id, bedrock_id)] = (
-                    self.vertical_transition_textures["empty_bedrock"]
-                )
-                self.vertical_tile_pair_to_texture[(bedrock_id, empty_id)] = (
-                    self.vertical_transition_textures["bedrock_empty"]
-                )
+        self.horizontal_transition_lookup[np.ix_(empty_ids, bedrock_ids)] = 1
+        self.horizontal_transition_lookup[np.ix_(bedrock_ids, empty_ids)] = 2
+        self.vertical_transition_lookup[np.ix_(empty_ids, bedrock_ids)] = 1
+        self.vertical_transition_lookup[np.ix_(bedrock_ids, empty_ids)] = 2
 
         # Empty <-> Dirt transitions
-        for empty_id in EMPTY_TILE_IDS:
-            for dirt_id in DIRT_TILE_IDS:
-                self.horizontal_tile_pair_to_texture[(empty_id, dirt_id)] = (
-                    self.horizontal_transition_textures["empty_dirt"]
-                )
-                self.horizontal_tile_pair_to_texture[(dirt_id, empty_id)] = (
-                    self.horizontal_transition_textures["dirt_empty"]
-                )
-                self.vertical_tile_pair_to_texture[(empty_id, dirt_id)] = (
-                    self.vertical_transition_textures["empty_dirt"]
-                )
-                self.vertical_tile_pair_to_texture[(dirt_id, empty_id)] = (
-                    self.vertical_transition_textures["dirt_empty"]
-                )
+        self.horizontal_transition_lookup[np.ix_(empty_ids, dirt_ids)] = 3
+        self.horizontal_transition_lookup[np.ix_(dirt_ids, empty_ids)] = 4
+        self.vertical_transition_lookup[np.ix_(empty_ids, dirt_ids)] = 3
+        self.vertical_transition_lookup[np.ix_(dirt_ids, empty_ids)] = 4
 
         # Map tile IDs to textures
         self.tile_id_to_texture_dictionary = list()
@@ -260,6 +261,7 @@ class GameRenderer(arcade.Window):
                 sprite.center_x = (x + 1) * SPRITE_SIZE * self.zoom
                 sprite.center_y = center_y
                 sprite.scale = self.zoom
+                sprite.texture = self.transparent_texture
                 sprite_idx += 1
 
         self.horizontal_transition_sprite_list.extend(
@@ -283,6 +285,7 @@ class GameRenderer(arcade.Window):
                 sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
                 sprite.center_y = center_y
                 sprite.scale = self.zoom
+                sprite.texture = self.transparent_texture
                 sprite_idx += 1
 
         self.vertical_transition_sprite_list.extend(
@@ -452,37 +455,28 @@ class GameRenderer(arcade.Window):
         state = self.server.get_render_state()
 
         # Update background tiles
-        for i in range(state.height * state.width):
-            self.sprites[i].texture = self.tile_id_to_texture_dictionary[
-                state.tilemap[i]
-            ]
+        for y in range(state.height):
+            for x in range(state.width):
+                i = y * state.width + x
+                self.sprites[i].texture = self.tile_id_to_texture_dictionary[
+                    state.tilemap[y, x]
+                ]
 
-        # Update horizontal transitions
-        for i in range(state.height * state.width):
-            # Check if we're at the right edge of a row (no tile to the right)
-            if (i + 1) % state.width == 0:
-                self.horizontal_transition_sprites[i].texture = self.transparent_texture
-            else:
-                left_tile = state.tilemap[i]
-                right_tile = state.tilemap[i + 1]
-                texture = self.horizontal_tile_pair_to_texture.get(
-                    (left_tile, right_tile), self.transparent_texture
-                )
-                self.horizontal_transition_sprites[i].texture = texture
+        # Update horizontal transitions using sliding window view
+        h_pairs = np.lib.stride_tricks.sliding_window_view(state.tilemap, (1, 2))[:, :, 0, :]
+        h_indices = self.horizontal_transition_lookup[h_pairs[:, :, 0], h_pairs[:, :, 1]].ravel()
 
-        # Update vertical transitions
-        last_row_start = (state.height - 1) * state.width
-        for i in range(state.height * state.width):
-            # Check if we're in the last row (no tile below)
-            if i >= last_row_start:
-                self.vertical_transition_sprites[i].texture = self.transparent_texture
-            else:
-                top_tile = state.tilemap[i]
-                bottom_tile = state.tilemap[i + state.width]
-                texture = self.vertical_tile_pair_to_texture.get(
-                    (top_tile, bottom_tile), self.transparent_texture
-                )
-                self.vertical_transition_sprites[i].texture = texture
+        for y in range(state.height):
+            for x in range(state.width - 1):
+                self.horizontal_transition_sprites[y * state.width + x].texture = \
+                    self.horizontal_transition_textures_list[h_indices[y * (state.width - 1) + x]]
+
+        # Update vertical transitions using sliding window view
+        v_pairs = np.lib.stride_tricks.sliding_window_view(state.tilemap, (2, 1))[:, :, :, 0]
+        v_indices = self.vertical_transition_lookup[v_pairs[:, :, 0], v_pairs[:, :, 1]].ravel()
+
+        for i, idx in enumerate(v_indices):
+            self.vertical_transition_sprites[i].texture = self.vertical_transition_textures_list[idx]
 
         # Update pickups (dynamic list)
         pickup_count = len(state.pickups)
@@ -531,10 +525,12 @@ class GameRenderer(arcade.Window):
         for i, bomb in enumerate(state.bombs):
             self.bomb_sprites[i].update_from_bomb(bomb)
 
-        # Update explosions (static list, texture based on byte array)
-        for i in range(state.height * state.width):
-            type = state.explosions[i]
-            self.explosion_sprite_list[i].update_from_type(type)
+        # Update explosions (static list, texture based on 2D array)
+        for y in range(state.height):
+            for x in range(state.width):
+                i = y * state.width + x
+                explosion_type = state.explosions[y, x]
+                self.explosion_sprite_list[i].update_from_type(explosion_type)
 
         # Update monsters
         for i, monster in enumerate(state.monsters):

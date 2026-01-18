@@ -1,8 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional, TYPE_CHECKING
 
 from cfg.tile_dictionary import EMPTY_TILE_ID, ROCK1_TILE_ID, ROCK2_TILE_ID, BRICS2_TILE_ID, BRICS3_TILE_ID
 from game_engine.entities.game_object import GameObject
+
+if TYPE_CHECKING:
+    from game_engine.entities.explosion import ExplosionType
+else:
+    from game_engine.entities.explosion import ExplosionType
 
 
 class TileType(Enum):
@@ -28,12 +34,20 @@ class Tile(GameObject):
     interactable: bool = False
     diggable: bool = False
 
-    def take_damage(self, amount: int) -> None:
+    def take_damage(self, amount: int, damage_type: Optional["ExplosionType"] = None) -> None:
         """Take damage and update visual for bedrock tiles based on health."""
-        self.health = max(0, self.health - amount)
+        damage = int(amount)
+
+        # Dirt takes double damage from small, medium, and large explosions
+        if self.tile_type == TileType.DIRT and damage_type in (
+            ExplosionType.SMALL, ExplosionType.MEDIUM, ExplosionType.LARGE
+        ):
+            damage *= 2
+
+        self.health = max(0, self.health - damage)
 
         # Tile destroyed - become empty
-        if self.health == 0:
+        if self.health <= 0:
             self.tile_type = TileType.EMPTY
             self.visual_id = EMPTY_TILE_ID
             self.solid = False

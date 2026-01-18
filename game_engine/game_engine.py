@@ -1,4 +1,3 @@
-import array
 import numpy as np
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 from itertools import chain
@@ -34,15 +33,13 @@ if TYPE_CHECKING:
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
-    explosions = array.array("B")
-
     def __init__(self, width: int = 64, height: int = 45):
         self.width = width
         self.height = height
         self.tiles: list[list[Tile]] = [
             [Tile() for _ in range(width)] for _ in range(height)
         ]
-        self.explosions = array.array("B", [0]) * self.width * self.height
+        self.explosions = np.zeros((self.height, self.width), dtype=np.uint8)
         self.players: List[Player] = []
         self.player_map: Dict[str, int] = {}
         self.monsters: List[DynamicEntity] = []
@@ -301,8 +298,10 @@ class GameEngine:
                 if dmg > 0:
                     tile = self.get_tile(x, y)
                     if tile:
-                        tile.take_damage(dmg)
-                    self.explosions[x + y * self.width] = 1
+                        tile.take_damage(dmg, target.explosion_type)
+                        if not tile.solid:
+                            self.explosions[y, x] = 1
+                        
 
         if target.bomb_type == BombType.SMALL_BOMB:
             self.sounds.small_explosion()
@@ -524,13 +523,13 @@ class GameEngine:
     def get_render_state(self) -> RenderState:
         """Build and return a RenderState for the renderer."""
 
-        # Build tilemap
-        tilemap = array.array("B")
-        for row in self.tiles:
-            for tile in row:
-                tilemap.append(tile.visual_id)
+        # Build tilemap as 2D numpy array
+        tilemap = np.array(
+            [[tile.visual_id for tile in row] for row in self.tiles],
+            dtype=np.uint8
+        )
 
-        explosions_copy = self.explosions[:]
+        explosions_copy = self.explosions.copy()
 
         self.cleanup_render_state()
 
@@ -538,19 +537,18 @@ class GameEngine:
             width=self.width,
             height=self.height,
             tilemap=tilemap,
+            explosions=explosions_copy,
             players=self.players,
             monsters=self.monsters,
             pickups=list(
                 filter(lambda x: x is not None, chain.from_iterable(self.pickups))
             ),
             bombs=self.bombs,
-            explosions=explosions_copy,
         )
 
     def cleanup_render_state(self):
-        # clean explosions byte array (0=none)
-        for i in range(self.height * self.width):
-            self.explosions[i] = 0
+        # clean explosions array (0=none)
+        self.explosions.fill(0)
 
     def clamp_to_map_size(
         self, x: Optional[Union[int, float]], y: Optional[Union[int, float]]

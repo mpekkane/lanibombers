@@ -2,7 +2,8 @@
 Test code for client-side
 """
 
-from typing import Union
+import sys
+from typing import Union, Optional
 from argparse import ArgumentParser
 from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl
 from game_engine.clock import Clock
@@ -27,6 +28,8 @@ class BomberClient:
         self.remote = config.get_config_mandatory("remote")
 
         self.client = BomberNetworkClient(cfg_path)
+        self.listener: Optional[keyboard.Listener] = None
+
         server_found = self.client.find_host()
         if not server_found:
             print("No server found")
@@ -34,6 +37,7 @@ class BomberClient:
 
         self.client.set_callback(ChatText, self.on_chattxt)
         self.client.set_callback(Ping, self.on_ping)
+        self.client.set_on_disconnect(self.on_disconnect)
 
     def start(self) -> None:
         self.client.start()
@@ -42,7 +46,14 @@ class BomberClient:
 
         # Create and start the listener
         with keyboard.Listener(on_press=self.on_press) as listener:
+            self.listener = listener
             listener.join()
+
+    def on_disconnect(self, reason: str) -> None:
+        print(f"Disconnected from server: {reason}")
+        if self.listener:
+            self.listener.stop()
+        sys.exit(0)
 
     def on_chattxt(self, msg: ChatText):
         print(f"{msg.timestamp}: {msg.text}")

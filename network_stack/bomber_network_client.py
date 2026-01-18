@@ -12,7 +12,7 @@ The usage is:
 After this, the responsibility of receiving and sending logic is to the owning class.
 """
 
-from typing import Dict, Type, Callable, TypeVar, cast
+from typing import Dict, Type, Callable, TypeVar, cast, Optional
 from network_stack.clients.transport_client import TransportClient
 from network_stack.shared.factory import get_client, get_scanner
 from network_stack.messages.messages import Message, Name
@@ -20,6 +20,7 @@ from common.config_reader import ConfigReader
 
 MsgType = TypeVar("MsgType", bound=Message)
 ClientHandler = Callable[[Message], None]
+DisconnectHandler = Callable[[str], None]
 
 
 class BomberNetworkClient:
@@ -38,6 +39,7 @@ class BomberNetworkClient:
         self.client: TransportClient
         self.connected = False
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
+        self.on_disconnect_handler: Optional[DisconnectHandler] = None
 
     def find_host(self) -> bool:
         scanner = get_scanner(
@@ -68,17 +70,27 @@ class BomberNetworkClient:
         def _on_connect():
             self.connected = True
 
+        def _on_disconnect(reason: str):
+            self.connected = False
+            if self.on_disconnect_handler:
+                self.on_disconnect_handler(reason)
+
         client = get_client(
             protocol=self.protocol,
             ip=self.server_ip,
             port=self.server_port,
             on_message=self.on_msg,
             on_connect=_on_connect,
+            on_disconnect=_on_disconnect,
         )
         client.start()
         self.client = client
         # FIXME: error checking
         return True
+
+    def set_on_disconnect(self, handler: DisconnectHandler) -> None:
+        """Set callback for when connection is lost."""
+        self.on_disconnect_handler = handler
 
     def set_callback(
         self, msg_type: Type[MsgType], callback: Callable[[MsgType], None]

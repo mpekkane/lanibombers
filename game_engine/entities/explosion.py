@@ -15,10 +15,18 @@ def _create_circular_pattern(diameter: int) -> np.ndarray:
 
 
 # Explosion shape lookup tables
-EXPLOSION_SMALL = _create_circular_pattern(3)    # 3x3
+EXPLOSION_SMALL = _create_circular_pattern(2.5)  # 3x3 cross
 EXPLOSION_MEDIUM = _create_circular_pattern(5)   # 5x5
 EXPLOSION_LARGE = _create_circular_pattern(7)    # 7x7
-EXPLOSION_NUKE = _create_circular_pattern(25)    # 25x25
+EXPLOSION_NUKE = _create_circular_pattern(24.04)  # 25x25 cross
+
+# Explosion damage amounts
+DAMAGE_SMALL = 50
+DAMAGE_MEDIUM = 50
+DAMAGE_LARGE = 70
+DAMAGE_NUKE = 100
+DAMAGE_FLAME = 35
+DAMAGE_DIRECTED_FLAME = 35
 
 
 class ExplosionType(Enum):
@@ -60,7 +68,7 @@ class Explosion(ABC):
 class SmallExplosion(Explosion):
     """Small explosion with 1-tile radius."""
 
-    def __init__(self, base_damage: int = 40):
+    def __init__(self, base_damage: int = DAMAGE_SMALL):
         super().__init__(base_damage)
 
     def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
@@ -76,7 +84,7 @@ class SmallExplosion(Explosion):
         p_y = slice(max(0, radius - origin_y), pattern.shape[0] - max(0, origin_y + radius + 1 - solids.shape[0]))
         p_x = slice(max(0, radius - origin_x), pattern.shape[1] - max(0, origin_x + radius + 1 - solids.shape[1]))
 
-        np.place(damage[d_y, d_x], pattern[p_y, p_x], 51)
+        np.place(damage[d_y, d_x], pattern[p_y, p_x], self.base_damage)
 
         return damage
 
@@ -84,7 +92,7 @@ class SmallExplosion(Explosion):
 class MediumExplosion(Explosion):
     """Medium explosion with 2-tile radius."""
 
-    def __init__(self, base_damage: int = 50):
+    def __init__(self, base_damage: int = DAMAGE_MEDIUM):
         super().__init__(base_damage)
 
     def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
@@ -98,7 +106,7 @@ class MediumExplosion(Explosion):
         p_y = slice(max(0, radius - origin_y), pattern.shape[0] - max(0, origin_y + radius + 1 - solids.shape[0]))
         p_x = slice(max(0, radius - origin_x), pattern.shape[1] - max(0, origin_x + radius + 1 - solids.shape[1]))
 
-        np.place(damage[d_y, d_x], pattern[p_y, p_x], 51)
+        np.place(damage[d_y, d_x], pattern[p_y, p_x], self.base_damage)
 
         return damage
 
@@ -106,7 +114,7 @@ class MediumExplosion(Explosion):
 class LargeExplosion(Explosion):
     """Large explosion with 3-tile radius."""
 
-    def __init__(self, base_damage: int = 60):
+    def __init__(self, base_damage: int = DAMAGE_LARGE):
         super().__init__(base_damage)
 
     def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
@@ -120,7 +128,7 @@ class LargeExplosion(Explosion):
         p_y = slice(max(0, radius - origin_y), pattern.shape[0] - max(0, origin_y + radius + 1 - solids.shape[0]))
         p_x = slice(max(0, radius - origin_x), pattern.shape[1] - max(0, origin_x + radius + 1 - solids.shape[1]))
 
-        np.place(damage[d_y, d_x], pattern[p_y, p_x], 51)
+        np.place(damage[d_y, d_x], pattern[p_y, p_x], self.base_damage)
 
         return damage
 
@@ -128,7 +136,7 @@ class LargeExplosion(Explosion):
 class NukeExplosion(Explosion):
     """Massive explosion with 25-tile diameter."""
 
-    def __init__(self, base_damage: int = 100):
+    def __init__(self, base_damage: int = DAMAGE_NUKE):
         super().__init__(base_damage)
 
     def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
@@ -142,7 +150,7 @@ class NukeExplosion(Explosion):
         p_y = slice(max(0, radius - origin_y), pattern.shape[0] - max(0, origin_y + radius + 1 - solids.shape[0]))
         p_x = slice(max(0, radius - origin_x), pattern.shape[1] - max(0, origin_x + radius + 1 - solids.shape[1]))
 
-        np.place(damage[d_y, d_x], pattern[p_y, p_x], 51)
+        np.place(damage[d_y, d_x], pattern[p_y, p_x], self.base_damage)
 
         return damage
 
@@ -150,7 +158,7 @@ class NukeExplosion(Explosion):
 class FlameExplosion(Explosion):
     """Flame explosion that spreads in all four cardinal directions."""
 
-    def __init__(self, base_damage: int = 35):
+    def __init__(self, base_damage: int = DAMAGE_FLAME):
         super().__init__(base_damage)
 
     def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
@@ -160,7 +168,7 @@ class FlameExplosion(Explosion):
 class DirectedFlameExplosion(Explosion):
     """Directed flame that shoots in a single direction."""
 
-    def __init__(self, direction: Direction, base_damage: int = 45):
+    def __init__(self, direction: Direction, base_damage: int = DAMAGE_DIRECTED_FLAME):
         super().__init__(base_damage)
         self.direction = direction
 
