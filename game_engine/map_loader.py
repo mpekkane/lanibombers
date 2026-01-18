@@ -62,13 +62,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             # Check for monster spawn tile
             if tile_id in MONSTER_SPAWN_TILES:
                 entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
-                monster = DynamicEntity(
-                    x=float(x + 0.5), #offset to the center of the tile. (0,0) is the last pixel in the grid, (.5,.5) is the center of the first tile.
-                    y=float(y + 0.5),
-                    direction=Direction(direction_str),
-                    entity_type=EntityType(entity_type_str),
-                    state='walk'
-                )
+                # offset to the center of the tile. (0,0) is the last pixel in the grid, (.5,.5) is the center of the first tile
+                monster = DynamicEntity.create_monster(EntityType(entity_type_str), float(x+0.5), float(y+0.5), Direction(direction_str))
                 monsters.append(monster)
                 # Replace spawn tile with empty in tilemap
                 tilemap[i] = EMPTY_TILE_ID
@@ -110,6 +105,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
+                    diggable=True,
                     health=25
                 )
             elif tile_id == ROCK2_TILE_ID:
@@ -118,7 +114,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=50
+                    diggable=True,
+                    health=50,
                 )
             elif tile_id in BEDROCK_CORNER_TILES:
                 tile = Tile(
@@ -126,7 +123,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=TileType.BEDROCK,
                     solid=True,
                     interactable=False,
-                    health=60
+                    diggable=True,
+                    health=60,
                 )
             else:
                 tile = Tile(

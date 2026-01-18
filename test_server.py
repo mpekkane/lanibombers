@@ -109,6 +109,9 @@ class BomberServer:
         if player is None:
             return
 
+        if player.state == "dead":
+            return
+
         cmd: Action = msg.command
         if cmd.is_move():
             if cmd == Action.RIGHT:

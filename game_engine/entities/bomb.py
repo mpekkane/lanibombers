@@ -12,6 +12,8 @@ class BombType(Enum):
     C4 = 'c4'
     LANDMINE = 'landmine'
     REMOTE = 'remote'
+    SMALL_BOMB = "small_bomb"
+    URETHANE = "urethane"
 
     def is_timed(self) -> bool:
         return self != BombType.LANDMINE and self != BombType.REMOTE
