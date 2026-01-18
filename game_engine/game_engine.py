@@ -3,7 +3,7 @@ from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
@@ -81,6 +81,7 @@ class GameEngine:
             sprite_id=num_players + 1,
             state="idle",
             speed=3,
+            fight_power=20
         )
         return self._create_player(player)
 
@@ -334,6 +335,9 @@ class GameEngine:
         if flags.spawn and not blocked:
             self.move_entity(target)
 
+        # fight monsters
+        self.fight(target)
+
     def resolve_dig(self, target: Player, event: Event, flags: ResolveFlags) -> None:
         target_tile = self.get_neighbor_tile(target)
         dig_power = target.get_dig_power()
@@ -417,6 +421,19 @@ class GameEngine:
         #         print(f"not here {pickup.x} {pickup.y}")
         # if picked >= 0:
         #     del self.pickups[picked]
+
+    def fight(self, agent: DynamicEntity) -> None:
+        entities = self.players + self.monsters
+        px, py = xy_to_tile(agent.x, agent.y)
+        for other in entities:
+            if other.x == px and other.y == py and other.state != "dead":
+                other.take_damage(agent.fight_power)
+                agent.take_damage(other.fight_power)
+                # print("FIGHT!")
+                # print(f"Agent deals {agent.fight_power} damage")
+                # print(f"Enemy deals {other.fight_power} damage")
+                # print(f"Agent health {agent.health}")
+                # print(f"Enemy health {other.health}")
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""

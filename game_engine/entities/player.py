@@ -57,7 +57,7 @@ class Player(DynamicEntity):
         print(f"Tools: {self.tools}")
 
     def pickup_treasure(self, treasure: Treasure) -> None:
-        self.money += treasure.value
+        self.add_money(treasure.value)
         print(f"Picked up {treasure.treasure_type}")
         print(f"Money: {self.money}")
 

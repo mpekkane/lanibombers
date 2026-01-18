@@ -62,13 +62,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             # Check for monster spawn tile
             if tile_id in MONSTER_SPAWN_TILES:
                 entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
-                monster = DynamicEntity(
-                    x=float(x),
-                    y=float(y),
-                    direction=Direction(direction_str),
-                    entity_type=EntityType(entity_type_str),
-                    state='walk'
-                )
+                monster = DynamicEntity.create_monster(EntityType(entity_type_str), float(x), float(y), Direction(direction_str))
                 monsters.append(monster)
                 # Replace spawn tile with empty in tilemap
                 tilemap[i] = EMPTY_TILE_ID
