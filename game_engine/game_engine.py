@@ -1,4 +1,5 @@
 import array
+import numpy as np
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 
 from game_engine.clock import Clock
@@ -7,7 +8,18 @@ from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
+from game_engine.entities.explosion import (
+    ExplosionType, SmallExplosion, MediumExplosion, LargeExplosion, NukeExplosion
+)
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
+
+# Map ExplosionType to explosion instances
+EXPLOSION_MAP = {
+    ExplosionType.SMALL: SmallExplosion(),
+    ExplosionType.MEDIUM: MediumExplosion(),
+    ExplosionType.LARGE: LargeExplosion(),
+    ExplosionType.NUKE: NukeExplosion(),
+}
 from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState
 from game_engine.entities import Tool, Treasure
@@ -256,18 +268,20 @@ class GameEngine:
 
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
-        # FIXME: ?
-        current_time = Clock.now()
+        # Get explosion instance and calculate damage pattern
+        explosion = EXPLOSION_MAP[target.explosion_type]
+        solids = np.zeros((self.height, self.width), dtype=bool)
+        damage_array = explosion.calculate_damage(target.x, target.y, solids)
 
-        # Damage tiles and create explosions within blast radius
-        for dy in range(-target.blast_radius, target.blast_radius + 1):
-            for dx in range(-target.blast_radius, target.blast_radius + 1):
-                tx, ty = target.x + dx, target.y + dy
-                tile = self.get_tile(tx, ty)
-                if tile:
-                    tile.take_damage(target.damage)
-                    # Record explosion start time and type at this tile (type 1 = big bomb)
-                    self.explosions[tx + ty * self.width] = 1  # for normal big bomb
+        # Apply damage to tiles
+        for y in range(self.height):
+            for x in range(self.width):
+                dmg = damage_array[y, x]
+                if dmg > 0:
+                    tile = self.get_tile(x, y)
+                    if tile:
+                        tile.take_damage(dmg)
+                    self.explosions[x + y * self.width] = 1
 
         # Remove bomb from list
         if target in self.bombs:
