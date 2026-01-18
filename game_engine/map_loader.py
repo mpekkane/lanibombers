@@ -63,8 +63,8 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             if tile_id in MONSTER_SPAWN_TILES:
                 entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
                 monster = DynamicEntity(
-                    x=float(x),
-                    y=float(y),
+                    x=float(x + 0.5), #offset to the center of the tile. (0,0) is the last pixel in the grid, (.5,.5) is the center of the first tile.
+                    y=float(y + 0.5),
                     direction=Direction(direction_str),
                     entity_type=EntityType(entity_type_str),
                     state='walk'

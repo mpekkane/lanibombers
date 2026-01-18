@@ -74,8 +74,8 @@ class GameEngine:
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(
-            x=start_pose[0],
-            y=start_pose[1],
+            x=start_pose[0] + 0.5,
+            y=start_pose[1] + 0.5,
             direction=Direction.RIGHT,
             name=name,
             sprite_id=num_players + 1,
