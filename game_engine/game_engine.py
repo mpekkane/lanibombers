@@ -1,5 +1,6 @@
 import array
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
+from itertools import chain
 
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile
@@ -12,8 +13,7 @@ from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState
 from game_engine.entities import Tool, Treasure
 from game_engine.utils import xy_to_tile, clamp
-from itertools import chain
-
+from game_engine.sound_engine import SoundEngine
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -50,6 +50,7 @@ class GameEngine:
             (height - 1, width - 1),
         ]
         self.prev_time = -1
+        self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
 
     def load_map(self, map_data: "MapData") -> None:
         """Load map data into the engine."""
@@ -64,10 +65,12 @@ class GameEngine:
 
     def start(self) -> None:
         """Start the game engine and event processing."""
+        self.sounds.game()
         self.event_resolver.start()
 
     def stop(self) -> None:
         """Stop the game engine and event processing."""
+        self.sounds.stop_all()
         self.event_resolver.stop()
 
     def create_player(self, name: str) -> None:
@@ -287,6 +290,13 @@ class GameEngine:
                     # Record explosion start time and type at this tile (type 1 = big bomb)
                     self.explosions[tx + ty * self.width] = 1  # for normal big bomb
 
+        if target.bomb_type == BombType.SMALL_BOMB:
+            self.sounds.small_explosion()
+        elif target.bomb_type == BombType.URETHANE:
+            self.sounds.urethane()
+        else:
+            self.sounds.explosion()
+
         # Remove bomb from list
         if target in self.bombs:
             self.bombs.remove(target)
@@ -390,6 +400,7 @@ class GameEngine:
         target_tile = self.get_neighbor_tile(target)
         dig_power = target.get_dig_power()
         target_tile.take_damage(dig_power)
+        self.sounds.dig()
         # print("DIG!")
         # print(target_tile)
 
@@ -452,6 +463,8 @@ class GameEngine:
             else:
                 assert isinstance(pickup, Treasure)
                 player.pickup_treasure(pickup)
+                # TODO:
+                self.sounds.treasure()
             self.pickups[py][px] = None
 
     def fight(self, agent: DynamicEntity) -> None:
@@ -467,6 +480,8 @@ class GameEngine:
                 # print(f"Enemy deals {other.fight_power} damage")
                 # print(f"Agent health {agent.health}")
                 # print(f"Enemy health {other.health}")
+        if agent.state == "dead":
+            self.sounds.die()
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
