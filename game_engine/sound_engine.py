@@ -36,8 +36,13 @@ class SoundEngine:
         self._monster = arcade.load_sound(f"{SOUND_PATH}/KARJAISU.wav")
 
         # init music
-        self._shop_music = arcade.load_sound(f"{MUSIC_PATH}/HUIPPE.wav")
-        self._game_music = arcade.load_sound(f"{MUSIC_PATH}/OEKU.wav")
+        try:
+            self._shop_music = arcade.load_sound(f"{MUSIC_PATH}/HUIPPE.wav")
+            self._game_music = arcade.load_sound(f"{MUSIC_PATH}/OEKU.wav")
+            self._music_enabled = True
+        except FileNotFoundError:
+            print("No music wavs found. Music disabled")
+            self._music_enabled = False
         self._shop_playback: Optional[media.Player] = None
         self._game_playback: Optional[media.Player] = None
         self._playbacks: List[media.Player] = []
@@ -54,11 +59,15 @@ class SoundEngine:
         return self._play(sound, loop=True, volume=self.music_volume)
 
     def shop(self) -> None:
+        if not self._music_enabled:
+            return
         if self._game_playback is not None:
             arcade.stop_sound(self._game_playback)
         self._shop_playback = self._play_music(self._shop_music)
 
     def game(self) -> None:
+        if not self._music_enabled:
+            return
         if self._shop_playback is not None:
             arcade.stop_sound(self._shop_playback)
         self._game_playback = self._play_music(self._game_music)
