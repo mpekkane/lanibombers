@@ -10,6 +10,7 @@ from game_engine.entities.explosion import ExplosionType
 class BombType(Enum):
     BIG_BOMB = 'big_bomb'
     C4 = 'c4'
+    C4_TILE = 'c4_tile'  # Internal: explosion from C4 tile chain reaction
     LANDMINE = 'landmine'
     REMOTE = 'remote'
     SMALL_BOMB = "small_bomb"
@@ -27,13 +28,15 @@ class BombType(Enum):
 BOMB_PROPERTIES = {
     BombType.BIG_BOMB: (3.0, ExplosionType.MEDIUM),
     BombType.SMALL_BOMB: (2.0, ExplosionType.SMALL),
-    BombType.C4: (5.0, ExplosionType.MEDIUM),
+    BombType.C4: (4.0, ExplosionType.NONE),  # Flood fills with C4 tiles
+    BombType.C4_TILE: (0.0, ExplosionType.MEDIUM),  # Instant explosion for chain reaction
     BombType.LANDMINE: (0.5, ExplosionType.SMALL),
     BombType.REMOTE: (-1.0, ExplosionType.MEDIUM),
+    BombType.URETHANE: (4.0, ExplosionType.NONE),  # Flood fills with urethane tiles
     BombType.SMALL_CROSS_BOMB: (3.0, ExplosionType.SMALL_CROSS),
     BombType.BIG_CROSS_BOMB: (4.0, ExplosionType.BIG_CROSS),
-    BombType.DYNAMITE: (2.5, ExplosionType.LARGE),
-    BombType.NUKE: (5.0, ExplosionType.NUKE),
+    BombType.DYNAMITE: (3, ExplosionType.LARGE),
+    BombType.NUKE: (6.0, ExplosionType.NUKE),
 }
 
 

@@ -45,6 +45,7 @@ DAMAGE_BIG_CROSS = 50
 
 
 class ExplosionType(Enum):
+    NONE = 'none'  # No explosion (used for bombs that don't explode)
     SMALL = 'small'
     MEDIUM = 'medium'
     LARGE = 'large'

@@ -3,8 +3,10 @@ from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 from itertools import chain
 
 from game_engine.clock import Clock
-from game_engine.entities.tile import Tile
+from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
+from game_engine.engine_utils import flood_fill, get_solid_map
+from cfg.tile_dictionary import C4_TILE_ID, URETHANE_TILE_ID
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
@@ -289,10 +291,23 @@ class GameEngine:
 
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
+        # C4 has special behavior - flood fill with c4 tiles instead of exploding
+        if target.bomb_type == BombType.C4:
+            self._resolve_c4(target)
+            return
+
+        # URETHANE has special behavior - flood fill with urethane tiles (no chain reaction)
+        if target.bomb_type == BombType.URETHANE:
+            self._resolve_urethane(target)
+            return
+
         # Get explosion instance and calculate damage pattern
         explosion = EXPLOSION_MAP[target.explosion_type]
         solids = np.zeros((self.height, self.width), dtype=bool)
         damage_array = explosion.calculate_damage(target.x, target.y, solids)
+
+        # Track C4 tiles that will be hit for chain reaction
+        c4_tiles_hit = []
 
         # Apply damage to tiles
         for y in range(self.height):
@@ -301,12 +316,34 @@ class GameEngine:
                 if dmg > 0:
                     tile = self.get_tile(x, y)
                     if tile:
+                        # Check if this is a C4 tile before damaging
+                        if tile.tile_type == TileType.C4:
+                            c4_tiles_hit.append((x, y))
                         tile.take_damage(dmg, target.explosion_type)
                         if not tile.solid:
                             self.explosions[y, x] = 1
-                        
 
-        if target.bomb_type == BombType.SMALL_BOMB:
+        # Schedule chain explosions for C4 tiles that were hit (1/60s delay)
+        chain_delay = 1.0 / 60.0
+        current_time = Clock.now()
+        for cx, cy in c4_tiles_hit:
+            c4_bomb = Bomb(
+                x=cx,
+                y=cy,
+                bomb_type=BombType.C4_TILE,
+                placed_at=current_time,
+                owner_id=target.owner_id,
+            )
+            explosion_event = Event(
+                trigger_at=current_time + chain_delay,
+                target=c4_bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
+
+        if target.bomb_type == BombType.C4_TILE:
+            pass  # No sound for C4 tile chain explosions
+        elif target.bomb_type == BombType.SMALL_BOMB:
             self.sounds.small_explosion()
         elif target.bomb_type == BombType.URETHANE:
             self.sounds.urethane()
@@ -316,6 +353,60 @@ class GameEngine:
         # Remove bomb from list
         if target in self.bombs:
             self.bombs.remove(target)
+
+    def _resolve_c4(self, bomb: Bomb) -> None:
+        """Resolve C4 bomb - flood fill empty tiles with c4_tiles."""
+        # Get solid map (True = solid, we need inverse for flood fill which expects True = walkable)
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map  # Invert: True = empty/walkable
+
+        # Flood fill from bomb position, max 8 tiles away
+        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=8)
+
+        # Convert all filled empty tiles to c4_tiles
+        for y in range(self.height):
+            for x in range(self.width):
+                if fill_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile and tile.tile_type == TileType.EMPTY:
+                        tile.tile_type = TileType.C4
+                        tile.visual_id = C4_TILE_ID
+                        tile.solid = True
+                        tile.diggable = True
+                        tile.health = 100
+
+        self.sounds.urethane()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_urethane(self, bomb: Bomb) -> None:
+        """Resolve URETHANE bomb - flood fill empty tiles with urethane tiles (no chain reaction)."""
+        # Get solid map (True = solid, we need inverse for flood fill which expects True = walkable)
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map  # Invert: True = empty/walkable
+
+        # Flood fill from bomb position, max 8 tiles away
+        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=8)
+
+        # Convert all filled empty tiles to urethane tiles
+        for y in range(self.height):
+            for x in range(self.width):
+                if fill_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile and tile.tile_type == TileType.EMPTY:
+                        tile.tile_type = TileType.URETHANE
+                        tile.visual_id = URETHANE_TILE_ID
+                        tile.solid = True
+                        tile.diggable = True
+                        tile.health = 200
+
+        self.sounds.urethane()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
 
     def resolve_movement(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags

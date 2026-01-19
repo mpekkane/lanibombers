@@ -17,6 +17,7 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.SMALL_BOMB, 50))
         self.inventory.append((BombType.BIG_BOMB, 50))
         self.inventory.append((BombType.C4, 10))
+        self.inventory.append((BombType.URETHANE, 10))
         self.inventory.append((BombType.LANDMINE, 20))
         self.inventory.append((BombType.REMOTE, 20))
         self.inventory.append((BombType.DYNAMITE, 20))

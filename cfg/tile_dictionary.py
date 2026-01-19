@@ -78,6 +78,7 @@ TILE_DICTIONARY = {
     154: 'gold_crown',
     155: 'urethane_block',
     156: 'tunnel',
+    157: 'c4_tile',
     #
     #
     164: 'crackerbarrel',
@@ -110,6 +111,8 @@ ROCK1_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if nam
 ROCK2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock2')
 BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics2')
 BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
+C4_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'c4_tile')
+URETHANE_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'urethane_block')
 
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {

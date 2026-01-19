@@ -561,7 +561,8 @@ class GameRenderer(arcade.Window):
         load_animated(BombType.NUKE, "nuke", has_defused=False)
 
         # Static bombs (single frame)
-        load_static(BombType.C4, "c4")
+        load_static(BombType.C4, "c4_bomb")
+        load_static(BombType.URETHANE, "urethane")
         load_static(BombType.LANDMINE, "landmine")
         load_static(BombType.SMALL_CROSS_BOMB, "smallcrucifix")
         load_static(BombType.BIG_CROSS_BOMB, "bigcrucifix")

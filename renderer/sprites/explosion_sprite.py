@@ -3,7 +3,7 @@ from game_engine.clock import Clock
 SPRITE_SIZE = 10
 
 # Animation timing (seconds per frame)
-FRAME_DURATION = 0.15
+FRAME_DURATION = 0.10
 
 
 class ExplosionSprite(arcade.Sprite):
