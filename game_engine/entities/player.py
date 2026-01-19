@@ -14,12 +14,20 @@ class Player(DynamicEntity):
     selected = 0
 
     def _test_inventory(self) -> None:
-        self.inventory.append((BombType.BIG_BOMB, 100))
-        self.inventory.append((BombType.C4, 3))
-        self.inventory.append((BombType.LANDMINE, 100))
-        self.inventory.append((BombType.REMOTE, 100))
+        self.inventory.append((BombType.SMALL_BOMB, 50))
+        self.inventory.append((BombType.BIG_BOMB, 50))
+        self.inventory.append((BombType.C4, 10))
+        self.inventory.append((BombType.LANDMINE, 20))
+        self.inventory.append((BombType.REMOTE, 20))
+        self.inventory.append((BombType.DYNAMITE, 20))
+        self.inventory.append((BombType.NUKE, 5))
+        self.inventory.append((BombType.SMALL_CROSS_BOMB, 10))
+        self.inventory.append((BombType.BIG_CROSS_BOMB, 5))
 
     def choose(self) -> None:
+        if not self.inventory:
+            return
+
         self.selected += 1
         if self.selected >= len(self.inventory):
             self.selected = 0
@@ -28,7 +36,14 @@ class Player(DynamicEntity):
         selected_bomb_type, bomb_count = self.inventory[self.selected]
         print(selected_bomb_type, bomb_count)
 
-    def plant_bomb(self) -> Bomb:
+    def plant_bomb(self) -> Bomb | None:
+        if not self.inventory:
+            return None
+
+        # Ensure selected index is valid
+        if self.selected >= len(self.inventory):
+            self.selected = len(self.inventory) - 1
+
         selected_bomb_type, bomb_count = self.inventory[self.selected]
         vx, vy = xy_to_tile(self.x, self.y)
 
@@ -43,6 +58,10 @@ class Player(DynamicEntity):
 
         if new_count <= 0:
             del self.inventory[self.selected]
+            # Adjust selected index if it's now out of bounds
+            if self.selected >= len(self.inventory) and self.inventory:
+                self.selected = len(self.inventory) - 1
+
         else:
             self.inventory[self.selected] = selected_bomb_type, new_count
 

@@ -360,16 +360,7 @@ class GameRenderer(arcade.Window):
 
         # Bomb textures: (bomb_type, state, frame) -> texture
         self.bomb_textures = {}
-        # Big bomb - active frames 1-3 and defused
-        for frame in range(1, 4):
-            path = os.path.join(SPRITES_PATH, f"bigbomb{frame}.png")
-            self.bomb_textures[(BombType.BIG_BOMB, "active", frame)] = (
-                arcade.load_texture(path)
-            )
-        path = os.path.join(SPRITES_PATH, "bigbomb_defused.png")
-        self.bomb_textures[(BombType.BIG_BOMB, "defused", 0)] = arcade.load_texture(
-            path
-        )
+        self._load_bomb_textures()
 
         # Bomb sprite list (dynamic length)
         self.bomb_sprite_list = arcade.SpriteList()
@@ -539,6 +530,41 @@ class GameRenderer(arcade.Window):
         # Update players
         for i, player in enumerate(state.players):
             self.player_sprites[i].update_from_entity(player, delta_time)
+
+    def _load_bomb_textures(self):
+        """Load all bomb textures into self.bomb_textures dict."""
+        # Helper to load animated bomb with 3 frames
+        def load_animated(bomb_type, base_name, has_defused=True):
+            for frame in range(1, 4):
+                path = os.path.join(SPRITES_PATH, f"{base_name}{frame}.png")
+                self.bomb_textures[(bomb_type, "active", frame)] = arcade.load_texture(path)
+            if has_defused:
+                path = os.path.join(SPRITES_PATH, f"{base_name}_defused.png")
+                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(path)
+
+        # Helper to load single-frame bomb (same texture for all frames)
+        def load_static(bomb_type, sprite_name, defused_name=None):
+            path = os.path.join(SPRITES_PATH, f"{sprite_name}.png")
+            texture = arcade.load_texture(path)
+            for frame in range(1, 4):
+                self.bomb_textures[(bomb_type, "active", frame)] = texture
+            if defused_name:
+                defused_path = os.path.join(SPRITES_PATH, f"{defused_name}.png")
+                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(defused_path)
+            else:
+                self.bomb_textures[(bomb_type, "defused", 0)] = texture
+
+        # Animated bombs (3 frames + defused)
+        load_animated(BombType.BIG_BOMB, "bigbomb")
+        load_animated(BombType.SMALL_BOMB, "smallbomb")
+        load_animated(BombType.DYNAMITE, "dynamite")
+        load_animated(BombType.NUKE, "nuke", has_defused=False)
+
+        # Static bombs (single frame)
+        load_static(BombType.C4, "c4")
+        load_static(BombType.LANDMINE, "landmine")
+        load_static(BombType.SMALL_CROSS_BOMB, "smallcrucifix")
+        load_static(BombType.BIG_CROSS_BOMB, "bigcrucifix")
 
     def on_draw(self):
         """Render the game"""

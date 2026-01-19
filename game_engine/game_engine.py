@@ -9,7 +9,8 @@ from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.entities.explosion import (
-    ExplosionType, SmallExplosion, MediumExplosion, LargeExplosion, NukeExplosion
+    ExplosionType, SmallExplosion, MediumExplosion, LargeExplosion, NukeExplosion,
+    SmallCrossExplosion, BigCrossExplosion
 )
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 
@@ -19,6 +20,8 @@ EXPLOSION_MAP = {
     ExplosionType.MEDIUM: MediumExplosion(),
     ExplosionType.LARGE: LargeExplosion(),
     ExplosionType.NUKE: NukeExplosion(),
+    ExplosionType.SMALL_CROSS: SmallCrossExplosion(),
+    ExplosionType.BIG_CROSS: BigCrossExplosion(),
 }
 from game_engine.events.event_resolver import EventResolver
 from game_engine.render_state import RenderState

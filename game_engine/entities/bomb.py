@@ -14,6 +14,10 @@ class BombType(Enum):
     REMOTE = 'remote'
     SMALL_BOMB = "small_bomb"
     URETHANE = "urethane"
+    SMALL_CROSS_BOMB = "small_cross_bomb"
+    BIG_CROSS_BOMB = "big_cross_bomb"
+    DYNAMITE = "dynamite"
+    NUKE = "nuke"
 
     def is_timed(self) -> bool:
         return self != BombType.LANDMINE and self != BombType.REMOTE
@@ -22,9 +26,14 @@ class BombType(Enum):
 # Bomb properties by type: (fuse_duration, explosion_type)
 BOMB_PROPERTIES = {
     BombType.BIG_BOMB: (3.0, ExplosionType.MEDIUM),
-    BombType.C4: (5.0, ExplosionType.LARGE),
+    BombType.SMALL_BOMB: (2.0, ExplosionType.SMALL),
+    BombType.C4: (5.0, ExplosionType.MEDIUM),
     BombType.LANDMINE: (0.5, ExplosionType.SMALL),
     BombType.REMOTE: (-1.0, ExplosionType.MEDIUM),
+    BombType.SMALL_CROSS_BOMB: (3.0, ExplosionType.SMALL_CROSS),
+    BombType.BIG_CROSS_BOMB: (4.0, ExplosionType.BIG_CROSS),
+    BombType.DYNAMITE: (2.5, ExplosionType.LARGE),
+    BombType.NUKE: (5.0, ExplosionType.NUKE),
 }
 
 
