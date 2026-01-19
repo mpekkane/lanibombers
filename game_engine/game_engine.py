@@ -171,13 +171,27 @@ class GameEngine:
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
 
+    def clear_entity_dig_events(self, player: DynamicEntity) -> None:
+        """Clear all dig actions by the player"""
+        # First resolve undergoing events, i.e., apply the dig damage
+        # already done
+        self.event_resolver.resolve_object_events(
+            player.id, "dig", ResolveFlags(spawn=False)
+        )
+        # Safety: clear all dig events from the queue
+        self.event_resolver.cancel_object_events(player.id, "dig")
+
     def change_entity_direction(self, player: DynamicEntity) -> None:
         """Create and handle player movement events"""
         if player.state == "dead":
             return
 
+        # Cancel dig events, this needs to be done first as the resolve
+        # init a move event
+        self.clear_entity_dig_events(player)
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
+
 
         # print("Centralize")
         # print(player.x, player.y)
@@ -493,8 +507,10 @@ class GameEngine:
         self.fight(target)
 
     def centralize_position(self, entity: DynamicEntity) -> None:
-        entity.x = int(entity.x - 0.5) + 0.5
-        entity.y = int(entity.y - 0.5) + 0.5
+        if entity.direction in (Direction.UP, Direction.DOWN):
+            entity.x = round(entity.x - 0.5) + 0.5
+        if entity.direction in (Direction.RIGHT, Direction.LEFT):
+            entity.y = round(entity.y - 0.5) + 0.5
 
     def round_position(self, entity: DynamicEntity) -> None:
         entity.x = int(round(entity.x * 2)) / 2
