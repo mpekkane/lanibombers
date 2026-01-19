@@ -26,18 +26,18 @@ def _create_cross_pattern(diameter: int) -> np.ndarray:
 
 
 # Explosion shape lookup tables
-EXPLOSION_SMALL = _create_circular_pattern(2.5)  # 3x3 cross
-EXPLOSION_MEDIUM = _create_circular_pattern(5)   # 5x5
-EXPLOSION_LARGE = _create_circular_pattern(7)    # 7x7
+EXPLOSION_SMALL = _create_circular_pattern(2.5)   # 3x3 cross
+EXPLOSION_MEDIUM = _create_circular_pattern(5)    # 5x5
+EXPLOSION_LARGE = _create_circular_pattern(7)     # 7x7
 EXPLOSION_NUKE = _create_circular_pattern(24.04)  # 25x25 cross
-EXPLOSION_SMALL_CROSS = _create_cross_pattern(25)  # 25-tile diameter cross
-EXPLOSION_BIG_CROSS = _create_cross_pattern(50)    # 50-tile diameter cross
+EXPLOSION_SMALL_CROSS = _create_cross_pattern(31) # 25-tile diameter cross
+EXPLOSION_BIG_CROSS = _create_cross_pattern(127)  # 50-tile diameter cross
 
 # Explosion damage amounts
 DAMAGE_SMALL = 50
 DAMAGE_MEDIUM = 50
 DAMAGE_LARGE = 70
-DAMAGE_NUKE = 100
+DAMAGE_NUKE = 200
 DAMAGE_FLAME = 35
 DAMAGE_DIRECTED_FLAME = 35
 DAMAGE_SMALL_CROSS = 50
