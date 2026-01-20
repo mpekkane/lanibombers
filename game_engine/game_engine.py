@@ -82,8 +82,9 @@ class GameEngine:
         self.event_resolver = EventResolver(resolve=self.resolve)
         # FIXME: placeholder
         self.starting_poses = [
-            (1, 1),
-            #(60, 5),  # debug: close to teleport
+            # (1, 1),
+            # (60, 5),  # debug: close to teleport
+            (10, 20),  # debug: close to boulder
             (1, width - 1),
             (height - 1, 1),
             (height - 1, width - 1),
@@ -213,6 +214,7 @@ class GameEngine:
         # )
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
+        self.event_resolver.cancel_object_events(player.id, "push")
 
     def clear_entity_dig_events(self, player: DynamicEntity) -> None:
         """Clear all dig actions by the player"""
@@ -257,12 +259,15 @@ class GameEngine:
             if next_tile.is_switch():
                 self.use_switch()
             elif next_tile.is_boulder():
-                pass
+                # TODO: can you push boulders on top of items?
+                tile_behind_push = self.get_neighbor_tile(entity, range=2)
+                if not tile_behind_push.solid:
+                    self.move_entity(entity, push=True)
         # if nothing can be done: stop
         else:
             entity.state = "idle"
 
-    def move_entity(self, entity: DynamicEntity):
+    def move_entity(self, entity: DynamicEntity, push: bool = False):
         """Main movement generator function from dynamic entities"""
         if entity.state == "dead":
             return
@@ -303,15 +308,21 @@ class GameEngine:
                 d = 0.5
 
             # this is the required time to cross the thershold
-            dt = d / entity.speed
+            speed_modifier = 1
+            if push:
+                speed_modifier = entity.push_power()
+            dt = d / (entity.speed * speed_modifier)
             # HACK: since the movement is calculated with actual time, add some bonus
             # time to cross the threshold properly, to make tile transition logic
             # nicee
             dt += 0.01
+
+            event = "move" if not push else "push"
+
             movement_event = MoveEvent(
                 trigger_at=Clock.now() + dt,
                 target=entity,
-                event_type="move",
+                event_type=event,
                 created_at=Clock.now(),
                 created_by=entity.id,
                 direction=str(entity.direction.value),
@@ -350,6 +361,8 @@ class GameEngine:
             self.resolve_bomb(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "move":
             self.resolve_movement(target, event, flags)
+        elif isinstance(target, Player) and event.event_type == "push":
+            self.resolve_push(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
 
@@ -470,6 +483,34 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
+    def resolve_push(
+        self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
+    ) -> None:
+        player_x, player_y = xy_to_tile(target.x, target.y)
+        target_x, target_y = player_x, player_y
+        new_x, new_y = target_x, target_y
+        if target.direction == Direction.RIGHT:
+            target_x = player_x + 1
+            new_x = target_x + 1
+        elif target.direction == Direction.LEFT:
+            target_x = player_x - 1
+            new_x = target_x - 1
+        elif target.direction == Direction.UP:
+            target_y = player_y - 1
+            new_y = target_y - 1
+        elif target.direction == Direction.DOWN:
+            target_y = player_y + 1
+            new_y = target_y + 1
+        else:
+            raise ValueError("Invalid move direction")
+
+        # TODO: do boulders crush items?
+        self.tiles[new_y][new_x] = deepcopy(self.tiles[target_y][target_x])
+        self.tiles[target_y][target_x].solid = False
+        self.tiles[target_y][target_x].tile_type = TileType.DIRT
+        self.tiles[target_y][target_x].visual_id = EMPTY_TILE_ID
+        self.resolve_movement(target, event, flags)
+
     def resolve_movement(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
     ) -> None:
@@ -485,7 +526,10 @@ class GameEngine:
         # other than planned, calculate actual traveled distance
         current_time = Clock.now()
         dt = current_time - event.created_at
-        d = dt * target.speed
+        speedmod = 1
+        if event.event_type == "push":
+            speedmod = target.push_power()
+        d = dt * target.speed * speedmod
 
         # move target to the stored direction, not the current one!
         # this is due to the fact that when changing direction, the target (pointer)
@@ -574,18 +618,18 @@ class GameEngine:
         else:
             self.move_entity(target)
 
-    def get_neighbor_tile(self, entity: DynamicEntity) -> Tile:
+    def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tile:
         px, py = xy_to_tile(entity.x, entity.y)
         nx, ny = px, py
         dir = Direction(entity.direction)
         if dir == Direction.RIGHT:
-            nx += 1
+            nx += range
         elif dir == Direction.LEFT:
-            nx -= 1
+            nx -= range
         elif dir == Direction.UP:
-            ny -= 1
+            ny -= range
         elif dir == Direction.DOWN:
-            ny += 1
+            ny += range
         else:
             print(entity)
             raise ValueError("Invalid move direction")
@@ -745,3 +789,4 @@ class GameEngine:
 
     def clamp_y(self, y: Union[int, float]):
         return clamp(y, 0, self.height)
+

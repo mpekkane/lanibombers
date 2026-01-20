@@ -67,3 +67,6 @@ class DynamicEntity(GameObject):
             state="walk",
             fight_power=MONSTER_DAMAGE[monster_type],
         )
+
+    def push_power(self) -> float:
+        return 0.25
