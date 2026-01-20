@@ -104,6 +104,7 @@ BRICKS_TILES = {172}
 SWITCH_TILES = {180}
 SECURITY_DOOR_TILES = {108}
 TUNNEL_TILES = {156}
+C4_TILES = {157}
 
 # Get tile IDs from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')

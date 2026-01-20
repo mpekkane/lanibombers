@@ -7,17 +7,42 @@ from dataclasses import dataclass, field
 from typing import List
 
 from cfg.tile_dictionary import (
-    EMPTY_TILE_ID, ROCK1_TILE_ID, ROCK2_TILE_ID,
-    MONSTER_SPAWN_TILES, TREASURE_TILES, TOOL_TILES,
-    BEDROCK_TILES, BEDROCK_CORNER_TILES, DIRT_TILES, CONCRETE_TILES, URETHANE_TILES,
-    BIOSLIME_TILES, BOULDER_TILES, BRICKS_TILES, SWITCH_TILES, SECURITY_DOOR_TILES, TUNNEL_TILES
+    EMPTY_TILE_ID,
+    ROCK1_TILE_ID,
+    ROCK2_TILE_ID,
+    MONSTER_SPAWN_TILES,
+    TREASURE_TILES,
+    TOOL_TILES,
+    BEDROCK_TILES,
+    BEDROCK_CORNER_TILES,
+    DIRT_TILES,
+    CONCRETE_TILES,
+    URETHANE_TILES,
+    BIOSLIME_TILES,
+    BOULDER_TILES,
+    BRICKS_TILES,
+    SWITCH_TILES,
+    SECURITY_DOOR_TILES,
+    TUNNEL_TILES,
+    C4_TILES,
 )
-from game_engine.entities import DynamicEntity, Direction, EntityType, Tile, TileType, Treasure, TreasureType, Tool, ToolType
+from game_engine.entities import (
+    DynamicEntity,
+    Direction,
+    EntityType,
+    Tile,
+    TileType,
+    Treasure,
+    TreasureType,
+    Tool,
+    ToolType,
+)
 
 
 @dataclass
 class MapData:
     """Loaded map data containing tiles and entities."""
+
     width: int
     height: int
     tiles: List[List[Tile]]
@@ -40,10 +65,10 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
         MapData containing tile grid and monster list
     """
     # Read raw bytes from file
-    tilemap = array.array('B')
-    with open(path, 'rb') as f:
+    tilemap = array.array("B")
+    with open(path, "rb") as f:
         for line in f:
-            line = line.rstrip(b'\r\n')
+            line = line.rstrip(b"\r\n")
             for char in line:
                 tilemap.append(char)
 
@@ -63,7 +88,12 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             if tile_id in MONSTER_SPAWN_TILES:
                 entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
                 # offset to the center of the tile. (0,0) is the last pixel in the grid, (.5,.5) is the center of the first tile
-                monster = DynamicEntity.create_monster(EntityType(entity_type_str), float(x+0.5), float(y+0.5), Direction(direction_str))
+                monster = DynamicEntity.create_monster(
+                    EntityType(entity_type_str),
+                    float(x + 0.5),
+                    float(y + 0.5),
+                    Direction(direction_str),
+                )
                 monsters.append(monster)
                 # Replace spawn tile with empty in tilemap
                 tilemap[i] = EMPTY_TILE_ID
@@ -76,7 +106,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     x=x,
                     y=y,
                     treasure_type=TreasureType(treasure_type_str),
-                    visual_id=tile_id
+                    visual_id=tile_id,
                 )
                 treasures.append(treasure)
                 # Replace treasure tile with empty in tilemap
@@ -87,10 +117,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             elif tile_id in TOOL_TILES:
                 tool_type_str = TOOL_TILES[tile_id]
                 tool = Tool(
-                    x=x,
-                    y=y,
-                    tool_type=ToolType(tool_type_str),
-                    visual_id=tile_id
+                    x=x, y=y, tool_type=ToolType(tool_type_str), visual_id=tile_id
                 )
                 tools.append(tool)
                 # Replace tool tile with empty in tilemap
@@ -106,7 +133,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     solid=True,
                     interactable=False,
                     diggable=True,
-                    health=25
+                    health=25,
                 )
             elif tile_id == ROCK2_TILE_ID:
                 tile = Tile(
@@ -132,7 +159,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
                     tile_type=_get_tile_type(tile_id),
                     solid=_is_solid(tile_id),
                     interactable=_is_interactable(tile_id),
-                    diggable=_is_diggable(tile_id)
+                    diggable=_is_diggable(tile_id),
                 )
             row.append(tile)
         tiles.append(row)
@@ -144,7 +171,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
         tilemap=tilemap,
         monsters=monsters,
         treasures=treasures,
-        tools=tools
+        tools=tools,
     )
 
 
@@ -175,13 +202,22 @@ def _get_tile_type(tile_id: int) -> TileType:
 
 def _is_solid(tile_id: int) -> bool:
     """Determine if a tile blocks movement."""
-    solid_tiles = BEDROCK_TILES | CONCRETE_TILES | BOULDER_TILES | BRICKS_TILES | SECURITY_DOOR_TILES | DIRT_TILES
+    solid_tiles = (
+        BEDROCK_TILES
+        | CONCRETE_TILES
+        | BOULDER_TILES
+        | BRICKS_TILES
+        | SECURITY_DOOR_TILES
+        | DIRT_TILES
+    )
     return tile_id in solid_tiles
 
+
 def _is_diggable(tile_id: int) -> bool:
-    """Determine if a tile can be digged """
-    solid_tiles = BEDROCK_TILES | BRICKS_TILES | DIRT_TILES
+    """Determine if a tile can be digged"""
+    solid_tiles = BEDROCK_TILES | BRICKS_TILES | DIRT_TILES | URETHANE_TILES | C4_TILES
     return tile_id in solid_tiles
+
 
 def _is_interactable(tile_id: int) -> bool:
     """Determine if a tile can be interacted with."""
