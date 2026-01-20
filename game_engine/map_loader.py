@@ -126,41 +126,7 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
 
             # Create tile object
             # Handle rock1 and rock2 as damaged bedrock tiles
-            if tile_id == ROCK1_TILE_ID:
-                tile = Tile(
-                    visual_id=tile_id,
-                    tile_type=TileType.BEDROCK,
-                    solid=True,
-                    interactable=False,
-                    diggable=True,
-                    health=25,
-                )
-            elif tile_id == ROCK2_TILE_ID:
-                tile = Tile(
-                    visual_id=tile_id,
-                    tile_type=TileType.BEDROCK,
-                    solid=True,
-                    interactable=False,
-                    diggable=True,
-                    health=50,
-                )
-            elif tile_id in BEDROCK_CORNER_TILES:
-                tile = Tile(
-                    visual_id=tile_id,
-                    tile_type=TileType.BEDROCK,
-                    solid=True,
-                    interactable=False,
-                    diggable=True,
-                    health=60,
-                )
-            else:
-                tile = Tile(
-                    visual_id=tile_id,
-                    tile_type=_get_tile_type(tile_id),
-                    solid=_is_solid(tile_id),
-                    interactable=_is_interactable(tile_id),
-                    diggable=_is_diggable(tile_id),
-                )
+            tile = Tile.create_by_id(tile_id)
             row.append(tile)
         tiles.append(row)
 

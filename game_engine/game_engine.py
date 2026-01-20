@@ -83,8 +83,8 @@ class GameEngine:
         # FIXME: placeholder
         self.starting_poses = [
             # (1, 1),
-            # (60, 5),  # debug: close to teleport
-            (10, 20),  # debug: close to boulder
+            (60, 5),  # debug: close to teleport
+            # (10, 20),  # debug: close to boulder
             (1, width - 1),
             (height - 1, 1),
             (height - 1, width - 1),
@@ -93,7 +93,7 @@ class GameEngine:
         self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
         self.teleports: List[Tuple[int, int]] = []
         self.switch_state = SwitchState.OFF
-        self.security_doors: List[Tuple[int, int]] = []
+        self.security_doors: List[Tuple[int, int, Tile]] = []
 
     def load_map(self, map_data: "MapData") -> None:
         """Load map data into the engine."""
@@ -116,7 +116,7 @@ class GameEngine:
         for y, tiles in enumerate(self.tiles):
             for x, tile in enumerate(tiles):
                 if tile.is_security_door():
-                    self.security_doors.append((x, y))
+                    self.security_doors.append((x, y, tile))
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -444,11 +444,7 @@ class GameEngine:
                 if fill_mask[y, x]:
                     tile = self.get_tile(x, y)
                     if tile and tile.tile_type == TileType.EMPTY:
-                        tile.tile_type = TileType.C4
-                        tile.visual_id = C4_TILE_ID
-                        tile.solid = True
-                        tile.diggable = True
-                        tile.health = 100
+                        self.set_tile(x, y, Tile.create_c4())
 
         self.sounds.urethane()
 
@@ -471,11 +467,7 @@ class GameEngine:
                 if fill_mask[y, x]:
                     tile = self.get_tile(x, y)
                     if tile and tile.tile_type == TileType.EMPTY:
-                        tile.tile_type = TileType.URETHANE
-                        tile.visual_id = URETHANE_TILE_ID
-                        tile.solid = True
-                        tile.diggable = True
-                        tile.health = 200
+                        self.set_tile(x, y, Tile.create_urethane())
 
         self.sounds.urethane()
 
@@ -506,9 +498,7 @@ class GameEngine:
 
         # TODO: do boulders crush items?
         self.tiles[new_y][new_x] = deepcopy(self.tiles[target_y][target_x])
-        self.tiles[target_y][target_x].solid = False
-        self.tiles[target_y][target_x].tile_type = TileType.DIRT
-        self.tiles[target_y][target_x].visual_id = EMPTY_TILE_ID
+        self.set_tile(target_x, target_y, Tile.create_empty())
         self.resolve_movement(target, event, flags)
 
     def resolve_movement(
@@ -693,15 +683,11 @@ class GameEngine:
 
     def use_switch(self) -> None:
         if self.switch_state == SwitchState.OFF:
-            for x, y in self.security_doors:
-                self.tiles[y][x].tile_type = TileType.DIRT
-                self.tiles[y][x].visual_id = EMPTY_TILE_ID
-                self.tiles[y][x].solid = False
+            for x, y, _ in self.security_doors:
+                self.set_tile(x, y, Tile.create_empty())
         else:
-            for x, y in self.security_doors:
-                self.tiles[y][x].tile_type = TileType.SECURITY_DOOR
-                self.tiles[y][x].visual_id = SECURITY_DOOR_ID
-                self.tiles[y][x].solid = True
+            for x, y, tile in self.security_doors:
+                self.set_tile(x, y, tile)
 
         self.switch_state = self.switch_state.switch()
 
@@ -789,4 +775,3 @@ class GameEngine:
 
     def clamp_y(self, y: Union[int, float]):
         return clamp(y, 0, self.height)
-

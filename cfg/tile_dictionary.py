@@ -114,7 +114,15 @@ BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if na
 BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
 C4_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'c4_tile')
 URETHANE_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'urethane_block')
+DIRT_TILE_ID = next(tile_id for tile_id in DIRT_TILES)
+BOULDER_TILE_ID = next(tile_id for tile_id in BOULDER_TILES)
+
+CONCRETE_TILE_ID = 49
+BIOSLIME_TILE_ID = 111
+BRICKS_TILE_ID = 172
+SWITCH_TILE_ID = 180
 SECURITY_DOOR_ID = 108
+TUNNEL_TILE_ID = 156
 
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {
