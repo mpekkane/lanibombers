@@ -17,6 +17,7 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.map_loader import load_map
 from game_engine import GameEngine
+#from game_engine.random_map_generator import RandomMapGenerator
 from renderer.game_renderer import GameRenderer
 
 
@@ -36,7 +37,11 @@ class BomberServer:
         self.state = ServerState.STARTING
         # game engine
         self.engine = GameEngine()
+
         map_data = load_map(map_path)
+
+        # random_map_generator = RandomMapGenerator()
+        # map_data = random_map_generator.generate()
         self.engine.load_map(map_data)
 
         # networking
@@ -250,9 +255,6 @@ def main() -> None:
     # ping_thread.start()
 
     # state = server.get_render_state()
-    # FIXME: refactor
-
-
     server.start_game()
     renderer = GameRenderer(server)
     renderer.run()

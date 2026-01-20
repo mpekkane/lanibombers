@@ -95,7 +95,7 @@ class GameEngine:
         self.switch_state = SwitchState.OFF
         self.security_doors: List[Tuple[int, int, Tile]] = []
 
-    def load_map(self, map_data: "MapData") -> None:
+    def load_map(self, map_data: MapData) -> None:
         """Load map data into the engine."""
         self.width = map_data.width
         self.height = map_data.height
