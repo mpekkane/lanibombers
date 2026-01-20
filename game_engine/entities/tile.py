@@ -68,3 +68,16 @@ class Tile(GameObject):
                 self.visual_id = BRICS3_TILE_ID
             elif self.health <= 50:
                 self.visual_id = BRICS2_TILE_ID
+
+    # helpers for types
+    def is_switch(self) -> bool:
+        return self.tile_type == TileType.SWITCH
+
+    def is_security_door(self) -> bool:
+        return self.tile_type == TileType.SECURITY_DOOR
+
+    def is_teleport(self) -> bool:
+        return self.tile_type == TileType.TUNNEL
+
+    def is_boulder(self) -> bool:
+        return self.tile_type == TileType.BOULDER

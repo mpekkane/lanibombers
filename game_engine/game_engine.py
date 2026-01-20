@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 from itertools import chain
-
+import random
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
@@ -59,12 +59,14 @@ class GameEngine:
         # FIXME: placeholder
         self.starting_poses = [
             (1, 1),
+            #(60, 5), # debug: close to teleport
             (1, width - 1),
             (height - 1, 1),
             (height - 1, width - 1),
         ]
         self.prev_time = -1
         self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
+        self.teleports: List[Tuple[int, int]] = []
 
     def load_map(self, map_data: "MapData") -> None:
         """Load map data into the engine."""
@@ -76,6 +78,11 @@ class GameEngine:
             self.pickups[pickup.y][pickup.x] = pickup
         for pickup in list(map_data.treasures):
             self.pickups[pickup.y][pickup.x] = pickup
+
+        for y, tiles in enumerate(self.tiles):
+            for x, tile in enumerate(tiles):
+                if tile.is_teleport():
+                    self.teleports.append((x, y))
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -194,7 +201,6 @@ class GameEngine:
         self.clear_entity_dig_events(player)
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
-
 
         # print("Centralize")
         # print(player.x, player.y)
@@ -362,8 +368,6 @@ class GameEngine:
             pass  # No sound for C4 tile chain explosions
         elif target.bomb_type == BombType.SMALL_BOMB:
             self.sounds.small_explosion()
-        elif target.bomb_type == BombType.URETHANE:
-            self.sounds.urethane()
         else:
             self.sounds.explosion()
 
@@ -494,14 +498,21 @@ class GameEngine:
             if next_tile.solid:
                 blocked = True
                 px, py = xy_to_tile(target.x, target.y)
-                if not next_tile.diggable:
-                    target.state = "idle"
+                # dig
+                if next_tile.diggable:
+                    self.dig(target)
+                # interact
+                elif next_tile.interactable:
+                    if next_tile.is_switch():
+                        pass
+                    elif next_tile.is_boulder():
+                        pass
+                # if nothing can be done: stop
+                else:
                     # print("resolve move blocked")
                     # print(target.x, target.y)
                     # print(next_tile)
-                else:
-                    # print("dig")
-                    self.dig(target)
+                    target.state = "idle"
 
         if flags.spawn and not blocked:
             self.move_entity(target)
@@ -580,6 +591,7 @@ class GameEngine:
     # TODO: tile center reached logic
     def entity_reach_tile_center(self, player: Player) -> None:
         """Events that happen when entity enters a tile center"""
+        # pickup items
         px, py = xy_to_tile(player.x, player.y)
         pickup = self.pickups[py][px]
         if pickup:
@@ -593,14 +605,29 @@ class GameEngine:
                 self.sounds.treasure()
             self.pickups[py][px] = None
 
+            # teleport
+        tile = self.tiles[py][px]
+        if tile.is_teleport():
+            available: List[Tuple[int, int]] = []
+            for teleport in self.teleports:
+                if teleport[0] == px and teleport[1] == py:
+                    continue
+                else:
+                    available.append(teleport)
+            if available:
+                val = random.choice(available)
+                player.x = val[0] + 0.5
+                player.y = val[1] + 0.5
+
     def fight(self, agent: DynamicEntity) -> None:
         entities = self.players + self.monsters
         px, py = xy_to_tile(agent.x, agent.y)
         for other in entities:
             ox, oy = (int)(other.x), (int)(other.y)
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
-                other.take_damage(agent.fight_power)
-                agent.take_damage(other.fight_power)
+                pass
+                # other.take_damage(agent.fight_power)
+                # agent.take_damage(other.fight_power)
                 # print("FIGHT!")
                 # print(f"Agent deals {agent.fight_power} damage")
                 # print(f"Enemy deals {other.fight_power} damage")
