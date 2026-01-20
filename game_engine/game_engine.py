@@ -82,8 +82,8 @@ class GameEngine:
         self.event_resolver = EventResolver(resolve=self.resolve)
         # FIXME: placeholder
         self.starting_poses = [
-            # (1, 1),
-            (60, 5),  # debug: close to teleport
+            (1, 1),
+            # (60, 5),  # debug: close to teleport
             # (10, 20),  # debug: close to boulder
             (1, width - 1),
             (height - 1, 1),
