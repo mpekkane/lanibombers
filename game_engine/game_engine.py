@@ -163,11 +163,14 @@ class GameEngine:
 
     def clear_entity_move_events(self, player: DynamicEntity) -> None:
         """Clear all move actions by the player"""
+        # Note: We assume that this is not needed. However, in the original game,
+        # the move is sometimes rounded up, i.e., you gain speed by turning.
+        # Up for discussion.
         # First resolve undergoing events, i.e., stop to the place the entity
         # has already made progress to
-        self.event_resolver.resolve_object_events(
-            player.id, "move", ResolveFlags(spawn=False)
-        )
+        # self.event_resolver.resolve_object_events(
+        #     player.id, "move", ResolveFlags(spawn=False)
+        # )
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
 
