@@ -114,6 +114,7 @@ BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if na
 BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
 C4_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'c4_tile')
 URETHANE_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'urethane_block')
+SECURITY_DOOR_ID = 108
 
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {

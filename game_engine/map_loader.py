@@ -209,6 +209,7 @@ def _is_solid(tile_id: int) -> bool:
         | BRICKS_TILES
         | SECURITY_DOOR_TILES
         | DIRT_TILES
+        | SWITCH_TILES
     )
     return tile_id in solid_tiles
 
