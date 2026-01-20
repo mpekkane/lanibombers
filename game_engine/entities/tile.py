@@ -167,7 +167,7 @@ class Tile(GameObject):
     def create_dirt(tile_id: int = DIRT_TILE_ID) -> Tile:
         return Tile(
             tile_type=TileType.DIRT,
-            solid=False,
+            solid=True,
             interactable=False,
             diggable=True,
             visual_id=tile_id,
