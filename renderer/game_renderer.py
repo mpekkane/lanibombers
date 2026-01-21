@@ -491,9 +491,9 @@ class GameRenderer(arcade.Window):
         self.current_player_name = None  # Use None so first comparison triggers text creation
 
         # Fight power and money text sprite lists
-        self.fight_power_sprites = arcade.SpriteList()
+        self.dig_power_sprites = arcade.SpriteList()
         self.money_sprites = arcade.SpriteList()
-        self.current_fight_power = None
+        self.current_dig_power = None
         self.current_money = None
 
         # Inventory icons sprite list (updated in update_header)
@@ -664,14 +664,14 @@ class GameRenderer(arcade.Window):
         else:
             self.player_card_sprite.texture = self.transparent_texture
 
-        # Update fight_power text (only recreate if changed)
-        if client_player.fight_power != self.current_fight_power:
-            self.current_fight_power = client_player.fight_power
+        # Update dig_power text (only recreate if changed)
+        if client_player.get_dig_power() != self.current_dig_power:
+            self.dig_power = client_player.get_dig_power()
             # Position: 26 pixels from left, 11 pixels down (8+3)
             text_x = 26 * self.zoom
             text_y = self.height - 11 * self.zoom
-            self.fight_power_sprites = self.bitmap_text.create_text_sprites(
-                f"{client_player.fight_power}", text_x, text_y, color=(255, 0, 0, 255)
+            self.dig_power_sprites = self.bitmap_text.create_text_sprites(
+                f"{client_player.get_dig_power()}", text_x, text_y, color=(255, 0, 0, 255)
             )
 
         # Update money text (only recreate if changed)
@@ -799,7 +799,7 @@ class GameRenderer(arcade.Window):
         self.explosion_sprite_list.draw(pixelated=True)
         self.header_sprite_list.draw(pixelated=True)
         self.player_name_sprites.draw(pixelated=True)
-        self.fight_power_sprites.draw(pixelated=True)
+        self.dig_power_sprites.draw(pixelated=True)
         self.money_sprites.draw(pixelated=True)
         self.inventory_sprites.draw(pixelated=True)
         self.inventory_hatch_sprites.draw(pixelated=True)
