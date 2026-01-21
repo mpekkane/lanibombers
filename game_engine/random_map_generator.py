@@ -1,3 +1,5 @@
+"""Creates random maps"""
+
 import array
 import random
 from typing import List
@@ -25,6 +27,7 @@ class RandomMapGenerator:
     def is_bedrock(
         self, map: np.ndarray, x: int, y: int, width: int, height: int
     ) -> bool:
+        """Determines if map square is bedrock"""
         if 0 <= x and x < width and 0 <= y and y < height:
             return map[x, y]
         else:
@@ -32,16 +35,31 @@ class RandomMapGenerator:
 
     def generate(
         self,
-        feature_resolution: int = 3,
-        aspect: float = 1.43,
-        fidelity: int = 15,
+        x: int = 64,
+        y: int = 45,
+        feature_size: int = 20,
         threshold: float = 0.1,
         min_treasure: int = 10,
         max_treasure: int = 40,
         min_tools: int = 5,
         max_tools: int = 20,
     ) -> MapData:
-        _, map = generate_and_threshold(feature_resolution, aspect, fidelity, threshold)  # type: ignore
+        """Generate a random map.
+
+        Args:
+            x (int, optional): Generted map width. Defaults to 64.
+            y (int, optional): Generted map height. Defaults to 45.
+            feature_size (int, optional): "Size" of features. Large values have large bedrock formations. Small values result in scattered small features. Defaults to 20.
+            threshold (float, optional): Noise control value. From -1 to 1. Larger values produce more bedrock. Defaults to 0.1.
+            min_treasure (int, optional): Minimum number of generated treasures. Defaults to 10.
+            max_treasure (int, optional): Maximum number of generated treasures. Defaults to 40.
+            min_tools (int, optional): Minimum number of generated tools. Defaults to 5.
+            max_tools (int, optional): Maximum number of generated tools. Defaults to 20.
+
+        Returns:
+            MapData: Map data in renderer-friendly format
+        """
+        _, map = generate_and_threshold(x, y, feature_size, threshold)  # type: ignore
 
         width: int = map.shape[0]  # type: ignore
         height: int = map.shape[1]  # type: ignore

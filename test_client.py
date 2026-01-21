@@ -3,16 +3,18 @@ Test code for client-side
 """
 
 import sys
+import threading
 from typing import Union, Optional
 from argparse import ArgumentParser
-from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl
+from network_stack.messages.messages import ChatText, Ping, Pong, ClientControl, GameState
 from game_engine.clock import Clock
 from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
 from common.config_reader import ConfigReader
 from common.keymapper import check_input
-
+from renderer.game_renderer import GameRenderer
+from game_engine.render_state import RenderState
 
 class BomberClient:
     def __init__(self, cfg_path: str, key_path: str) -> None:
@@ -37,12 +39,19 @@ class BomberClient:
 
         self.client.set_callback(ChatText, self.on_chattxt)
         self.client.set_callback(Ping, self.on_ping)
+        self.client.set_callback(GameState, self.on_game_state)
         self.client.set_on_disconnect(self.on_disconnect)
+        self.state = None
+        self.renderer = None
+        self.running = False
 
     def start(self) -> None:
         self.client.start()
         name = input("Name: ")
         self.client.set_name(name)
+
+        # renderer_th = threading.Thread(target=self.render)
+        # renderer_th.start()
 
         # Create and start the listener
         with keyboard.Listener(on_press=self.on_press) as listener:
@@ -57,6 +66,23 @@ class BomberClient:
 
     def on_chattxt(self, msg: ChatText):
         print(f"{msg.timestamp}: {msg.text}")
+
+    def render(self) -> None:
+        while True:
+            if self.renderer and not self.running:
+                self.renderer.run()
+            else:
+                Clock.sleep(1)
+
+    def on_game_state(self, msg: GameState):
+        self.state = msg.to_render()
+        # if self.renderer is None:
+        #     self.renderer = GameRenderer(self)
+
+    def get_render_state(self):
+        """Returns RenderState with dimensions and sprite indices"""
+        if self.state is not None:
+            return self.state
 
     def on_ping(self, msg: Ping):
         received = Clock.now_ns()
