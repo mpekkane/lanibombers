@@ -10,12 +10,13 @@ NUKE_FRAME_DURATION = 0.1  # seconds per frame for nuke animation
 class BombSprite(arcade.Sprite):
     """Sprite class for bomb entities with fuse-based animation"""
 
-    def __init__(self, bomb_textures: dict, transparent_texture, zoom: float, screen_height: int):
+    def __init__(self, bomb_textures: dict, transparent_texture, zoom: float, screen_height: int, y_offset: float = 0):
         super().__init__()
         self.bomb_textures = bomb_textures
         self.transparent_texture = transparent_texture
         self.zoom = zoom
         self.screen_height = screen_height
+        self.y_offset = y_offset
         self.scale = zoom
         self.texture = transparent_texture
         # Track nuke animation state per bomb (by id)
@@ -29,7 +30,7 @@ class BombSprite(arcade.Sprite):
 
         # Update position (grid-aligned, integer coordinates)
         self.center_x = (bomb.x + 0.5) * SPRITE_SIZE * self.zoom
-        self.center_y = self.screen_height - (bomb.y + 0.5) * SPRITE_SIZE * self.zoom
+        self.center_y = self.screen_height - self.y_offset - (bomb.y + 0.5) * SPRITE_SIZE * self.zoom
 
         # Get texture based on bomb type and state
         if bomb.bomb_type == BombType.NUKE:

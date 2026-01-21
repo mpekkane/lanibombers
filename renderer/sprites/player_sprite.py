@@ -8,7 +8,7 @@ SPRITE_SIZE = 10
 class PlayerSprite(arcade.Sprite):
     """Extended sprite class for player entities with animation support"""
 
-    def __init__(self, sprite_id: int, color_variant: tuple, player_textures: dict, transparent_texture, blood_texture, zoom: float, screen_height: int):
+    def __init__(self, sprite_id: int, color_variant: tuple, player_textures: dict, transparent_texture, blood_texture, zoom: float, screen_height: int, y_offset: float = 0):
         super().__init__()
         self.sprite_id = sprite_id
         self.color_variant = color_variant
@@ -17,6 +17,7 @@ class PlayerSprite(arcade.Sprite):
         self.blood_texture = blood_texture
         self.zoom = zoom
         self.screen_height = screen_height
+        self.y_offset = y_offset
 
         # Animation state - ping-pong pattern: 1,2,3,4,3,2,1,2,3,4...
         self.frame_sequence = [1, 2, 3, 4, 3, 2]
@@ -35,7 +36,7 @@ class PlayerSprite(arcade.Sprite):
         """Update sprite position, texture and animation from player entity data"""
         # Update position (rounded to pixel grid before zoom)
         self.center_x = round((player.x) * SPRITE_SIZE) * self.zoom
-        self.center_y = self.screen_height - round((player.y) * SPRITE_SIZE) * self.zoom
+        self.center_y = self.screen_height - self.y_offset - round((player.y) * SPRITE_SIZE) * self.zoom
 
         # Handle dead state
         if player.state == 'dead':

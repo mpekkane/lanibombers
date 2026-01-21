@@ -725,6 +725,176 @@ def split_sprites(output_base):
     return count
 
 
+# Player card definitions: (x_start, x_end, name)
+# All cards are at y=0-29 (30 pixels height), resulting in 110x30 sprites
+PLAYER_CARD_DEFS = [
+    (42, 151, 'player_card_1'),
+    (204, 313, 'player_card_2'),
+    (367, 476, 'player_card_3'),
+    (530, 639, 'player_card_4'),
+]
+
+
+# Icon definitions: (start_x, start_y, names[])
+# All icons are 30x30 pixels, extracted from SIKA.png
+ICON_SIZE = 30
+ICON_DEFS = [
+    # Row 1: starts at (0, 40), 3 icons
+    (0, 40, ['fire_extinguisher', 'teleport', 'grasshopper']),
+    # Row 2: starts at (105, 40), 1 icon
+    (105, 40, ['kevlar_vest']),
+    # Row 3: starts at (232, 80), 2 icons
+    (232, 80, ['clone', 'bio_slime']),
+    # Row 4: starts at (0, 90), 1 icon
+    (0, 90, ['super_drill']),
+    # Row 5: starts at (216, 110), 3 icons
+    (216, 110, ['metal_plate', 'cracker_barrel', 'digger_bomb']),
+    # Row 6: starts at (0, 140), 5 icons (including ready button)
+    (0, 140, ['small_pick', 'big_pick', 'drill', 'small_crucifix', 'ready']),
+    # Row 7: starts at (216, 140), 3 icons
+    (216, 140, ['nuke', 'grenade', 'c4']),
+    # Row 8: starts at (0, 170), 10 icons
+    (0, 170, ['small_bomb', 'big_bomb', 'dynamite', 'flame_thrower', 'flame_barrel',
+              'big_crucifix', 'urethane', 'big_remote', 'small_remote', 'landmine']),
+]
+
+
+def extract_icons(output_base):
+    """Extract item/bomb icon sprites from SIKA.png"""
+    sika_path = os.path.join(output_base, 'graphics', 'SIKA.png')
+    sprites_dir = os.path.join(output_base, 'sprites')
+    os.makedirs(sprites_dir, exist_ok=True)
+
+    if not os.path.exists(sika_path):
+        print("  SIKA.png not found, skipping icon extraction")
+        return 0
+
+    img = Image.open(sika_path)
+
+    print("  Extracting item/bomb icons...")
+    count = 0
+
+    for start_x, start_y, names in ICON_DEFS:
+        for i, name in enumerate(names):
+            x = start_x + i * ICON_SIZE
+            y = start_y
+            icon = img.crop((x, y, x + ICON_SIZE, y + ICON_SIZE))
+            icon.save(os.path.join(sprites_dir, f"{name}_icon.png"))
+            count += 1
+
+    print(f"  Extracted {count} icons")
+    return count
+
+
+def extract_player_cards(output_base):
+    """Extract player cards and icon separator from PLAYERS.png"""
+    players_path = os.path.join(output_base, 'graphics', 'PLAYERS.png')
+    sprites_dir = os.path.join(output_base, 'sprites')
+    os.makedirs(sprites_dir, exist_ok=True)
+
+    if not os.path.exists(players_path):
+        print(f"  PLAYERS.png not found, skipping player card extraction")
+        return 0
+
+    img = Image.open(players_path)
+
+    print(f"  Extracting {len(PLAYER_CARD_DEFS)} player cards...")
+    count = 0
+
+    for x_start, x_end, name in PLAYER_CARD_DEFS:
+        # Crop box is (left, upper, right, lower) - right/lower are exclusive
+        sprite = img.crop((x_start, 0, x_end + 1, 30))
+        sprite.save(os.path.join(sprites_dir, f"{name}.png"))
+        count += 1
+
+    # Extract icon separator (3x30 pixels at x=9-11, y=0-30)
+    separator = img.crop((9, 0, 12, 30))
+    separator.save(os.path.join(sprites_dir, "icon_separator.png"))
+    count += 1
+    print(f"  Extracted icon separator")
+
+    print(f"  Extracted {count} player card assets")
+    return count
+
+
+# ============================================================================
+# Bitmap Font Extractor
+# ============================================================================
+
+# Font properties
+FONT_CHAR_WIDTH = 8
+FONT_CHAR_HEIGHT = 8
+FONT_CHARS_PER_ROW = 16
+FONT_NUM_CHARS = 256
+
+
+def extract_bitmap_font(zip_path, output_base):
+    """Extract FONTTI.FON bitmap font to a PNG spritesheet.
+
+    The font is a raw 8x8 bitmap font with 256 characters.
+    Output is a 128x128 PNG (16x16 grid of 8x8 characters).
+    """
+    sprites_dir = os.path.join(output_base, 'sprites')
+    os.makedirs(sprites_dir, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Try to find the font file
+            font_file = None
+            for name in zf.namelist():
+                if name.upper().endswith('FONTTI.FON'):
+                    font_file = name
+                    break
+
+            if font_file is None:
+                print("  FONTTI.FON not found in zip, skipping font extraction")
+                return 0
+
+            data = zf.read(font_file)
+
+            if len(data) != FONT_NUM_CHARS * FONT_CHAR_HEIGHT:
+                print(f"  Unexpected font size: {len(data)} bytes, expected {FONT_NUM_CHARS * FONT_CHAR_HEIGHT}")
+                return 0
+
+            print("  Extracting bitmap font...")
+
+            # Create output image (16x16 grid of 8x8 chars = 128x128)
+            img_width = FONT_CHARS_PER_ROW * FONT_CHAR_WIDTH
+            img_height = (FONT_NUM_CHARS // FONT_CHARS_PER_ROW) * FONT_CHAR_HEIGHT
+            img = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+            pixels = img.load()
+
+            # Process each character
+            for char_code in range(FONT_NUM_CHARS):
+                # Position in the grid
+                grid_x = char_code % FONT_CHARS_PER_ROW
+                grid_y = char_code // FONT_CHARS_PER_ROW
+
+                # Pixel position of character's top-left corner
+                base_x = grid_x * FONT_CHAR_WIDTH
+                base_y = grid_y * FONT_CHAR_HEIGHT
+
+                # Read 8 bytes for this character
+                char_offset = char_code * FONT_CHAR_HEIGHT
+
+                for row in range(FONT_CHAR_HEIGHT):
+                    byte = data[char_offset + row]
+                    for col in range(FONT_CHAR_WIDTH):
+                        # MSB first - bit 7 is leftmost pixel
+                        if byte & (0x80 >> col):
+                            pixels[base_x + col, base_y + row] = (255, 255, 255, 255)
+
+            # Save the font spritesheet
+            output_path = os.path.join(sprites_dir, 'font.png')
+            img.save(output_path)
+            print(f"  Extracted bitmap font to font.png ({img_width}x{img_height})")
+            return 1
+
+    except Exception as e:
+        print(f"  Error extracting font: {e}")
+        return 0
+
+
 # ============================================================================
 # Main Extractor
 # ============================================================================
@@ -820,15 +990,21 @@ def main():
 
     stats = extract_assets(zip_path, output_base)
     sprite_count = split_sprites(output_base)
+    player_card_count = extract_player_cards(output_base)
+    icon_count = extract_icons(output_base)
+    font_count = extract_bitmap_font(zip_path, output_base)
     padded_count = pad_sprites(output_base)
     bg_removed_count = remove_background_color(output_base)
 
     print(f"\nExtraction complete!")
-    print(f"  Graphics: {stats['graphics']}")
-    print(f"  Sounds:   {stats['sounds']}")
-    print(f"  Music:    {stats['music']}")
-    print(f"  Maps:     {stats['maps']}")
-    print(f"  Sprites:  {sprite_count}")
+    print(f"  Graphics:     {stats['graphics']}")
+    print(f"  Sounds:       {stats['sounds']}")
+    print(f"  Music:        {stats['music']}")
+    print(f"  Maps:         {stats['maps']}")
+    print(f"  Sprites:      {sprite_count}")
+    print(f"  Player cards: {player_card_count}")
+    print(f"  Icons:        {icon_count}")
+    print(f"  Fonts:        {font_count}")
 
 
 if __name__ == '__main__':
