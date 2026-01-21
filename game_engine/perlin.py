@@ -1,3 +1,5 @@
+"""Generates perlin noise"""
+
 from typing import Tuple
 import numpy as np
 import random
@@ -5,28 +7,43 @@ from tqdm import tqdm
 
 
 def ed(x1: np.ndarray, x2: np.ndarray) -> float:
+    """Euclidean distance"""
     return np.sqrt((x1[0] - x2[0]) ** 2 + (x1[1] - x2[1]) ** 2)
 
 
 def disp(x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
+    """Displacement vector"""
     return (x1 - x2).astype(np.float32)
 
 
 def gradient(angle: float) -> np.ndarray:
+    """Create gradient vector from angle"""
     x = np.cos(angle)
     y = np.sin(angle)
     return np.array((x, y)).astype(np.float32)
 
 
 def lerp(t: float, x1: float, x2: float) -> float:
+    """Linear interpolation"""
     return x1 + t * (x2 - x1)
 
 
 def fade(t: float):
+    """Original smoothing from Perlin"""
     return ((6.0 * t - 15.0) * t + 10.0) * t * t * t
 
 
 def perlin_noise(x_r: int, y_r: int, g: int) -> np.ndarray:
+    """Generate perlin noise
+
+    Args:
+        x_r (int): width of the noise
+        y_r (int): height of the noise
+        g (int): "feature size" of the noise, i.e. the outer grid size
+
+    Returns:
+        np.ndarray: noise map
+    """
     output = np.zeros((x_r, y_r))
     grid = np.zeros((x_r // g + 2, y_r // g + 2))
     for gx in range(grid.shape[0]):
@@ -71,6 +88,7 @@ def perlin_noise(x_r: int, y_r: int, g: int) -> np.ndarray:
 
 
 def threshold_map(perlin: np.ndarray, th: float) -> np.ndarray:
+    """Binary classification for bedrock/dirt"""
     pos = perlin > th
     out = np.zeros_like(perlin)
     out[pos] = 1
@@ -80,6 +98,7 @@ def threshold_map(perlin: np.ndarray, th: float) -> np.ndarray:
 def generate_and_threshold(
     x, y, feature_size, threshold
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate noise and threshold into usable map"""
     perlin = perlin_noise(x, y, feature_size)
     tr = threshold_map(perlin, threshold)
     return perlin, tr
