@@ -4,6 +4,7 @@ Allows players to configure their name, color, icon, hotkeys, and weapon order.
 """
 
 import os
+import json
 import random
 import arcade
 from PIL import Image
@@ -12,12 +13,19 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 
 from game_engine.entities import Direction
-from game_engine.entities.bomb import BombType
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import (
     PlayerColorizer,
     PLAYER_COLORS,
     PLAYER_COLOR_NAMES,
+)
+from cfg.bomb_dictionary import (
+    BOMB_TYPES,
+    BOMB_TYPE_NAMES,
+    BOMB_TYPE_TO_ICON,
+    BOMB_NAME_TO_TYPE,
+    DEFAULT_HOTKEYS,
+    HOTKEY_ORDER,
 )
 
 
@@ -45,61 +53,6 @@ DIG_DURATION = 1.0  # seconds to dig
 PLAYER_APPEARANCES = [1, 2, 3, 4]
 PLAYER_APPEARANCE_NAMES = ["Appearance 1", "Appearance 2", "Appearance 3", "Appearance 4"]
 
-# Available bomb types for inventory ordering
-BOMB_TYPES = [
-    BombType.SMALL_BOMB,
-    BombType.BIG_BOMB,
-    BombType.DYNAMITE,
-    BombType.C4,
-    BombType.LANDMINE,
-    BombType.REMOTE,
-    BombType.URETHANE,
-    BombType.SMALL_CROSS_BOMB,
-    BombType.BIG_CROSS_BOMB,
-    BombType.NUKE,
-]
-
-BOMB_TYPE_NAMES = {
-    BombType.SMALL_BOMB: "Small Bomb",
-    BombType.BIG_BOMB: "Big Bomb",
-    BombType.DYNAMITE: "Dynamite",
-    BombType.C4: "C4",
-    BombType.LANDMINE: "Landmine",
-    BombType.REMOTE: "Remote",
-    BombType.URETHANE: "Urethane",
-    BombType.SMALL_CROSS_BOMB: "Small Cross",
-    BombType.BIG_CROSS_BOMB: "Big Cross",
-    BombType.NUKE: "Nuke",
-}
-
-# Default hotkeys for weapons
-DEFAULT_HOTKEYS = {
-    BombType.SMALL_BOMB: "1",
-    BombType.BIG_BOMB: "2",
-    BombType.DYNAMITE: "3",
-    BombType.C4: "4",
-    BombType.LANDMINE: "5",
-    BombType.REMOTE: "6",
-    BombType.URETHANE: "7",
-    BombType.SMALL_CROSS_BOMB: "8",
-    BombType.BIG_CROSS_BOMB: "9",
-    BombType.NUKE: "0",
-}
-
-# Mapping from BombType to icon sprite name
-BOMB_TYPE_TO_ICON = {
-    BombType.SMALL_BOMB: "small_bomb",
-    BombType.BIG_BOMB: "big_bomb",
-    BombType.DYNAMITE: "dynamite",
-    BombType.C4: "c4",
-    BombType.LANDMINE: "landmine",
-    BombType.REMOTE: "small_remote",
-    BombType.URETHANE: "urethane",
-    BombType.SMALL_CROSS_BOMB: "small_crucifix",
-    BombType.BIG_CROSS_BOMB: "big_crucifix",
-    BombType.NUKE: "nuke",
-}
-
 # Icon size (icons are 30x30 pixels)
 ICON_SIZE = 30
 
@@ -108,7 +61,7 @@ class FieldType(Enum):
     TEXT = "text"
     OPTION = "option"
     HOTKEY = "hotkey"
-    WEAPON_ORDER = "weapon_order"
+    SAVE = "save"
 
 
 @dataclass
@@ -251,7 +204,7 @@ class PlayerSetup(arcade.Window):
         font_path = os.path.join(SPRITES_PATH, "font.png")
         self.bitmap_text = BitmapText(font_path, zoom=self.zoom)
 
-        # Initialize player settings
+        # Initialize player settings with defaults
         self.player_name = "Player"
         self.player_appearance_index = 0
         self.player_color_index = 0  # Default to first color (matches appearance 1's base color)
@@ -259,6 +212,9 @@ class PlayerSetup(arcade.Window):
         self.hotkeys = dict(DEFAULT_HOTKEYS)
         self.dig_power = 1
         self.money = 100
+
+        # Load saved config if it exists
+        self._load_config()
 
         # Initialize menu fields
         self._init_menu_fields()
@@ -468,35 +424,35 @@ class PlayerSetup(arcade.Window):
         self.fields.append(MenuField(
             name="Player Appearance",
             field_type=FieldType.OPTION,
-            value=PLAYER_APPEARANCES[0],
+            value=PLAYER_APPEARANCES[self.player_appearance_index],
             options=PLAYER_APPEARANCES,
             option_names=PLAYER_APPEARANCE_NAMES,
-            selected_option_index=0,
+            selected_option_index=self.player_appearance_index,
         ))
 
         # Player color field
         self.fields.append(MenuField(
             name="Player Color",
             field_type=FieldType.OPTION,
-            value=PLAYER_COLORS[0],
+            value=PLAYER_COLORS[self.player_color_index],
             options=PLAYER_COLORS,
             option_names=PLAYER_COLOR_NAMES,
-            selected_option_index=0,
+            selected_option_index=self.player_color_index,
         ))
 
-        # Hotkey fields for each bomb type
-        for bomb_type in BOMB_TYPES:
+        # Hotkey fields for each bomb type (in weapon_order)
+        for bomb_type in self.weapon_order:
             self.fields.append(MenuField(
                 name=f"{BOMB_TYPE_NAMES[bomb_type]} Hotkey",
                 field_type=FieldType.HOTKEY,
-                value=self.hotkeys[bomb_type],
+                value=self.hotkeys.get(bomb_type, ""),
             ))
 
-        # Weapon order field
+        # Save field
         self.fields.append(MenuField(
-            name="Weapon Order",
-            field_type=FieldType.WEAPON_ORDER,
-            value=list(BOMB_TYPES),
+            name="Save",
+            field_type=FieldType.SAVE,
+            value=None,
         ))
 
     def _init_mini_map(self):
@@ -691,7 +647,13 @@ class PlayerSetup(arcade.Window):
                 for s in value_sprites:
                     self.menu_text_sprites.append(s)
 
-            
+            elif menu_field.field_type == FieldType.SAVE:
+                if is_selected:
+                    value_sprites = self.bitmap_text.create_text_sprites(
+                        "<Press Enter to save and exit>", value_x, y, color=(100, 255, 100, 255)
+                    )
+                    for s in value_sprites:
+                        self.menu_text_sprites.append(s)
 
     def on_draw(self):
         """Render the setup screen."""
@@ -722,6 +684,117 @@ class PlayerSetup(arcade.Window):
 
         # Draw instructions
         self.instructions_sprites.draw(pixelated=True)
+
+    def _load_config(self):
+        """Load player configuration from cfg/player.json if it exists."""
+        cfg_path = os.path.join(os.path.dirname(__file__), "cfg")
+        json_path = os.path.join(cfg_path, "player.json")
+
+        if not os.path.exists(json_path):
+            return
+
+        try:
+            with open(json_path, "r") as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return
+
+        # Load player name
+        if "player_name" in config:
+            self.player_name = config["player_name"]
+
+        # Load appearance ID
+        if "appearance_id" in config:
+            appearance_id = config["appearance_id"]
+            if appearance_id in PLAYER_APPEARANCES:
+                self.player_appearance_index = PLAYER_APPEARANCES.index(appearance_id)
+
+        # Load color
+        if "color" in config:
+            color_hex = config["color"]
+            try:
+                # Parse hex color string like "#00008B"
+                r = int(color_hex[1:3], 16)
+                g = int(color_hex[3:5], 16)
+                b = int(color_hex[5:7], 16)
+                color_tuple = (r, g, b)
+                if color_tuple in PLAYER_COLORS:
+                    self.player_color_index = PLAYER_COLORS.index(color_tuple)
+            except (ValueError, IndexError):
+                pass
+
+        # Load items (weapon order and hotkeys)
+        if "items" in config:
+            items = config["items"]
+
+            # Build weapon order from saved items
+            loaded_weapon_order = []
+            used_hotkeys = set()
+
+            # Sort items by menu_order
+            sorted_items = sorted(items, key=lambda x: x.get("menu_order", 0))
+
+            for item in sorted_items:
+                item_name = item.get("name", "")
+                hotkey = item.get("hotkey", "")
+
+                if item_name in BOMB_NAME_TO_TYPE:
+                    bomb_type = BOMB_NAME_TO_TYPE[item_name]
+                    loaded_weapon_order.append(bomb_type)
+                    if hotkey:
+                        self.hotkeys[bomb_type] = hotkey
+                        used_hotkeys.add(hotkey.lower())
+
+            # Find any bomb types that are in BOMB_TYPES but not in the config
+            missing_bomb_types = [bt for bt in BOMB_TYPES if bt not in loaded_weapon_order]
+
+            # Assign hotkeys to missing items from HOTKEY_ORDER
+            for bomb_type in missing_bomb_types:
+                # Find the next available hotkey
+                for key in HOTKEY_ORDER:
+                    if key not in used_hotkeys:
+                        self.hotkeys[bomb_type] = key
+                        used_hotkeys.add(key)
+                        break
+                else:
+                    # No more keys available, leave without hotkey
+                    self.hotkeys[bomb_type] = ""
+
+                # Append to the end of the weapon order
+                loaded_weapon_order.append(bomb_type)
+
+            self.weapon_order = loaded_weapon_order
+
+    def _save_config(self):
+        """Save player configuration to cfg/player.json."""
+        # Build items list with name, hotkey, and menu order
+        items = []
+        for i, bomb_type in enumerate(self.weapon_order):
+            items.append({
+                "name": BOMB_TYPE_NAMES[bomb_type],
+                "hotkey": self.hotkeys.get(bomb_type, ""),
+                "menu_order": i
+            })
+
+        # Get the selected color as hex string
+        color = PLAYER_COLORS[self.player_color_index]
+        color_hex = "#{:02X}{:02X}{:02X}".format(color[0], color[1], color[2])
+
+        config = {
+            "player_name": self.fields[0].value,
+            "appearance_id": PLAYER_APPEARANCES[self.player_appearance_index],
+            "color": color_hex,
+            "items": items
+        }
+
+        # Ensure cfg directory exists
+        cfg_path = os.path.join(os.path.dirname(__file__), "cfg")
+        os.makedirs(cfg_path, exist_ok=True)
+
+        # Write to player.json
+        json_path = os.path.join(cfg_path, "player.json")
+        with open(json_path, "w") as f:
+            json.dump(config, f, indent=2)
 
     def on_key_press(self, key: int, modifiers: int):
         """Handle key presses."""
@@ -754,8 +827,8 @@ class PlayerSetup(arcade.Window):
                     current_field.value = char
                     # Update hotkeys dict
                     bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
-                    if 0 <= bomb_index < len(BOMB_TYPES):
-                        self.hotkeys[BOMB_TYPES[bomb_index]] = char
+                    if 0 <= bomb_index < len(self.weapon_order):
+                        self.hotkeys[self.weapon_order[bomb_index]] = char
                 self.editing_hotkey = False
             return
 
@@ -779,23 +852,16 @@ class PlayerSetup(arcade.Window):
             elif current_field.field_type == FieldType.HOTKEY:
                 # Move this weapon left in the weapon order
                 bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
-                if 0 <= bomb_index < len(BOMB_TYPES):
-                    bomb_type = BOMB_TYPES[bomb_index]
-                    if bomb_type in self.weapon_order:
-                        current_pos = self.weapon_order.index(bomb_type)
-                        if current_pos > 0:
-                            # Swap with previous
-                            self.weapon_order[current_pos], self.weapon_order[current_pos - 1] = \
-                                self.weapon_order[current_pos - 1], self.weapon_order[current_pos]
-                            # Update the weapon order field value
-                            self.fields[-1].value = self.weapon_order
-
-            elif current_field.field_type == FieldType.WEAPON_ORDER:
-                # Move selected weapon left in the order
-                # For simplicity, rotate the first weapon to the end
-                if current_field.value:
-                    current_field.value = current_field.value[1:] + [current_field.value[0]]
-                    self.weapon_order = current_field.value
+                if bomb_index > 0:
+                    # Swap in weapon_order
+                    self.weapon_order[bomb_index], self.weapon_order[bomb_index - 1] = \
+                        self.weapon_order[bomb_index - 1], self.weapon_order[bomb_index]
+                    # Swap menu fields
+                    field_idx = self.current_field_index
+                    self.fields[field_idx], self.fields[field_idx - 1] = \
+                        self.fields[field_idx - 1], self.fields[field_idx]
+                    # Move cursor to follow the item
+                    self.current_field_index -= 1
 
         elif key == arcade.key.RIGHT:
             if current_field.field_type == FieldType.OPTION:
@@ -810,23 +876,16 @@ class PlayerSetup(arcade.Window):
             elif current_field.field_type == FieldType.HOTKEY:
                 # Move this weapon right in the weapon order
                 bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
-                if 0 <= bomb_index < len(BOMB_TYPES):
-                    bomb_type = BOMB_TYPES[bomb_index]
-                    if bomb_type in self.weapon_order:
-                        current_pos = self.weapon_order.index(bomb_type)
-                        if current_pos < len(self.weapon_order) - 1:
-                            # Swap with next
-                            self.weapon_order[current_pos], self.weapon_order[current_pos + 1] = \
-                                self.weapon_order[current_pos + 1], self.weapon_order[current_pos]
-                            # Update the weapon order field value
-                            self.fields[-1].value = self.weapon_order
-
-            elif current_field.field_type == FieldType.WEAPON_ORDER:
-                # Move selected weapon right in the order
-                # For simplicity, rotate the last weapon to the front
-                if current_field.value:
-                    current_field.value = [current_field.value[-1]] + current_field.value[:-1]
-                    self.weapon_order = current_field.value
+                if bomb_index < len(self.weapon_order) - 1:
+                    # Swap in weapon_order
+                    self.weapon_order[bomb_index], self.weapon_order[bomb_index + 1] = \
+                        self.weapon_order[bomb_index + 1], self.weapon_order[bomb_index]
+                    # Swap menu fields
+                    field_idx = self.current_field_index
+                    self.fields[field_idx], self.fields[field_idx + 1] = \
+                        self.fields[field_idx + 1], self.fields[field_idx]
+                    # Move cursor to follow the item
+                    self.current_field_index += 1
 
         elif key == arcade.key.ENTER:
             if current_field.field_type == FieldType.TEXT:
@@ -836,6 +895,10 @@ class PlayerSetup(arcade.Window):
 
             elif current_field.field_type == FieldType.HOTKEY:
                 self.editing_hotkey = True
+
+            elif current_field.field_type == FieldType.SAVE:
+                self._save_config()
+                arcade.close_window()
 
         elif key == arcade.key.ESCAPE:
             arcade.close_window()

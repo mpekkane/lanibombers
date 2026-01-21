@@ -7,22 +7,9 @@ import os
 import arcade
 import numpy as np
 
-from game_engine.entities.bomb import BombType
 from game_engine.entities import Direction, EntityType
+from cfg.bomb_dictionary import BombType, BOMB_TYPE_TO_ICON
 
-# Mapping from BombType to icon sprite name (without _icon suffix)
-BOMB_TYPE_TO_ICON = {
-    BombType.SMALL_BOMB: "small_bomb",
-    BombType.BIG_BOMB: "big_bomb",
-    BombType.DYNAMITE: "dynamite",
-    BombType.C4: "c4",
-    BombType.LANDMINE: "landmine",
-    BombType.REMOTE: "small_remote",
-    BombType.URETHANE: "urethane",
-    BombType.SMALL_CROSS_BOMB: "small_crucifix",
-    BombType.BIG_CROSS_BOMB: "big_crucifix",
-    BombType.NUKE: "nuke",
-}
 from renderer.sprites import (
     PlayerSprite,
     MonsterSprite,
