@@ -1,7 +1,9 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+from typing import Tuple
 import numpy as np
 import random
 from tqdm import tqdm
+
 
 def ed(x1: np.ndarray, x2: np.ndarray) -> float:
     return np.sqrt((x1[0] - x2[0]) ** 2 + (x1[1] - x2[1]) ** 2)
@@ -78,27 +80,29 @@ def threshold_map(perlin: np.ndarray, th: float) -> np.ndarray:
     return out
 
 
-def generate_and_threshold(feature_resolution, aspect, fidelity, threshold):
-    x = feature_resolution
-    y = int(feature_resolution * aspect)
+def generate_and_threshold(
+    feature_resolution, aspect, fidelity, threshold
+) -> Tuple[np.ndarray, np.ndarray]:
+    y = feature_resolution
+    x = int(feature_resolution * aspect)
     perlin = perlin_noise(x, y, fidelity)
     tr = threshold_map(perlin, threshold)
     return perlin, tr
 
 
-def test_perlin():
-    feature_resolution = 3
-    aspect = 1.5
-    fidelity = 20
-    thresholds = [0.05, 0.1, 0.15, 0.2]
-    fig, ax = plt.subplots(len(thresholds), 2)
-    for i, tr in enumerate(thresholds):
-        perlin, th = generate_and_threshold(feature_resolution, aspect, fidelity, tr)
-        ax[i, 0].imshow(perlin)
-        ax[i, 1].imshow(th)
-        print(f"generated {i}: {tr}")
-    plt.show()
+# def test_perlin():
+#     feature_resolution = 3
+#     aspect = 1.5
+#     fidelity = 20
+#     thresholds = [0.05, 0.1, 0.15, 0.2]
+#     fig, ax = plt.subplots(len(thresholds), 2)
+#     for i, tr in enumerate(thresholds):
+#         perlin, th = generate_and_threshold(feature_resolution, aspect, fidelity, tr)
+#         ax[i, 0].imshow(perlin)
+#         ax[i, 1].imshow(th)
+#         print(f"generated {i}: {tr}")
+#     plt.show()
 
 
-if __name__ == "__main__":
-    test_perlin()
+# if __name__ == "__main__":
+#     test_perlin()

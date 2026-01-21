@@ -264,6 +264,9 @@ class Tile(GameObject):
             visual_id=TUNNEL_TILE_ID,
         )
 
+    def to_byte(self) -> int:
+        return self.visual_id
+
     # damage
     def take_damage(
         self, amount: int, damage_type: Optional["ExplosionType"] = None

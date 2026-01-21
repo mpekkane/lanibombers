@@ -17,7 +17,7 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.map_loader import load_map
 from game_engine import GameEngine
-#from game_engine.random_map_generator import RandomMapGenerator
+from game_engine.random_map_generator import RandomMapGenerator
 from renderer.game_renderer import GameRenderer
 
 
@@ -35,13 +35,14 @@ class ServerState(IntEnum):
 class BomberServer:
     def __init__(self, cfg: str, map_path: str) -> None:
         self.state = ServerState.STARTING
+
+        # map_data = load_map(map_path)
+        random_map_generator = RandomMapGenerator()
+        map_data = random_map_generator.generate()
+
         # game engine
-        self.engine = GameEngine()
-
-        map_data = load_map(map_path)
-
-        # random_map_generator = RandomMapGenerator()
-        # map_data = random_map_generator.generate()
+        self.engine = GameEngine(map_data.width, map_data.height)
+        print(map_data.width, map_data.height)
         self.engine.load_map(map_data)
 
         # networking
