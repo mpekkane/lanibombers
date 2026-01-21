@@ -94,6 +94,7 @@ TILE_DICTIONARY = {
 
 # Tile ID groupings by type
 BEDROCK_TILES = {55, 56, 57, 65, 67, 68, 69, 70}
+BEDROCK_INSIDE_TILES = {67, 68, 69, 70}
 BEDROCK_CORNER_TILES = {55, 56, 57, 65}
 DIRT_TILES = {50, 51, 52, 53, 54}  # Includes gravel
 CONCRETE_TILES = {49}
@@ -104,6 +105,7 @@ BRICKS_TILES = {172}
 SWITCH_TILES = {180}
 SECURITY_DOOR_TILES = {108}
 TUNNEL_TILES = {156}
+C4_TILES = {157}
 
 # Get tile IDs from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
@@ -113,6 +115,36 @@ BRICS2_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if na
 BRICS3_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'brics3')
 C4_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'c4_tile')
 URETHANE_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'urethane_block')
+DIRT_TILE_ID = next(tile_id for tile_id in DIRT_TILES)
+BOULDER_TILE_ID = next(tile_id for tile_id in BOULDER_TILES)
+
+CONCRETE_TILE_ID = 49
+BIOSLIME_TILE_ID = 111
+BRICKS_TILE_ID = 172
+SWITCH_TILE_ID = 180
+SECURITY_DOOR_ID = 108
+TUNNEL_TILE_ID = 156
+
+# pickup ids
+MEDPACK_ID = 109
+CRATE_ID = 121
+SMALLPICK_ID = 143
+BIGPICK_ID = 144
+DRILL_ID = 145
+GOLD_SHIELD_ID = 146
+GOLD_EGG_ID = 147
+GOLD_COINS_ID = 148
+GOLD_BRACELET_ID = 149
+GOLD_BAR_ID = 150
+GOLD_CROSS_ID = 151
+GOLD_SCEPTRE_ID = 152
+GOLD_RUBY_ID = 153
+GOLD_CROWN_ID = 154
+
+BEDROCK_NW_ID = 55
+BEDROCK_NE_ID = 56
+BEDROCK_SE_ID = 57
+BEDROCK_SW_ID = 65
 
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {

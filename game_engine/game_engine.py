@@ -1,18 +1,31 @@
+from __future__ import annotations
 import numpy as np
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
 from itertools import chain
-
+import random
+from enum import Enum
+from copy import deepcopy
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.engine_utils import flood_fill, get_solid_map
-from cfg.tile_dictionary import C4_TILE_ID, URETHANE_TILE_ID
+from cfg.tile_dictionary import (
+    C4_TILE_ID,
+    URETHANE_TILE_ID,
+    EMPTY_TILE_ID,
+    SECURITY_DOOR_ID,
+)
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.entities.explosion import (
-    ExplosionType, SmallExplosion, MediumExplosion, LargeExplosion, NukeExplosion,
-    SmallCrossExplosion, BigCrossExplosion
+    ExplosionType,
+    SmallExplosion,
+    MediumExplosion,
+    LargeExplosion,
+    NukeExplosion,
+    SmallCrossExplosion,
+    BigCrossExplosion,
 )
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 
@@ -33,6 +46,17 @@ from game_engine.sound_engine import SoundEngine
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
+
+
+class SwitchState(Enum):
+    ON = "on"
+    OFF = "off"
+
+    def switch(self) -> SwitchState:
+        if self == SwitchState.OFF:
+            return SwitchState.ON
+        else:
+            return SwitchState.OFF
 
 
 class GameEngine:
@@ -59,14 +83,19 @@ class GameEngine:
         # FIXME: placeholder
         self.starting_poses = [
             (1, 1),
+            # (60, 5),  # debug: close to teleport
+            # (10, 20),  # debug: close to boulder
             (1, width - 1),
             (height - 1, 1),
             (height - 1, width - 1),
         ]
         self.prev_time = -1
         self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
+        self.teleports: List[Tuple[int, int]] = []
+        self.switch_state = SwitchState.OFF
+        self.security_doors: List[Tuple[int, int, Tile]] = []
 
-    def load_map(self, map_data: "MapData") -> None:
+    def load_map(self, map_data: MapData) -> None:
         """Load map data into the engine."""
         self.width = map_data.width
         self.height = map_data.height
@@ -76,6 +105,18 @@ class GameEngine:
             self.pickups[pickup.y][pickup.x] = pickup
         for pickup in list(map_data.treasures):
             self.pickups[pickup.y][pickup.x] = pickup
+
+        # list teleports, here we add also weapon teleports
+        for y, tiles in enumerate(self.tiles):
+            for x, tile in enumerate(tiles):
+                if tile.is_teleport():
+                    self.teleports.append((x, y))
+
+        # list security tiles
+        for y, tiles in enumerate(self.tiles):
+            for x, tile in enumerate(tiles):
+                if tile.is_security_door():
+                    self.security_doors.append((x, y, tile))
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -163,13 +204,17 @@ class GameEngine:
 
     def clear_entity_move_events(self, player: DynamicEntity) -> None:
         """Clear all move actions by the player"""
+        # Note: We assume that this is not needed. However, in the original game,
+        # the move is sometimes rounded up, i.e., you gain speed by turning.
+        # Up for discussion.
         # First resolve undergoing events, i.e., stop to the place the entity
         # has already made progress to
-        self.event_resolver.resolve_object_events(
-            player.id, "move", ResolveFlags(spawn=False)
-        )
+        # self.event_resolver.resolve_object_events(
+        #     player.id, "move", ResolveFlags(spawn=False)
+        # )
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
+        self.event_resolver.cancel_object_events(player.id, "push")
 
     def clear_entity_dig_events(self, player: DynamicEntity) -> None:
         """Clear all dig actions by the player"""
@@ -192,7 +237,6 @@ class GameEngine:
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player)
 
-
         # print("Centralize")
         # print(player.x, player.y)
         self.centralize_position(player)
@@ -201,18 +245,29 @@ class GameEngine:
         # collision check
         next_tile = self.get_neighbor_tile(player)
         if next_tile.solid:
-            if not next_tile.diggable:
-                # print("change entity direction: blocked")
-                # print(player.x, player.y)
-                # print(next_tile)
-                return
-            else:
-                self.dig(player)
+            self.collision_check(player, next_tile)
         else:
             # Create new movement
             self.move_entity(player)
 
-    def move_entity(self, entity: DynamicEntity):
+    def collision_check(self, entity: DynamicEntity, next_tile: Tile):
+        # dig
+        if next_tile.diggable:
+            self.dig(entity)
+        # interact
+        elif next_tile.interactable:
+            if next_tile.is_switch():
+                self.use_switch()
+            elif next_tile.is_boulder():
+                # TODO: can you push boulders on top of items?
+                tile_behind_push = self.get_neighbor_tile(entity, range=2)
+                if not tile_behind_push.solid:
+                    self.move_entity(entity, push=True)
+        # if nothing can be done: stop
+        else:
+            entity.state = "idle"
+
+    def move_entity(self, entity: DynamicEntity, push: bool = False):
         """Main movement generator function from dynamic entities"""
         if entity.state == "dead":
             return
@@ -253,15 +308,21 @@ class GameEngine:
                 d = 0.5
 
             # this is the required time to cross the thershold
-            dt = d / entity.speed
+            speed_modifier = 1
+            if push:
+                speed_modifier = entity.push_power()
+            dt = d / (entity.speed * speed_modifier)
             # HACK: since the movement is calculated with actual time, add some bonus
             # time to cross the threshold properly, to make tile transition logic
             # nicee
             dt += 0.01
+
+            event = "move" if not push else "push"
+
             movement_event = MoveEvent(
                 trigger_at=Clock.now() + dt,
                 target=entity,
-                event_type="move",
+                event_type=event,
                 created_at=Clock.now(),
                 created_by=entity.id,
                 direction=str(entity.direction.value),
@@ -300,6 +361,8 @@ class GameEngine:
             self.resolve_bomb(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "move":
             self.resolve_movement(target, event, flags)
+        elif isinstance(target, Player) and event.event_type == "push":
+            self.resolve_push(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
 
@@ -359,8 +422,6 @@ class GameEngine:
             pass  # No sound for C4 tile chain explosions
         elif target.bomb_type == BombType.SMALL_BOMB:
             self.sounds.small_explosion()
-        elif target.bomb_type == BombType.URETHANE:
-            self.sounds.urethane()
         else:
             self.sounds.explosion()
 
@@ -383,11 +444,7 @@ class GameEngine:
                 if fill_mask[y, x]:
                     tile = self.get_tile(x, y)
                     if tile and tile.tile_type == TileType.EMPTY:
-                        tile.tile_type = TileType.C4
-                        tile.visual_id = C4_TILE_ID
-                        tile.solid = True
-                        tile.diggable = True
-                        tile.health = 100
+                        self.set_tile(x, y, Tile.create_c4())
 
         self.sounds.urethane()
 
@@ -410,17 +467,39 @@ class GameEngine:
                 if fill_mask[y, x]:
                     tile = self.get_tile(x, y)
                     if tile and tile.tile_type == TileType.EMPTY:
-                        tile.tile_type = TileType.URETHANE
-                        tile.visual_id = URETHANE_TILE_ID
-                        tile.solid = True
-                        tile.diggable = True
-                        tile.health = 200
+                        self.set_tile(x, y, Tile.create_urethane())
 
         self.sounds.urethane()
 
         # Remove bomb from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)
+
+    def resolve_push(
+        self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
+    ) -> None:
+        player_x, player_y = xy_to_tile(target.x, target.y)
+        target_x, target_y = player_x, player_y
+        new_x, new_y = target_x, target_y
+        if target.direction == Direction.RIGHT:
+            target_x = player_x + 1
+            new_x = target_x + 1
+        elif target.direction == Direction.LEFT:
+            target_x = player_x - 1
+            new_x = target_x - 1
+        elif target.direction == Direction.UP:
+            target_y = player_y - 1
+            new_y = target_y - 1
+        elif target.direction == Direction.DOWN:
+            target_y = player_y + 1
+            new_y = target_y + 1
+        else:
+            raise ValueError("Invalid move direction")
+
+        # TODO: do boulders crush items?
+        self.tiles[new_y][new_x] = deepcopy(self.tiles[target_y][target_x])
+        self.set_tile(target_x, target_y, Tile.create_empty())
+        self.resolve_movement(target, event, flags)
 
     def resolve_movement(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
@@ -437,7 +516,10 @@ class GameEngine:
         # other than planned, calculate actual traveled distance
         current_time = Clock.now()
         dt = current_time - event.created_at
-        d = dt * target.speed
+        speedmod = 1
+        if event.event_type == "push":
+            speedmod = target.push_power()
+        d = dt * target.speed * speedmod
 
         # move target to the stored direction, not the current one!
         # this is due to the fact that when changing direction, the target (pointer)
@@ -488,17 +570,11 @@ class GameEngine:
             # wall
             # interact
             next_tile = self.get_neighbor_tile(target)
+            # print(next_tile)
             if next_tile.solid:
                 blocked = True
                 px, py = xy_to_tile(target.x, target.y)
-                if not next_tile.diggable:
-                    target.state = "idle"
-                    # print("resolve move blocked")
-                    # print(target.x, target.y)
-                    # print(next_tile)
-                else:
-                    # print("dig")
-                    self.dig(target)
+                self.collision_check(target, next_tile)
 
         if flags.spawn and not blocked:
             self.move_entity(target)
@@ -532,18 +608,18 @@ class GameEngine:
         else:
             self.move_entity(target)
 
-    def get_neighbor_tile(self, entity: DynamicEntity) -> Tile:
+    def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tile:
         px, py = xy_to_tile(entity.x, entity.y)
         nx, ny = px, py
         dir = Direction(entity.direction)
         if dir == Direction.RIGHT:
-            nx += 1
+            nx += range
         elif dir == Direction.LEFT:
-            nx -= 1
+            nx -= range
         elif dir == Direction.UP:
-            ny -= 1
+            ny -= range
         elif dir == Direction.DOWN:
-            ny += 1
+            ny += range
         else:
             print(entity)
             raise ValueError("Invalid move direction")
@@ -577,6 +653,7 @@ class GameEngine:
     # TODO: tile center reached logic
     def entity_reach_tile_center(self, player: Player) -> None:
         """Events that happen when entity enters a tile center"""
+        # pickup items
         px, py = xy_to_tile(player.x, player.y)
         pickup = self.pickups[py][px]
         if pickup:
@@ -590,14 +667,39 @@ class GameEngine:
                 self.sounds.treasure()
             self.pickups[py][px] = None
 
+        # teleport
+        tile = self.tiles[py][px]
+        if tile.is_teleport():
+            available: List[Tuple[int, int]] = []
+            for teleport in self.teleports:
+                if teleport[0] == px and teleport[1] == py:
+                    continue
+                else:
+                    available.append(teleport)
+            if available:
+                val = random.choice(available)
+                player.x = val[0] + 0.5
+                player.y = val[1] + 0.5
+
+    def use_switch(self) -> None:
+        if self.switch_state == SwitchState.OFF:
+            for x, y, _ in self.security_doors:
+                self.set_tile(x, y, Tile.create_empty())
+        else:
+            for x, y, tile in self.security_doors:
+                self.set_tile(x, y, tile)
+
+        self.switch_state = self.switch_state.switch()
+
     def fight(self, agent: DynamicEntity) -> None:
         entities = self.players + self.monsters
         px, py = xy_to_tile(agent.x, agent.y)
         for other in entities:
             ox, oy = (int)(other.x), (int)(other.y)
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
-                other.take_damage(agent.fight_power)
-                agent.take_damage(other.fight_power)
+                pass
+                # other.take_damage(agent.fight_power)
+                # agent.take_damage(other.fight_power)
                 # print("FIGHT!")
                 # print(f"Agent deals {agent.fight_power} damage")
                 # print(f"Enemy deals {other.fight_power} damage")
@@ -635,8 +737,7 @@ class GameEngine:
 
         # Build tilemap as 2D numpy array
         tilemap = np.array(
-            [[tile.visual_id for tile in row] for row in self.tiles],
-            dtype=np.uint8
+            [[tile.visual_id for tile in row] for row in self.tiles], dtype=np.uint8
         )
 
         explosions_copy = self.explosions.copy()

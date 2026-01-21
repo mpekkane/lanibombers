@@ -1,7 +1,19 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
 from game_engine.entities.pickup import Pickup, PickupType
+from cfg.tile_dictionary import (
+    GOLD_SHIELD_ID,
+    GOLD_EGG_ID,
+    GOLD_COINS_ID,
+    GOLD_BRACELET_ID,
+    GOLD_BAR_ID,
+    GOLD_CROSS_ID,
+    GOLD_SCEPTRE_ID,
+    GOLD_RUBY_ID,
+    GOLD_CROWN_ID,
+)
 
 
 class TreasureType(Enum):
@@ -34,6 +46,27 @@ TREASURE_VALUES = {
 class Treasure(Pickup):
     """Gold treasure item that can be picked up for points."""
     treasure_type: TreasureType = TreasureType.GOLD_COINS
+
+    @staticmethod
+    def create(x: int, y: int, treasure_type: TreasureType) -> Treasure:
+        if treasure_type == TreasureType.GOLD_CROWN:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_CROWN, visual_id=GOLD_CROWN_ID)
+        elif treasure_type == TreasureType.GOLD_RUBY:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_RUBY, visual_id=GOLD_RUBY_ID)
+        elif treasure_type == TreasureType.GOLD_SCEPTRE:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_SCEPTRE, visual_id=GOLD_SCEPTRE_ID)
+        elif treasure_type == TreasureType.GOLD_CROSS:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_CROSS, visual_id=GOLD_CROSS_ID)
+        elif treasure_type == TreasureType.GOLD_BAR:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_BAR, visual_id=GOLD_BAR_ID)
+        elif treasure_type == TreasureType.GOLD_EGG:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_EGG, visual_id=GOLD_EGG_ID)
+        elif treasure_type == TreasureType.GOLD_COINS:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_COINS, visual_id=GOLD_COINS_ID)
+        elif treasure_type == TreasureType.GOLD_SHIELD:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_SHIELD, visual_id=GOLD_SHIELD_ID)
+        elif treasure_type == TreasureType.GOLD_BRACELET:
+            return Treasure(x=x, y=y, treasure_type=TreasureType.GOLD_BRACELET, visual_id=GOLD_BRACELET_ID)
 
     def __post_init__(self):
         self.pickup_type = PickupType.TREASURE
