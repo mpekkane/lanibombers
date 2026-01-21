@@ -141,6 +141,11 @@ GOLD_SCEPTRE_ID = 152
 GOLD_RUBY_ID = 153
 GOLD_CROWN_ID = 154
 
+BEDROCK_NW_ID = 55
+BEDROCK_NE_ID = 56
+BEDROCK_SE_ID = 57
+BEDROCK_SW_ID = 65
+
 # Monster spawn tile definitions (tile_id -> (entity_type, direction))
 MONSTER_SPAWN_TILES = {
     71: ('furryman', 'right'),

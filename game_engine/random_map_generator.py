@@ -1,6 +1,7 @@
 import array
 import random
 from typing import List
+import numpy as np
 from game_engine.map_loader import MapData
 from game_engine.entities.tile import Tile
 from game_engine.entities.treasure import TreasureType, Treasure
@@ -9,14 +10,25 @@ from game_engine.entities import DynamicEntity
 from game_engine.perlin import generate_and_threshold
 from cfg.tile_dictionary import (
     BEDROCK_INSIDE_TILES,
-    BEDROCK_CORNER_TILES,
-    DIRT_TILES
+    BEDROCK_NW_ID,
+    BEDROCK_NE_ID,
+    BEDROCK_SE_ID,
+    BEDROCK_SW_ID,
+    DIRT_TILES,
 )
 
 
 class RandomMapGenerator:
     def __init__(self) -> None:
         pass
+
+    def is_bedrock(
+        self, map: np.ndarray, x: int, y: int, width: int, height: int
+    ) -> bool:
+        if 0 <= x and x < width and 0 <= y and y < height:
+            return map[x, y]
+        else:
+            return True
 
     def generate(
         self,
@@ -42,8 +54,30 @@ class RandomMapGenerator:
             tiles.append([])
             for x in range(width):
                 if map[x, y]:
-                    # TODO: fix corner tiles
-                    rid = random.choice(list(BEDROCK_INSIDE_TILES))
+                    corner = 0
+                    north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
+                    south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
+                    west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
+                    east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
+                    if east and south and not west and not north:
+                        corner = 1
+                    elif west and south and not east and not north:
+                        corner = 2
+                    elif east and north and not west and not south:
+                        corner = 3
+                    elif west and north and not east and not south:
+                        corner = 4
+
+                    if corner == 1:
+                        rid = BEDROCK_NW_ID
+                    elif corner == 2:
+                        rid = BEDROCK_NE_ID
+                    elif corner == 3:
+                        rid = BEDROCK_SW_ID
+                    elif corner == 4:
+                        rid = BEDROCK_SE_ID
+                    else:
+                        rid = random.choice(list(BEDROCK_INSIDE_TILES))
                     tiles[y].append(Tile.create_by_id(tile_id=rid))
                 else:
                     rid = random.choice(list(DIRT_TILES))
