@@ -36,13 +36,14 @@ class BomberServer:
     def __init__(self, cfg: str, map_path: str) -> None:
         self.state = ServerState.STARTING
 
-        # map_data = load_map(map_path)
-        random_map_generator = RandomMapGenerator()
-        map_data = random_map_generator.generate()
+        if map_path:
+            map_data = load_map(map_path)
+        else:
+            random_map_generator = RandomMapGenerator()
+            map_data = random_map_generator.generate()
 
         # game engine
         self.engine = GameEngine(map_data.width, map_data.height)
-        print(map_data.width, map_data.height)
         self.engine.load_map(map_data)
 
         # networking
@@ -242,7 +243,7 @@ def main() -> None:
     assert Path("assets").exists(), "Assets missing"
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
-    parser.add_argument("--map", "-m", type=str, default="assets/maps/ANZULABY.MNE")
+    parser.add_argument("--map", "-m", type=str, default="")
     args = parser.parse_args()
     cfg = args.cfg
     map_path = args.map
