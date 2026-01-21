@@ -54,27 +54,17 @@ class RandomMapGenerator:
             tiles.append([])
             for x in range(width):
                 if map[x, y]:
-                    corner = 0
                     north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
                     south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
                     west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
                     east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
-                    if east and south and not west and not north:
-                        corner = 1
-                    elif west and south and not east and not north:
-                        corner = 2
-                    elif east and north and not west and not south:
-                        corner = 3
-                    elif west and north and not east and not south:
-                        corner = 4
-
-                    if corner == 1:
+                    if south and east and not north and not west:
                         rid = BEDROCK_NW_ID
-                    elif corner == 2:
+                    elif south and west and not north and not east:
                         rid = BEDROCK_NE_ID
-                    elif corner == 3:
+                    elif north and east and not south and not west:
                         rid = BEDROCK_SW_ID
-                    elif corner == 4:
+                    elif north and west and not south and not east:
                         rid = BEDROCK_SE_ID
                     else:
                         rid = random.choice(list(BEDROCK_INSIDE_TILES))
