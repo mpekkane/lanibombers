@@ -7,9 +7,13 @@ and handles registry of the message types, encoding and decoding.
 from __future__ import annotations
 import struct
 from dataclasses import dataclass
+import pickle
+import numpy as np
 from game_engine.clock import Clock
 from typing import ClassVar, Dict, Type, Iterable, List
 from game_engine.agent_state import Action
+from game_engine.entities import Pickup, Bomb, DynamicEntity
+from game_engine.render_state import RenderState
 
 
 class Message:
@@ -188,7 +192,7 @@ class Announce(Message):
         if len(payload) != 8 + name_len:
             raise ValueError("Announce name length mismatch")
 
-        name_b = payload[8:8 + name_len]
+        name_b = payload[8 : 8 + name_len]
         name = name_b.decode("utf-8", errors="strict")
         return cls(port=port, name=name)
 
@@ -250,3 +254,158 @@ class ClientControl(Message):
     @classmethod
     def from_bytes(cls, payload: bytes) -> ClientControl:
         return cls(Action(int.from_bytes(payload, "big")))
+
+
+@register_message
+@dataclass(frozen=True)
+class GameState(Message):
+
+    TYPE: ClassVar[int] = 9
+    width: int
+    height: int
+    tilemap: np.ndarray
+    explosions: np.ndarray
+    players: List[DynamicEntity]
+    monsters: List[DynamicEntity]
+    pickups: List[Pickup]
+    bombs: List[Bomb]
+
+    @staticmethod
+    def from_render(state: RenderState) -> GameState:
+        width = state.width
+        height = state.height
+        tilemap = state.tilemap
+        explosions = state.explosions
+        players = state.players
+        monsters = state.monsters
+        pickups = state.pickups
+        bombs = state.bombs
+
+        return GameState(
+            width=width,
+            height=height,
+            tilemap=tilemap,
+            explosions=explosions,
+            players=players,
+            monsters=monsters,
+            pickups=pickups,
+            bombs=bombs,
+        )
+
+    def to_render(self) -> RenderState:
+        return RenderState(
+            width=self.width,
+            height=self.height,
+            tilemap=self.tilemap,
+            explosions=self.explosions,
+            players=self.players,
+            monsters=self.monsters,
+            pickups=self.pickups,
+            bombs=self.bombs,
+        )
+
+    def to_bytes(self) -> bytes:
+        # main data
+        b_width = self.width.to_bytes(1, "big")
+        b_height = self.height.to_bytes(1, "big")
+        b_tilemap = self.tilemap.tobytes()
+        b_explosions = self.explosions.tobytes()
+        b_players = pickle.dumps(self.players)
+        b_monsters = pickle.dumps(self.monsters)
+        b_pickups = pickle.dumps(self.pickups)
+        b_bombs = pickle.dumps(self.bombs)
+        # auxiliary data
+        b_num_players = len(self.players).to_bytes(1, "big")
+        b_num_monsters = len(self.monsters).to_bytes(1, "big")
+        b_num_pickups = len(self.pickups).to_bytes(1, "big")
+        b_num_bombs = len(self.bombs).to_bytes(1, "big")
+        b_tilemap_size = self.tilemap.size.to_bytes(4, "big")
+        b_explosions_size = self.explosions.size.to_bytes(4, "big")
+        b_players_size = len(b_players).to_bytes(2, "big")
+        b_monsters_size = len(b_monsters).to_bytes(2, "big")
+        b_pickups_size = len(b_pickups).to_bytes(2, "big")
+        b_bombs_size = len(b_bombs).to_bytes(2, "big")
+
+        return (
+            b_width
+            + b_height
+            + b_num_players
+            + b_num_monsters
+            + b_num_pickups
+            + b_num_bombs
+            + b_tilemap_size
+            + b_explosions_size
+            + b_players_size
+            + b_monsters_size
+            + b_pickups_size
+            + b_bombs_size
+            + b_tilemap
+            + b_explosions
+            + b_players
+            + b_monsters
+            + b_pickups
+            + b_bombs
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ClientControl:
+        # width = int.from_bytes(payload[0], "big")
+        # height = int.from_bytes(payload[1], "big")
+        # num_players = int.from_bytes(payload[2], "big")
+        # num_monsters = int.from_bytes(payload[3], "big")
+        # num_pickups = int.from_bytes(payload[4], "big")
+        # num_bombs = int.from_bytes(payload[5], "big")
+        width = int(payload[0])
+        height = int(payload[1])
+        num_players = int(payload[2])
+        num_monsters = int(payload[3])
+        num_pickups = int(payload[4])
+        num_bombs = int(payload[5])
+        tilemap_size = int.from_bytes(payload[6:10], "big")
+        explosions_size = int.from_bytes(payload[10:14], "big")
+        players_size = int.from_bytes(payload[14:16], "big")
+        monsters_size = int.from_bytes(payload[16:18], "big")
+        pickups_size = int.from_bytes(payload[18:20], "big")
+        bombs_size = int.from_bytes(payload[20:22], "big")
+        start = 22
+        stop = 22 + tilemap_size
+        tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
+            (height, width)
+        )
+        start = stop + 1
+        stop = start + explosions_size
+        explosions = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
+            (height, width)
+        )
+        start = stop + 1
+        stop = start + players_size
+        players = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + monsters_size
+        if monsters_size == 5:
+            monsters = []
+        else:
+            monsters = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + pickups_size
+        if pickups_size == 5:
+            pickups = []
+        else:
+            pickups = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + bombs_size
+        if bombs_size == 5:
+            bombs = []
+        else:
+            bombs = pickle.loads(payload[start:stop])
+
+        return cls(
+            width=width,
+            height=height,
+            tilemap=tilemap,
+            explosions=explosions,
+            players=players,
+            monsters=monsters,
+            pickups=pickups,
+            bombs=bombs,
+        )

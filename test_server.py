@@ -10,7 +10,7 @@ from typing import Dict, List
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
-from network_stack.messages.messages import Name, ChatText, Ping, Pong, ClientControl
+from network_stack.messages.messages import Name, ChatText, Ping, Pong, ClientControl, GameState
 from game_engine.clock import Clock
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
@@ -44,6 +44,7 @@ class BomberServer:
 
         # game engine
         self.engine = GameEngine(map_data.width, map_data.height)
+        self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(map_data)
 
         # networking
@@ -61,6 +62,9 @@ class BomberServer:
         self.pong_count = 0
         self.MAX_PING_BUFFER = 1
         self.players: List[str] = []
+
+    def render_callback(self, state: RenderState) -> None:
+        self.server.broadcast(GameState.from_render(state), None)
 
     def run_lobby(self) -> bool:
         self.state = ServerState.LOBBY

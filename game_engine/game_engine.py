@@ -1,6 +1,6 @@
 from __future__ import annotations
 import numpy as np
-from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union
+from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union, Callable
 from itertools import chain
 import random
 from enum import Enum
@@ -94,6 +94,12 @@ class GameEngine:
         self.teleports: List[Tuple[int, int]] = []
         self.switch_state = SwitchState.OFF
         self.security_doors: List[Tuple[int, int, Tile]] = []
+        self.state_callback: Optional[Callable[[RenderState], None]] = None
+
+    def set_render_callback(
+        self, callback: Callable[[RenderState], None]
+    ) -> None:
+        self.state_callback = callback
 
     def load_map(self, map_data: MapData) -> None:
         """Load map data into the engine."""
@@ -365,6 +371,10 @@ class GameEngine:
             self.resolve_push(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
+
+        # send renderstate
+        if self.state_callback:
+            self.state_callback(self.get_render_state())
 
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
