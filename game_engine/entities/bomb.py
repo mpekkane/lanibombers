@@ -17,6 +17,11 @@ class Bomb(GameObject):
     placed_at: float
     owner_id: UUID
 
+    # Optional override fields (used by grasshopper hops)
+    fuse_override: Optional[float] = None
+    explosion_override: Optional[ExplosionType] = None
+    hop_count: int = 0  # For grasshopper bombs: tracks explosion count
+
     # Auto-set fields based on bomb_type
     fuse_duration: float = field(default=0.0, init=False)
     explosion_type: ExplosionType = field(default=ExplosionType.SMALL, init=False)
@@ -24,8 +29,9 @@ class Bomb(GameObject):
 
     def __post_init__(self):
         fuse, explosion_type = BOMB_PROPERTIES[self.bomb_type]
-        self.fuse_duration = fuse
-        self.explosion_type = explosion_type
+        # Allow overrides for special cases like grasshopper hops
+        self.fuse_duration = self.fuse_override if self.fuse_override is not None else fuse
+        self.explosion_type = self.explosion_override if self.explosion_override is not None else explosion_type
 
     def get_fuse_percentage(self, current_time: Optional[float] = None) -> float:
         """

@@ -24,6 +24,10 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.NUKE, 5))
         self.inventory.append((BombType.SMALL_CROSS_BOMB, 10))
         self.inventory.append((BombType.BIG_CROSS_BOMB, 5))
+        self.inventory.append((BombType.GRASSHOPPER, 10))
+        self.inventory.append((BombType.FLAME_BARREL, 10))
+        self.inventory.append((BombType.CRACKER_BARREL, 10))
+        self.inventory.append((BombType.DIGGER_BOMB, 10))
 
     def choose(self) -> None:
         if not self.inventory:

@@ -772,6 +772,27 @@ class GameRenderer(arcade.Window):
         load_static(BombType.LANDMINE, "landmine")
         load_static(BombType.SMALL_CROSS_BOMB, "smallcrucifix")
         load_static(BombType.BIG_CROSS_BOMB, "bigcrucifix")
+        load_static(BombType.GRASSHOPPER, "grasshopper")
+        # Flame barrel has 2-frame animation like nuke
+        for frame in [1, 2]:
+            path = os.path.join(SPRITES_PATH, f"smallbarrel{frame}.png")
+            self.bomb_textures[(BombType.FLAME_BARREL, "active", frame)] = arcade.load_texture(path)
+        # Defused state
+        defused_path = os.path.join(SPRITES_PATH, "smallbarrel_defused.png")
+        self.bomb_textures[(BombType.FLAME_BARREL, "defused", 0)] = arcade.load_texture(defused_path)
+
+        # Cracker barrel (static, no defused state since it's triggered by damage)
+        load_static(BombType.CRACKER_BARREL, "crackerbarrel")
+
+        # Digger bomb (static)
+        load_static(BombType.DIGGER_BOMB, "diggerbomb")
+
+        # GRASSHOPPER_HOP uses same texture as GRASSHOPPER
+        for frame in range(1, 4):
+            self.bomb_textures[(BombType.GRASSHOPPER_HOP, "active", frame)] = \
+                self.bomb_textures[(BombType.GRASSHOPPER, "active", frame)]
+        self.bomb_textures[(BombType.GRASSHOPPER_HOP, "defused", 0)] = \
+            self.bomb_textures[(BombType.GRASSHOPPER, "defused", 0)]
 
     def on_draw(self):
         """Render the game"""

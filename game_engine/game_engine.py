@@ -18,6 +18,7 @@ from cfg.tile_dictionary import (
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
+from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG
 from game_engine.entities.explosion import (
     ExplosionType,
     SmallExplosion,
@@ -388,6 +389,24 @@ class GameEngine:
             self._resolve_urethane(target)
             return
 
+        # FLAME_BARREL flood fills and damages all non-solid tiles in range
+        if target.bomb_type == BombType.FLAME_BARREL:
+            self._resolve_flame_barrel(target)
+            return
+
+        # CRACKER_BARREL does flood fill damage + scattered medium explosions
+        if target.bomb_type == BombType.CRACKER_BARREL:
+            self._resolve_cracker_barrel(target)
+            return
+
+        # DIGGER_BOMB only damages bedrock tiles using large explosion radius
+        if target.bomb_type == BombType.DIGGER_BOMB:
+            self._resolve_digger_bomb(target)
+            return
+
+        # Grasshopper bombs have special spawning behavior after explosion
+        is_grasshopper = target.bomb_type in (BombType.GRASSHOPPER, BombType.GRASSHOPPER_HOP)
+
         # Get explosion instance and calculate damage pattern
         explosion = EXPLOSION_MAP[target.explosion_type]
         solids = np.zeros((self.height, self.width), dtype=bool)
@@ -428,9 +447,15 @@ class GameEngine:
             )
             self.event_resolver.schedule_event(explosion_event)
 
+        # Grasshopper: spawn next hop if we haven't reached 13 explosions
+        if is_grasshopper:
+            self._spawn_grasshopper_hop(target, current_time)
+
         if target.bomb_type == BombType.C4_TILE:
             pass  # No sound for C4 tile chain explosions
         elif target.bomb_type == BombType.SMALL_BOMB:
+            self.sounds.small_explosion()
+        elif target.explosion_type == ExplosionType.SMALL:
             self.sounds.small_explosion()
         else:
             self.sounds.explosion()
@@ -484,6 +509,199 @@ class GameEngine:
         # Remove bomb from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)
+
+    def _resolve_flame_barrel(self, bomb: Bomb) -> None:
+        """Resolve FLAME_BARREL bomb - flood fill and damage all non-solid tiles in range."""
+        cfg = FLAME_BARREL_CONFIG
+
+        # Get solid map (True = solid, we need inverse for flood fill which expects True = walkable)
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map  # Invert: True = empty/walkable
+
+        # Flood fill from bomb position
+        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=cfg['max_distance'])
+
+        # Apply damage to all tiles in the flood fill area
+        damage = cfg['damage']
+        for y in range(self.height):
+            for x in range(self.width):
+                if fill_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile:
+                        tile.take_damage(damage)
+                        # Mark explosion visual
+                        if not tile.solid:
+                            self.explosions[y, x] = 1
+
+        self.sounds.explosion()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_cracker_barrel(self, bomb: Bomb) -> None:
+        """Resolve CRACKER_BARREL bomb - flood fill damage + scattered medium explosions."""
+        cfg = CRACKER_BARREL_CONFIG
+        current_time = Clock.now()
+
+        # Get solid map for flood fill
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map
+
+        # Flood fill from bomb position (like flame barrel but shorter range)
+        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=cfg['flood_fill_distance'])
+
+        # Apply damage to all tiles in the flood fill area
+        damage = cfg['flood_fill_damage']
+        for y in range(self.height):
+            for x in range(self.width):
+                if fill_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile:
+                        tile.take_damage(damage)
+                        if not tile.solid:
+                            self.explosions[y, x] = 1
+
+        # Schedule scattered medium explosions
+        scatter_count = cfg['scatter_explosions']
+        scatter_dist = cfg['scatter_distance']
+        interval = cfg['scatter_interval']
+
+        for i in range(scatter_count):
+            # Random position up to scatter_dist away
+            offset_x = random.randint(-scatter_dist, scatter_dist)
+            offset_y = random.randint(-scatter_dist, scatter_dist)
+            new_x = bomb.x + offset_x
+            new_y = bomb.y + offset_y
+
+            # Clamp to game area with 1-tile border
+            new_x = max(1, min(self.width - 2, new_x))
+            new_y = max(1, min(self.height - 2, new_y))
+
+            # Create a medium explosion bomb (using C4_TILE type for instant explosion)
+            scatter_bomb = Bomb(
+                x=new_x,
+                y=new_y,
+                bomb_type=BombType.C4_TILE,  # Reuse C4_TILE for medium instant explosion
+                placed_at=current_time,
+                owner_id=bomb.owner_id,
+            )
+
+            # Schedule at 1/60 second intervals
+            trigger_time = current_time + (i * interval)
+            explosion_event = Event(
+                trigger_at=trigger_time,
+                target=scatter_bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
+
+        self.sounds.explosion()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_digger_bomb(self, bomb: Bomb) -> None:
+        """Resolve DIGGER_BOMB - only damages bedrock tiles using large explosion radius."""
+        # Use LARGE explosion pattern
+        explosion = EXPLOSION_MAP[ExplosionType.LARGE]
+        solids = np.zeros((self.height, self.width), dtype=bool)
+        damage_array = explosion.calculate_damage(bomb.x, bomb.y, solids)
+
+        # Apply damage only to bedrock tiles
+        for y in range(self.height):
+            for x in range(self.width):
+                dmg = damage_array[y, x]
+                if dmg > 0:
+                    tile = self.get_tile(x, y)
+                    if tile and tile.tile_type == TileType.BEDROCK:
+                        tile.take_damage(dmg)
+                        # Show explosion visual on the tile
+                        self.explosions[y, x] = 1
+
+        self.sounds.explosion()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _spawn_grasshopper_hop(self, source_bomb: Bomb, current_time: float) -> None:
+        """
+        Spawn the next grasshopper hop bomb after an explosion.
+        Configuration is loaded from GRASSHOPPER_CONFIG in bomb_dictionary.py.
+        """
+        cfg = GRASSHOPPER_CONFIG
+
+        # Count this explosion
+        new_hop_count = source_bomb.hop_count + 1
+
+        # Stop after max hops
+        if new_hop_count >= cfg['max_hops']:
+            return
+
+        # Calculate new position: random offset up to max_hop_distance in each direction
+        max_dist = cfg['max_hop_distance']
+        offset_x = random.randint(-max_dist, max_dist)
+        offset_y = random.randint(-max_dist, max_dist)
+        new_x = source_bomb.x + offset_x
+        new_y = source_bomb.y + offset_y
+
+        # Clamp to game area with 1-tile border
+        new_x = max(1, min(self.width - 2, new_x))
+        new_y = max(1, min(self.height - 2, new_y))
+
+        # Determine explosion type for next hop
+        if source_bomb.bomb_type == BombType.GRASSHOPPER:
+            # First hop after initial bomb: random from first_hop_explosions
+            next_explosion = random.choice(cfg['first_hop_explosions'])
+        else:
+            # Subsequent hops: shrink/stay/grow based on configured chances
+            current_explosion = source_bomb.explosion_type
+            explosion_order = cfg['explosion_order']
+            roll = random.random()
+
+            if roll < cfg['shrink_chance']:
+                # Shrink: move down in explosion_order, stay at minimum
+                try:
+                    idx = explosion_order.index(current_explosion)
+                    next_explosion = explosion_order[max(0, idx - 1)]
+                except ValueError:
+                    next_explosion = explosion_order[0]
+            elif roll < cfg['shrink_chance'] + cfg['stay_chance']:
+                # Stay same
+                next_explosion = current_explosion
+            else:
+                # Grow: move up in explosion_order, stay at maximum
+                try:
+                    idx = explosion_order.index(current_explosion)
+                    next_explosion = explosion_order[min(len(explosion_order) - 1, idx + 1)]
+                except ValueError:
+                    next_explosion = explosion_order[-1]
+
+        # Random fuse between configured min and max
+        fuse_time = random.uniform(cfg['fuse_min'], cfg['fuse_max'])
+
+        # Create the hop bomb
+        hop_bomb = Bomb(
+            x=new_x,
+            y=new_y,
+            bomb_type=BombType.GRASSHOPPER_HOP,
+            placed_at=current_time,
+            owner_id=source_bomb.owner_id,
+            fuse_override=fuse_time,
+            explosion_override=next_explosion,
+            hop_count=new_hop_count,
+        )
+
+        # Add to bombs list and schedule explosion
+        self.bombs.append(hop_bomb)
+        explosion_event = Event(
+            trigger_at=current_time + fuse_time,
+            target=hop_bomb,
+            event_type="explode",
+        )
+        self.event_resolver.schedule_event(explosion_event)
 
     def resolve_push(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags

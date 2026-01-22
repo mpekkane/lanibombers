@@ -5,6 +5,7 @@ from game_engine.entities.bomb import Bomb, BombType
 
 SPRITE_SIZE = 10
 NUKE_FRAME_DURATION = 0.1  # seconds per frame for nuke animation
+FLAME_BARREL_FRAME_DURATION = 0.1  # seconds per frame for flame barrel animation
 
 
 class BombSprite(arcade.Sprite):
@@ -22,6 +23,9 @@ class BombSprite(arcade.Sprite):
         # Track nuke animation state per bomb (by id)
         self.nuke_frames = {}  # bomb_id -> last frame shown (1, 2, or 3)
         self.nuke_last_update = {}  # bomb_id -> last frame change time
+        # Track flame barrel animation state per bomb (by id)
+        self.flame_barrel_frames = {}  # bomb_id -> last frame shown (1 or 2)
+        self.flame_barrel_last_update = {}  # bomb_id -> last frame change time
 
     def update_from_bomb(self, bomb: Bomb, current_time: float = None):
         """Update sprite position and texture from bomb entity data"""
@@ -35,6 +39,9 @@ class BombSprite(arcade.Sprite):
         # Get texture based on bomb type and state
         if bomb.bomb_type == BombType.NUKE:
             frame = self._get_nuke_frame(bomb, current_time)
+            texture_key = (bomb.bomb_type, 'active', frame)
+        elif bomb.bomb_type == BombType.FLAME_BARREL:
+            frame = self._get_flame_barrel_frame(bomb, current_time)
             texture_key = (bomb.bomb_type, 'active', frame)
         elif bomb.state == 'defused':
             texture_key = (bomb.bomb_type, 'defused', 0)
@@ -75,3 +82,27 @@ class BombSprite(arcade.Sprite):
             self.nuke_last_update[bomb_id] = current_time
 
         return self.nuke_frames[bomb_id]
+
+    def _get_flame_barrel_frame(self, bomb: Bomb, current_time: float) -> int:
+        """Get the current animation frame for a flame barrel (cycles 1->2->1->2...)"""
+        bomb_id = bomb.id
+
+        # Initialize tracking for new flame barrels
+        if bomb_id not in self.flame_barrel_frames:
+            self.flame_barrel_frames[bomb_id] = 1
+            self.flame_barrel_last_update[bomb_id] = current_time
+
+        # If defused, return the last frame (frozen)
+        if bomb.state == 'defused':
+            return self.flame_barrel_frames[bomb_id]
+
+        # Check if it's time to advance the frame
+        elapsed = current_time - self.flame_barrel_last_update[bomb_id]
+        if elapsed >= FLAME_BARREL_FRAME_DURATION:
+            # Advance frame (1 -> 2 -> 1 -> 2 -> ...)
+            current_frame = self.flame_barrel_frames[bomb_id]
+            next_frame = 2 if current_frame == 1 else 1
+            self.flame_barrel_frames[bomb_id] = next_frame
+            self.flame_barrel_last_update[bomb_id] = current_time
+
+        return self.flame_barrel_frames[bomb_id]
