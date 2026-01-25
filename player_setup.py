@@ -35,8 +35,8 @@ from cfg.bomb_dictionary import (
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "assets", "sprites")
 
-WINDOW_WIDTH = 839
-WINDOW_HEIGHT = 480
+WINDOW_WIDTH = 1708
+WINDOW_HEIGHT = 960
 WINDOW_TITLE = "Player Setup"
 
 SPRITE_SIZE = 10

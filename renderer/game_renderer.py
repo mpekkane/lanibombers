@@ -73,7 +73,7 @@ VERTICAL_TRANSITION_TEXTURES = {
 class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
-    def __init__(self, server, width=1280, height=960, client_player_name: str = "", show_stats: bool = False):
+    def __init__(self, server, width=1708, height=960, client_player_name: str = "", show_stats: bool = False):
         super().__init__(width, height, "lanibombers", vsync=VSYNC)
         self.client_player_name = client_player_name
         self.show_stats = show_stats
@@ -773,6 +773,8 @@ class GameRenderer(arcade.Window):
         load_static(BombType.SMALL_CROSS_BOMB, "smallcrucifix")
         load_static(BombType.BIG_CROSS_BOMB, "bigcrucifix")
         load_static(BombType.GRASSHOPPER, "grasshopper")
+        load_static(BombType.SMALL_REMOTE, "smallremote_player1")
+        load_static(BombType.BIG_REMOTE, "bigremote_player1")
         # Flame barrel has 2-frame animation like nuke
         for frame in [1, 2]:
             path = os.path.join(SPRITES_PATH, f"smallbarrel{frame}.png")

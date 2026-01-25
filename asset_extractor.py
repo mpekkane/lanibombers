@@ -744,7 +744,7 @@ ICON_DEFS = [
     # Row 2: starts at (105, 40), 1 icon
     (105, 40, ['kevlar_vest']),
     # Row 3: starts at (232, 80), 2 icons
-    (232, 80, ['clone', 'bio_slime']),
+    (232, 80, ['clone', 'bioslime']),
     # Row 4: starts at (0, 90), 1 icon
     (0, 90, ['super_drill']),
     # Row 5: starts at (216, 110), 3 icons
@@ -754,7 +754,7 @@ ICON_DEFS = [
     # Row 7: starts at (216, 140), 3 icons
     (216, 140, ['nuke', 'grenade', 'c4']),
     # Row 8: starts at (0, 170), 10 icons
-    (0, 170, ['small_bomb', 'big_bomb', 'dynamite', 'flame_thrower', 'flame_barrel',
+    (0, 170, ['small_bomb', 'big_bomb', 'dynamite', 'flamethrower', 'flame_barrel',
               'big_crucifix', 'urethane', 'big_remote', 'small_remote', 'landmine']),
 ]
 

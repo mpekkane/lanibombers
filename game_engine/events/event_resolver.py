@@ -54,6 +54,24 @@ class EventResolver:
         with self._lock:
             return self.queue.get_object_events(creator, event_type)
 
+    def get_events_by_target(self, target, event_type: str = "") -> List[Event]:
+        """Find events by their target object."""
+        with self._lock:
+            return self.queue.get_events_by_target(target, event_type)
+
+    def reschedule_events_by_target(self, target, event_type: str, relative_time: float) -> int:
+        """
+        Reschedule all events for a target to trigger at current_time + relative_time.
+
+        Returns:
+            Number of events rescheduled
+        """
+        with self._lock:
+            count = self.queue.reschedule_events_by_target(target, event_type, relative_time)
+            if self._running:
+                self._schedule_next_wakeup()
+            return count
+
     def cancel_object_events(self, creator: UUID, type: str = "") -> None:
         with self._lock:
             self.queue.cancel_object_events(creator, type)

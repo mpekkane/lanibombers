@@ -18,7 +18,7 @@ from cfg.tile_dictionary import (
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
-from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG
+from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG, FLAMETHROWER_CONFIG, FIRE_EXTINGUISHER_CONFIG
 from game_engine.entities.explosion import (
     ExplosionType,
     SmallExplosion,
@@ -27,6 +27,7 @@ from game_engine.entities.explosion import (
     NukeExplosion,
     SmallCrossExplosion,
     BigCrossExplosion,
+    DirectedFlameExplosion,
 )
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 
@@ -198,16 +199,47 @@ class GameEngine:
                 event_type="explode",
             )
             self.event_resolver.schedule_event(explosion_event)
+        elif bomb.bomb_type == BombType.FLAMETHROWER:
+            # Flamethrower fires immediately
+            explosion_event = Event(
+                trigger_at=Clock.now(),
+                target=bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
+        elif bomb.bomb_type == BombType.FIRE_EXTINGUISHER:
+            # Fire extinguisher fires immediately
+            explosion_event = Event(
+                trigger_at=Clock.now(),
+                target=bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
 
     def detonate_remotes(self, player: Player) -> None:
         for bomb in self.bombs:
-            if bomb.bomb_type == BombType.REMOTE and bomb.owner_id == player.id:
+            if bomb.bomb_type in (BombType.SMALL_REMOTE, BombType.BIG_REMOTE) and bomb.owner_id == player.id:
                 explosion_event = Event(
                     trigger_at=Clock.now() + 0,
                     target=bomb,
                     event_type="explode",
                 )
                 self.event_resolver.schedule_event(explosion_event)
+
+    def _trigger_bombs_in_area(self, source_bomb: Bomb, affected_area: np.ndarray, delay: float = 1.0 / 60.0) -> None:
+        """
+        Trigger all bombs in the affected area to explode after a delay.
+
+        Args:
+            source_bomb: The bomb causing the explosion (will be skipped)
+            affected_area: Boolean or numeric numpy array where truthy values indicate affected tiles
+            delay: Time delay before triggered bombs explode (default 1/60s)
+        """
+        for other_bomb in self.bombs:
+            if other_bomb is source_bomb:
+                continue
+            if affected_area[other_bomb.y, other_bomb.x]:
+                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", delay)
 
     def clear_entity_move_events(self, player: DynamicEntity) -> None:
         """Clear all move actions by the player"""
@@ -404,6 +436,26 @@ class GameEngine:
             self._resolve_digger_bomb(target)
             return
 
+        # BIOSLIME places a bioslime tile at bomb location
+        if target.bomb_type == BombType.BIOSLIME:
+            self._resolve_bioslime(target)
+            return
+
+        # METAL_PLATE places a concrete tile at bomb location
+        if target.bomb_type == BombType.METAL_PLATE:
+            self._resolve_metal_plate(target)
+            return
+
+        # FLAMETHROWER does a 90-degree cone flame in player's facing direction
+        if target.bomb_type == BombType.FLAMETHROWER:
+            self._resolve_flamethrower(target)
+            return
+
+        # FIRE_EXTINGUISHER defuses bombs in a 90-degree cone
+        if target.bomb_type == BombType.FIRE_EXTINGUISHER:
+            self._resolve_fire_extinguisher(target)
+            return
+
         # Grasshopper bombs have special spawning behavior after explosion
         is_grasshopper = target.bomb_type in (BombType.GRASSHOPPER, BombType.GRASSHOPPER_HOP)
 
@@ -446,6 +498,9 @@ class GameEngine:
                 event_type="explode",
             )
             self.event_resolver.schedule_event(explosion_event)
+
+        # Trigger any bombs in the damage area
+        self._trigger_bombs_in_area(target, damage_array)
 
         # Grasshopper: spawn next hop if we haven't reached 13 explosions
         if is_grasshopper:
@@ -510,6 +565,101 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
+    def _resolve_bioslime(self, bomb: Bomb) -> None:
+        """Resolve BIOSLIME bomb - place a bioslime tile at bomb location."""
+        tile = self.get_tile(bomb.x, bomb.y)
+        if tile and tile.tile_type == TileType.EMPTY:
+            self.set_tile(bomb.x, bomb.y, Tile.create_bioslime())
+
+        self.sounds.urethane()  # Use urethane sound for now
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_metal_plate(self, bomb: Bomb) -> None:
+        """Resolve METAL_PLATE bomb - place a concrete tile at bomb location."""
+        tile = self.get_tile(bomb.x, bomb.y)
+        if tile and tile.tile_type == TileType.EMPTY:
+            self.set_tile(bomb.x, bomb.y, Tile.create_concrete())
+
+        self.sounds.urethane()  # Use urethane sound for now
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_flamethrower(self, bomb: Bomb) -> None:
+        """Resolve FLAMETHROWER - 90-degree cone flame in player's facing direction."""
+        cfg = FLAMETHROWER_CONFIG
+        direction = bomb.direction if bomb.direction else Direction.DOWN
+
+        # Create directed flame explosion
+        directed_flame = DirectedFlameExplosion(
+            direction=direction,
+            max_distance=cfg['max_distance'],
+            base_damage=cfg['damage']
+        )
+
+        # Get walkable map
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map
+
+        # Calculate affected area
+        final_mask = directed_flame.calculate_area(bomb.x, bomb.y, walkable_map, flood_fill)
+
+        # Apply damage to tiles in the final mask
+        for y in range(self.height):
+            for x in range(self.width):
+                if final_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile:
+                        tile.take_damage(cfg['damage'])
+                        # Mark explosion visual
+                        if not tile.solid:
+                            self.explosions[y, x] = 1
+
+        # Trigger any bombs in the affected area
+        self._trigger_bombs_in_area(bomb, final_mask)
+
+        self.sounds.explosion()
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_fire_extinguisher(self, bomb: Bomb) -> None:
+        """Resolve FIRE_EXTINGUISHER - 90-degree cone that defuses bombs."""
+        cfg = FIRE_EXTINGUISHER_CONFIG
+        direction = bomb.direction if bomb.direction else Direction.DOWN
+
+        # Create directed flame explosion (reuse the cone calculation)
+        directed_flame = DirectedFlameExplosion(
+            direction=direction,
+            max_distance=cfg['max_distance']
+        )
+
+        # Get walkable map
+        solid_map = get_solid_map(self.tiles, self.height, self.width)
+        walkable_map = ~solid_map
+
+        # Calculate affected area
+        final_mask = directed_flame.calculate_area(bomb.x, bomb.y, walkable_map, flood_fill)
+
+        # Defuse any bombs in the final mask area
+        defuse_delay = 24 * 60 * 60  # 24 hours in seconds
+        for other_bomb in self.bombs:
+            if other_bomb is bomb:
+                continue  # Skip the fire extinguisher itself
+            if final_mask[other_bomb.y, other_bomb.x]:
+                other_bomb.state = 'defused'
+                # Reschedule explosion to 24 hours from now
+                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay)
+
+        # Remove fire extinguisher from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
     def _resolve_flame_barrel(self, bomb: Bomb) -> None:
         """Resolve FLAME_BARREL bomb - flood fill and damage all non-solid tiles in range."""
         cfg = FLAME_BARREL_CONFIG
@@ -532,6 +682,9 @@ class GameEngine:
                         # Mark explosion visual
                         if not tile.solid:
                             self.explosions[y, x] = 1
+
+        # Trigger any bombs in the affected area
+        self._trigger_bombs_in_area(bomb, fill_mask)
 
         self.sounds.explosion()
 
@@ -561,6 +714,9 @@ class GameEngine:
                         tile.take_damage(damage)
                         if not tile.solid:
                             self.explosions[y, x] = 1
+
+        # Trigger any bombs in the flood fill area
+        self._trigger_bombs_in_area(bomb, fill_mask)
 
         # Schedule scattered medium explosions
         scatter_count = cfg['scatter_explosions']

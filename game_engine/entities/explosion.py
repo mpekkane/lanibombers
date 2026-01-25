@@ -26,8 +26,8 @@ def _create_cross_pattern(diameter: int) -> np.ndarray:
 
 
 # Explosion shape lookup tables
-EXPLOSION_SMALL = _create_circular_pattern(2.5)   # 3x3 cross
-EXPLOSION_MEDIUM = _create_circular_pattern(5)    # 5x5
+EXPLOSION_SMALL = _create_circular_pattern(3)    # 3x3
+EXPLOSION_MEDIUM = _create_circular_pattern(4.4) # 5 wide middle row, rest smaller
 EXPLOSION_LARGE = _create_circular_pattern(7)     # 7x7
 EXPLOSION_NUKE = _create_circular_pattern(24.04)  # 25x25 cross
 EXPLOSION_SMALL_CROSS = _create_cross_pattern(31) # 25-tile diameter cross
@@ -162,12 +162,113 @@ class FlameExplosion(Explosion):
         pass  # TODO: implement flame spread logic
 
 
-class DirectedFlameExplosion(Explosion):
-    """Directed flame that shoots in a single direction."""
+class DirectedFlameExplosion:
+    """
+    Directed flame that shoots in a 90-degree cone.
 
-    def __init__(self, direction: Direction, base_damage: int = DAMAGE_DIRECTED_FLAME):
-        super().__init__(np.zeros((1, 1), dtype=bool), base_damage)
+    Unlike other explosions, this uses flood fill combined with a cone mask
+    to determine the affected area.
+    """
+
+    def __init__(self, direction: Direction, max_distance: int = 10, base_damage: int = DAMAGE_DIRECTED_FLAME):
         self.direction = direction
+        self.max_distance = max_distance
+        self.base_damage = base_damage
 
-    def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
-        pass  # TODO: implement directed flame logic
+    def calculate_cone_mask(self, start_x: int, start_y: int, map_height: int, map_width: int) -> np.ndarray:
+        """
+        Create a 90-degree cone mask oriented in the direction.
+
+        A tile (x, y) is in the cone if:
+        - RIGHT: rx > 0 and |ry| <= rx
+        - LEFT:  rx < 0 and |ry| <= |rx|
+        - DOWN:  ry > 0 and |rx| <= ry
+        - UP:    ry < 0 and |rx| <= |ry|
+        where rx = x - start_x, ry = y - start_y
+
+        The starting tile itself is always included.
+        """
+        cone_mask = np.zeros((map_height, map_width), dtype=bool)
+
+        for y in range(map_height):
+            for x in range(map_width):
+                rx = x - start_x
+                ry = y - start_y
+                in_cone = False
+
+                if self.direction == Direction.RIGHT:
+                    in_cone = rx > 0 and abs(ry) <= rx
+                elif self.direction == Direction.LEFT:
+                    in_cone = rx < 0 and abs(ry) <= abs(rx)
+                elif self.direction == Direction.DOWN:
+                    in_cone = ry > 0 and abs(rx) <= ry
+                elif self.direction == Direction.UP:
+                    in_cone = ry < 0 and abs(rx) <= abs(ry)
+
+                # Include the starting tile itself
+                if rx == 0 and ry == 0:
+                    in_cone = True
+
+                cone_mask[y, x] = in_cone
+
+        return cone_mask
+
+    def calculate_area(self, origin_x: int, origin_y: int, walkable: np.ndarray, flood_fill_func) -> np.ndarray:
+        """
+        Calculate the affected area using flood fill ANDed with cone mask.
+
+        Args:
+            origin_x: X coordinate of the player/bomb
+            origin_y: Y coordinate of the player/bomb
+            walkable: Boolean array where True = walkable/empty
+            flood_fill_func: The flood_fill function to use
+
+        Returns:
+            Boolean mask of affected tiles
+        """
+        map_height, map_width = walkable.shape
+
+        # Calculate starting tile (one tile in front of origin)
+        dx, dy = 0, 0
+        if self.direction == Direction.RIGHT:
+            dx = 1
+        elif self.direction == Direction.LEFT:
+            dx = -1
+        elif self.direction == Direction.DOWN:
+            dy = 1
+        elif self.direction == Direction.UP:
+            dy = -1
+
+        start_x = origin_x + dx
+        start_y = origin_y + dy
+
+        # Check bounds - return empty mask if starting tile is out of bounds
+        if not (0 <= start_x < map_width and 0 <= start_y < map_height):
+            return np.zeros((map_height, map_width), dtype=bool)
+
+        # Flood fill from starting tile
+        fill_mask = flood_fill_func(walkable, (start_y, start_x), max_dist=self.max_distance)
+
+        # Create cone mask
+        cone_mask = self.calculate_cone_mask(start_x, start_y, map_height, map_width)
+
+        # AND flood fill with cone mask
+        return fill_mask & cone_mask
+
+    def calculate_damage(self, origin_x: int, origin_y: int, walkable: np.ndarray, flood_fill_func) -> np.ndarray:
+        """
+        Calculate damage array for the directed flame.
+
+        Args:
+            origin_x: X coordinate of the player/bomb
+            origin_y: Y coordinate of the player/bomb
+            walkable: Boolean array where True = walkable/empty
+            flood_fill_func: The flood_fill function to use
+
+        Returns:
+            uint8 array with damage values
+        """
+        area = self.calculate_area(origin_x, origin_y, walkable, flood_fill_func)
+        damage = np.zeros(walkable.shape, dtype=np.uint8)
+        damage[area] = self.base_damage
+        return damage

@@ -19,7 +19,8 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.C4, 10))
         self.inventory.append((BombType.URETHANE, 10))
         self.inventory.append((BombType.LANDMINE, 20))
-        self.inventory.append((BombType.REMOTE, 20))
+        self.inventory.append((BombType.SMALL_REMOTE, 20))
+        self.inventory.append((BombType.BIG_REMOTE, 20))
         self.inventory.append((BombType.DYNAMITE, 20))
         self.inventory.append((BombType.NUKE, 5))
         self.inventory.append((BombType.SMALL_CROSS_BOMB, 10))
@@ -28,6 +29,10 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.FLAME_BARREL, 10))
         self.inventory.append((BombType.CRACKER_BARREL, 10))
         self.inventory.append((BombType.DIGGER_BOMB, 10))
+        self.inventory.append((BombType.BIOSLIME, 20))
+        self.inventory.append((BombType.METAL_PLATE, 20))
+        self.inventory.append((BombType.FLAMETHROWER, 30))
+        self.inventory.append((BombType.FIRE_EXTINGUISHER, 30))
 
     def choose(self) -> None:
         if not self.inventory:
@@ -58,6 +63,7 @@ class Player(DynamicEntity):
             bomb_type=selected_bomb_type,
             placed_at=Clock.now(),
             owner_id=self.id,
+            direction=self.direction,  # Pass player's direction for directed weapons
         )
         new_count = bomb_count - 1
 

@@ -12,7 +12,8 @@ class BombType(Enum):
     C4 = 'c4'
     C4_TILE = 'c4_tile'  # Internal: explosion from C4 tile chain reaction
     LANDMINE = 'landmine'
-    REMOTE = 'remote'
+    SMALL_REMOTE = 'small_remote'
+    BIG_REMOTE = 'big_remote'
     SMALL_BOMB = "small_bomb"
     URETHANE = "urethane"
     SMALL_CROSS_BOMB = "small_cross_bomb"
@@ -24,9 +25,13 @@ class BombType(Enum):
     FLAME_BARREL = "flame_barrel"
     CRACKER_BARREL = "cracker_barrel"
     DIGGER_BOMB = "digger_bomb"
+    BIOSLIME = "bioslime"
+    METAL_PLATE = "metal_plate"
+    FLAMETHROWER = "flamethrower"
+    FIRE_EXTINGUISHER = "fire_extinguisher"
 
     def is_timed(self) -> bool:
-        return self != BombType.LANDMINE and self != BombType.REMOTE and self != BombType.CRACKER_BARREL
+        return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER)
 
 
 # Bomb properties by type: (fuse_duration, explosion_type)
@@ -36,7 +41,8 @@ BOMB_PROPERTIES = {
     BombType.C4: (4.0, ExplosionType.NONE),  # Flood fills with C4 tiles
     BombType.C4_TILE: (0.0, ExplosionType.MEDIUM),  # Instant explosion for chain reaction
     BombType.LANDMINE: (0.5, ExplosionType.SMALL),
-    BombType.REMOTE: (-1.0, ExplosionType.MEDIUM),
+    BombType.SMALL_REMOTE: (-1.0, ExplosionType.MEDIUM),
+    BombType.BIG_REMOTE: (-1.0, ExplosionType.LARGE),
     BombType.URETHANE: (4.0, ExplosionType.NONE),  # Flood fills with urethane tiles
     BombType.SMALL_CROSS_BOMB: (3.0, ExplosionType.SMALL_CROSS),
     BombType.BIG_CROSS_BOMB: (4.0, ExplosionType.BIG_CROSS),
@@ -47,6 +53,10 @@ BOMB_PROPERTIES = {
     BombType.FLAME_BARREL: (3.0, ExplosionType.NONE),  # Flood fills and damages tiles
     BombType.CRACKER_BARREL: (-1.0, ExplosionType.NONE),  # Triggered by damage, not timed
     BombType.DIGGER_BOMB: (3.0, ExplosionType.LARGE),  # Only damages bedrock tiles
+    BombType.BIOSLIME: (0.3, ExplosionType.NONE),  # Places bioslime tile at bomb location
+    BombType.METAL_PLATE: (0.3, ExplosionType.NONE),  # Places concrete tile at bomb location
+    BombType.FLAMETHROWER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant 90-degree cone flame
+    BombType.FIRE_EXTINGUISHER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant cone that defuses bombs
 }
 
 # Available bomb types in default order (excludes internal types like C4_TILE, GRASSHOPPER_HOP)
@@ -56,7 +66,8 @@ BOMB_TYPES = [
     BombType.DYNAMITE,
     BombType.C4,
     BombType.LANDMINE,
-    BombType.REMOTE,
+    BombType.SMALL_REMOTE,
+    BombType.BIG_REMOTE,
     BombType.URETHANE,
     BombType.SMALL_CROSS_BOMB,
     BombType.BIG_CROSS_BOMB,
@@ -65,6 +76,10 @@ BOMB_TYPES = [
     BombType.FLAME_BARREL,
     BombType.CRACKER_BARREL,
     BombType.DIGGER_BOMB,
+    BombType.BIOSLIME,
+    BombType.METAL_PLATE,
+    BombType.FLAMETHROWER,
+    BombType.FIRE_EXTINGUISHER,
 ]
 
 # Display names for bomb types
@@ -74,7 +89,8 @@ BOMB_TYPE_NAMES = {
     BombType.DYNAMITE: "Dynamite",
     BombType.C4: "C4",
     BombType.LANDMINE: "Landmine",
-    BombType.REMOTE: "Remote",
+    BombType.SMALL_REMOTE: "Small Remote",
+    BombType.BIG_REMOTE: "Big Remote",
     BombType.URETHANE: "Urethane",
     BombType.SMALL_CROSS_BOMB: "Small Cross",
     BombType.BIG_CROSS_BOMB: "Big Cross",
@@ -83,6 +99,10 @@ BOMB_TYPE_NAMES = {
     BombType.FLAME_BARREL: "Flame Barrel",
     BombType.CRACKER_BARREL: "Cracker Barrel",
     BombType.DIGGER_BOMB: "Digger Bomb",
+    BombType.BIOSLIME: "Bio Slime",
+    BombType.METAL_PLATE: "Metal Plate",
+    BombType.FLAMETHROWER: "Flamethrower",
+    BombType.FIRE_EXTINGUISHER: "Fire Extinguisher",
 }
 
 # Mapping from BombType to icon sprite name (without _icon suffix)
@@ -92,7 +112,8 @@ BOMB_TYPE_TO_ICON = {
     BombType.DYNAMITE: "dynamite",
     BombType.C4: "c4",
     BombType.LANDMINE: "landmine",
-    BombType.REMOTE: "small_remote",
+    BombType.SMALL_REMOTE: "small_remote",
+    BombType.BIG_REMOTE: "big_remote",
     BombType.URETHANE: "urethane",
     BombType.SMALL_CROSS_BOMB: "small_crucifix",
     BombType.BIG_CROSS_BOMB: "big_crucifix",
@@ -101,6 +122,10 @@ BOMB_TYPE_TO_ICON = {
     BombType.FLAME_BARREL: "flame_barrel",
     BombType.CRACKER_BARREL: "cracker_barrel",
     BombType.DIGGER_BOMB: "digger_bomb",
+    BombType.BIOSLIME: "bioslime",
+    BombType.METAL_PLATE: "metal_plate",
+    BombType.FLAMETHROWER: "flamethrower",
+    BombType.FIRE_EXTINGUISHER: "fire_extinguisher",
 }
 
 # Reverse lookup: bomb type name -> BombType
@@ -113,8 +138,9 @@ DEFAULT_HOTKEYS = {
     BombType.DYNAMITE: "3",
     BombType.C4: "4",
     BombType.LANDMINE: "5",
-    BombType.REMOTE: "6",
-    BombType.URETHANE: "7",
+    BombType.SMALL_REMOTE: "6",
+    BombType.BIG_REMOTE: "7",
+    BombType.URETHANE: "u",
     BombType.SMALL_CROSS_BOMB: "8",
     BombType.BIG_CROSS_BOMB: "9",
     BombType.NUKE: "0",
@@ -122,6 +148,10 @@ DEFAULT_HOTKEYS = {
     BombType.FLAME_BARREL: "w",
     BombType.CRACKER_BARREL: "e",
     BombType.DIGGER_BOMB: "r",
+    BombType.BIOSLIME: "t",
+    BombType.METAL_PLATE: "y",
+    BombType.FLAMETHROWER: "i",
+    BombType.FIRE_EXTINGUISHER: "o",
 }
 
 # Hotkey assignment order for new items (1234567890, qwertyuiop, asdfghjkl, zxcvbnm)
@@ -160,4 +190,15 @@ CRACKER_BARREL_CONFIG = {
     'scatter_explosions': 7,           # Number of random medium explosions
     'scatter_distance': 9,             # Max distance for scatter explosions
     'scatter_interval': 1.0 / 60.0,    # Time between scatter explosions (1/60 second)
+}
+
+# Flamethrower configuration
+FLAMETHROWER_CONFIG = {
+    'max_distance': 10,                # Maximum flame propagation distance
+    'damage': 35,                      # Damage applied to tiles in cone
+}
+
+# Fire extinguisher configuration
+FIRE_EXTINGUISHER_CONFIG = {
+    'max_distance': 10,                # Maximum propagation distance
 }

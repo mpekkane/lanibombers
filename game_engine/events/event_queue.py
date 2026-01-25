@@ -2,6 +2,7 @@ import heapq
 from typing import Optional, List
 from uuid import UUID
 
+from game_engine.clock import Clock
 from game_engine.events.event import Event
 
 
@@ -47,6 +48,58 @@ class EventQueue:
                 if not event_type or event_type == event.event_type:
                     found.append(event)
         return found
+
+    def get_events_by_target(self, target, event_type: str = "") -> List[Event]:
+        """Find events by their target object."""
+        found: List[Event] = []
+        for event in self._events:
+            if event.id not in self._event_map:
+                continue  # Skip cancelled events
+            if event.target is target:
+                if not event_type or event_type == event.event_type:
+                    found.append(event)
+        return found
+
+    def reschedule_events_by_target(self, target, event_type: str, relative_time: float) -> int:
+        """
+        Reschedule all events for a target to trigger at current_time + relative_time.
+        If no existing event is found, schedules a new one.
+
+        Args:
+            target: The target object to find events for
+            event_type: The event type to match (e.g., "explode")
+            relative_time: Time from now when the event should trigger
+
+        Returns:
+            Number of events rescheduled or created
+        """
+        events = self.get_events_by_target(target, event_type)
+        new_trigger_time = Clock.now() + relative_time
+
+        if events:
+            # Reschedule existing events
+            for event in events:
+                # Cancel old event
+                self.cancel_event(event.id)
+                # Create new event with updated trigger time
+                new_event = Event(
+                    trigger_at=new_trigger_time,
+                    target=event.target,
+                    event_type=event.event_type,
+                    created_at=event.created_at,
+                    created_by=event.created_by,
+                )
+                self.add_event(new_event)
+            return len(events)
+        else:
+            # No existing event, schedule a new one
+            new_event = Event(
+                trigger_at=new_trigger_time,
+                target=target,
+                event_type=event_type,
+            )
+            self.add_event(new_event)
+            return 1
 
     def cancel_object_events(self, creator: UUID, event_type: str = "") -> None:
         for event in self._events:

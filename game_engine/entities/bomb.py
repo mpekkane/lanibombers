@@ -1,10 +1,13 @@
 from dataclasses import dataclass, field
 from uuid import UUID
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from game_engine.clock import Clock
 from game_engine.entities.game_object import GameObject
 from game_engine.entities.explosion import ExplosionType
 from cfg.bomb_dictionary import BombType, BOMB_PROPERTIES
+
+if TYPE_CHECKING:
+    from game_engine.entities.dynamic_entity import Direction
 
 
 @dataclass(kw_only=True)
@@ -17,10 +20,11 @@ class Bomb(GameObject):
     placed_at: float
     owner_id: UUID
 
-    # Optional override fields (used by grasshopper hops)
+    # Optional override fields (used by grasshopper hops, flamethrower direction)
     fuse_override: Optional[float] = None
     explosion_override: Optional[ExplosionType] = None
     hop_count: int = 0  # For grasshopper bombs: tracks explosion count
+    direction: Optional["Direction"] = None  # For directed explosions like flamethrower
 
     # Auto-set fields based on bomb_type
     fuse_duration: float = field(default=0.0, init=False)
