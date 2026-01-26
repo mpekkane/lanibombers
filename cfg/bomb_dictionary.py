@@ -29,9 +29,11 @@ class BombType(Enum):
     METAL_PLATE = "metal_plate"
     FLAMETHROWER = "flamethrower"
     FIRE_EXTINGUISHER = "fire_extinguisher"
+    CLONE = "clone"
+    TELEPORT = "teleport"
 
     def is_timed(self) -> bool:
-        return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER)
+        return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER, BombType.CLONE)
 
 
 # Bomb properties by type: (fuse_duration, explosion_type)
@@ -57,6 +59,8 @@ BOMB_PROPERTIES = {
     BombType.METAL_PLATE: (0.3, ExplosionType.NONE),  # Places concrete tile at bomb location
     BombType.FLAMETHROWER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant 90-degree cone flame
     BombType.FIRE_EXTINGUISHER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant cone that defuses bombs
+    BombType.CLONE: (-1.0, ExplosionType.NONE),  # Instant: spawns a decoy entity
+    BombType.TELEPORT: (0.3, ExplosionType.NONE),  # Places a tunnel tile at bomb location
 }
 
 # Available bomb types in default order (excludes internal types like C4_TILE, GRASSHOPPER_HOP)
@@ -80,6 +84,8 @@ BOMB_TYPES = [
     BombType.METAL_PLATE,
     BombType.FLAMETHROWER,
     BombType.FIRE_EXTINGUISHER,
+    BombType.CLONE,
+    BombType.TELEPORT,
 ]
 
 # Display names for bomb types
@@ -103,6 +109,8 @@ BOMB_TYPE_NAMES = {
     BombType.METAL_PLATE: "Metal Plate",
     BombType.FLAMETHROWER: "Flamethrower",
     BombType.FIRE_EXTINGUISHER: "Fire Extinguisher",
+    BombType.CLONE: "Clone",
+    BombType.TELEPORT: "Teleport",
 }
 
 # Mapping from BombType to icon sprite name (without _icon suffix)
@@ -126,6 +134,8 @@ BOMB_TYPE_TO_ICON = {
     BombType.METAL_PLATE: "metal_plate",
     BombType.FLAMETHROWER: "flamethrower",
     BombType.FIRE_EXTINGUISHER: "fire_extinguisher",
+    BombType.CLONE: "clone",
+    BombType.TELEPORT: "teleport",
 }
 
 # Reverse lookup: bomb type name -> BombType
@@ -152,6 +162,8 @@ DEFAULT_HOTKEYS = {
     BombType.METAL_PLATE: "y",
     BombType.FLAMETHROWER: "i",
     BombType.FIRE_EXTINGUISHER: "o",
+    BombType.CLONE: "p",
+    BombType.TELEPORT: "a",
 }
 
 # Hotkey assignment order for new items (1234567890, qwertyuiop, asdfghjkl, zxcvbnm)
@@ -202,3 +214,4 @@ FLAMETHROWER_CONFIG = {
 FIRE_EXTINGUISHER_CONFIG = {
     'max_distance': 10,                # Maximum propagation distance
 }
+

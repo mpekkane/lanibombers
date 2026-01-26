@@ -215,6 +215,14 @@ class GameEngine:
                 event_type="explode",
             )
             self.event_resolver.schedule_event(explosion_event)
+        elif bomb.bomb_type == BombType.CLONE:
+            # Clone fires immediately
+            explosion_event = Event(
+                trigger_at=Clock.now(),
+                target=bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
 
     def detonate_remotes(self, player: Player) -> None:
         for bomb in self.bombs:
@@ -456,6 +464,16 @@ class GameEngine:
             self._resolve_fire_extinguisher(target)
             return
 
+        # CLONE spawns a decoy entity
+        if target.bomb_type == BombType.CLONE:
+            self._resolve_clone(target)
+            return
+
+        # TELEPORT places a tunnel tile at bomb location
+        if target.bomb_type == BombType.TELEPORT:
+            self._resolve_teleport(target)
+            return
+
         # Grasshopper bombs have special spawning behavior after explosion
         is_grasshopper = target.bomb_type in (BombType.GRASSHOPPER, BombType.GRASSHOPPER_HOP)
 
@@ -657,6 +675,29 @@ class GameEngine:
                 self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay)
 
         # Remove fire extinguisher from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_clone(self, bomb: Bomb) -> None:
+        """Resolve CLONE bomb - spawns a decoy entity."""
+        # TODO: Implement decoy entity spawning
+        pass
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def _resolve_teleport(self, bomb: Bomb) -> None:
+        """Resolve TELEPORT bomb - places a tunnel tile at bomb location."""
+        tile = self.get_tile(bomb.x, bomb.y)
+        if tile and tile.tile_type == TileType.EMPTY:
+            self.set_tile(bomb.x, bomb.y, Tile.create_tunnel())
+            # Add to teleport list
+            self.teleports.append((bomb.x, bomb.y))
+
+        self.sounds.urethane()  # Use urethane sound for now
+
+        # Remove bomb from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
