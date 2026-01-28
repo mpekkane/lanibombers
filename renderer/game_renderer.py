@@ -173,6 +173,12 @@ class GameRenderer(arcade.Window):
                     texture = arcade.load_texture(path)
                     self.monster_textures[(entity_type, direction, frame)] = texture
 
+        # Load grenade projectile texture (single static sprite for all directions/frames)
+        grenade_texture = arcade.load_texture(os.path.join(SPRITES_PATH, "grenade.png"))
+        for direction in Direction:
+            for frame in range(1, 5):
+                self.monster_textures[(EntityType.GRENADE, direction, frame)] = grenade_texture
+
         # Load player card textures: sprite_id (1-4) -> texture
         self.player_card_textures = {}
         for sprite_id in range(1, 5):
@@ -602,8 +608,32 @@ class GameRenderer(arcade.Window):
                 explosion_type = state.explosions[y, x]
                 self.explosion_sprite_list[i].update_from_type(explosion_type)
 
-        # Update monsters
+        # Update monsters (dynamic list)
+        monster_count = len(state.monsters)
+
+        # Add new sprites if needed
+        while len(self.monster_sprites) < monster_count:
+            # Use a default entity type, will be updated from entity
+            sprite = MonsterSprite(
+                entity_type=EntityType.SLIME,  # Default, will be overwritten
+                monster_textures=self.monster_textures,
+                transparent_texture=self.transparent_texture,
+                blood_green_texture=self.blood_green_texture,
+                zoom=self.zoom,
+                screen_height=self.height,
+                y_offset=self.ui_offset,
+            )
+            self.monster_sprites.append(sprite)
+            self.monster_sprite_list.append(sprite)
+
+        # Remove excess sprites if needed
+        while len(self.monster_sprites) > monster_count:
+            sprite = self.monster_sprites.pop()
+            self.monster_sprite_list.remove(sprite)
+
+        # Update existing sprites
         for i, monster in enumerate(state.monsters):
+            self.monster_sprites[i].entity_type = monster.entity_type
             self.monster_sprites[i].update_from_entity(monster, delta_time)
 
         # Update players

@@ -17,6 +17,7 @@ class EntityType(Enum):
     SLIME = "slime"
     ALIEN = "alien"
     GRENADEMONSTER = "grenademonster"
+    GRENADE = "grenade"
 
 
 MONSTER_DAMAGE = {
@@ -70,3 +71,19 @@ class DynamicEntity(GameObject):
 
     def push_power(self) -> float:
         return 0.25
+
+    @staticmethod
+    def create_grenade(
+        x: float, y: float, direction: Direction, owner_id, speed: float
+    ) -> DynamicEntity:
+        """Create a grenade projectile entity."""
+        entity = DynamicEntity(
+            x=x,
+            y=y,
+            direction=direction,
+            entity_type=EntityType.GRENADE,
+            state="walk",
+            speed=speed,
+        )
+        entity.owner_id = owner_id
+        return entity

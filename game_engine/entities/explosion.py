@@ -26,7 +26,7 @@ def _create_cross_pattern(diameter: int) -> np.ndarray:
 
 
 # Explosion shape lookup tables
-EXPLOSION_SMALL = _create_circular_pattern(3)    # 3x3
+EXPLOSION_SMALL = _create_circular_pattern(2.5)    # 3x3
 EXPLOSION_MEDIUM = _create_circular_pattern(4.4) # 5 wide middle row, rest smaller
 EXPLOSION_LARGE = _create_circular_pattern(7)     # 7x7
 EXPLOSION_NUKE = _create_circular_pattern(24.04)  # 25x25 cross

@@ -43,6 +43,7 @@ from cfg.tile_dictionary import (
     SECURITY_DOOR_TILES,
     TUNNEL_TILES,
     C4_TILES,
+    INDESTRUCTIBLE_TILE_TYPES,
 )
 
 
@@ -272,6 +273,10 @@ class Tile(GameObject):
         self, amount: int, damage_type: Optional["ExplosionType"] = None
     ) -> None:
         """Take damage and update visual for bedrock tiles based on health."""
+        # Some tiles are indestructible
+        if self.tile_type.value in INDESTRUCTIBLE_TILE_TYPES:
+            return
+
         damage = int(amount)
 
         # Dirt takes double damage from small, medium, and large explosions

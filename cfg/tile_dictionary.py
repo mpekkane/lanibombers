@@ -107,6 +107,9 @@ SECURITY_DOOR_TILES = {108}
 TUNNEL_TILES = {156}
 C4_TILES = {157}
 
+# Indestructible tile types (by TileType enum value strings)
+INDESTRUCTIBLE_TILE_TYPES = {'tunnel', 'concrete', 'switch', 'security_door'}
+
 # Get tile IDs from the dictionary
 EMPTY_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'empty')
 ROCK1_TILE_ID = next(tile_id for tile_id, name in TILE_DICTIONARY.items() if name == 'rock1')

@@ -35,6 +35,7 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.FIRE_EXTINGUISHER, 30))
         self.inventory.append((BombType.CLONE, 10))
         self.inventory.append((BombType.TELEPORT, 10))
+        self.inventory.append((BombType.GRENADE, 15))
 
     def choose(self) -> None:
         if not self.inventory:

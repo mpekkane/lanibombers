@@ -31,9 +31,10 @@ class BombType(Enum):
     FIRE_EXTINGUISHER = "fire_extinguisher"
     CLONE = "clone"
     TELEPORT = "teleport"
+    GRENADE = "grenade"
 
     def is_timed(self) -> bool:
-        return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER, BombType.CLONE)
+        return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER, BombType.CLONE, BombType.GRENADE)
 
 
 # Bomb properties by type: (fuse_duration, explosion_type)
@@ -61,6 +62,7 @@ BOMB_PROPERTIES = {
     BombType.FIRE_EXTINGUISHER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant cone that defuses bombs
     BombType.CLONE: (-1.0, ExplosionType.NONE),  # Instant: spawns a decoy entity
     BombType.TELEPORT: (0.3, ExplosionType.NONE),  # Places a tunnel tile at bomb location
+    BombType.GRENADE: (-1.0, ExplosionType.NONE),  # Thrown projectile, resolved instantly
 }
 
 # Available bomb types in default order (excludes internal types like C4_TILE, GRASSHOPPER_HOP)
@@ -86,6 +88,7 @@ BOMB_TYPES = [
     BombType.FIRE_EXTINGUISHER,
     BombType.CLONE,
     BombType.TELEPORT,
+    BombType.GRENADE,
 ]
 
 # Display names for bomb types
@@ -111,6 +114,7 @@ BOMB_TYPE_NAMES = {
     BombType.FIRE_EXTINGUISHER: "Fire Extinguisher",
     BombType.CLONE: "Clone",
     BombType.TELEPORT: "Teleport",
+    BombType.GRENADE: "Grenade",
 }
 
 # Mapping from BombType to icon sprite name (without _icon suffix)
@@ -136,6 +140,7 @@ BOMB_TYPE_TO_ICON = {
     BombType.FIRE_EXTINGUISHER: "fire_extinguisher",
     BombType.CLONE: "clone",
     BombType.TELEPORT: "teleport",
+    BombType.GRENADE: "grenade",
 }
 
 # Reverse lookup: bomb type name -> BombType
@@ -164,6 +169,7 @@ DEFAULT_HOTKEYS = {
     BombType.FIRE_EXTINGUISHER: "o",
     BombType.CLONE: "p",
     BombType.TELEPORT: "a",
+    BombType.GRENADE: "s",
 }
 
 # Hotkey assignment order for new items (1234567890, qwertyuiop, asdfghjkl, zxcvbnm)
@@ -213,5 +219,10 @@ FLAMETHROWER_CONFIG = {
 # Fire extinguisher configuration
 FIRE_EXTINGUISHER_CONFIG = {
     'max_distance': 10,                # Maximum propagation distance
+}
+
+# Grenade configuration
+GRENADE_CONFIG = {
+    'speed': 4.0,                      # Projectile travel speed
 }
 

@@ -7,7 +7,7 @@ from enum import Enum
 from copy import deepcopy
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
 from game_engine.engine_utils import flood_fill, get_solid_map
 from cfg.tile_dictionary import (
     C4_TILE_ID,
@@ -18,7 +18,7 @@ from cfg.tile_dictionary import (
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
-from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG, FLAMETHROWER_CONFIG, FIRE_EXTINGUISHER_CONFIG
+from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG, FLAMETHROWER_CONFIG, FIRE_EXTINGUISHER_CONFIG, GRENADE_CONFIG
 from game_engine.entities.explosion import (
     ExplosionType,
     SmallExplosion,
@@ -223,6 +223,14 @@ class GameEngine:
                 event_type="explode",
             )
             self.event_resolver.schedule_event(explosion_event)
+        elif bomb.bomb_type == BombType.GRENADE:
+            # Grenade fires immediately
+            explosion_event = Event(
+                trigger_at=Clock.now(),
+                target=bomb,
+                event_type="explode",
+            )
+            self.event_resolver.schedule_event(explosion_event)
 
     def detonate_remotes(self, player: Player) -> None:
         for bomb in self.bombs:
@@ -412,6 +420,8 @@ class GameEngine:
             self.resolve_push(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
+        elif isinstance(target, DynamicEntity) and target.entity_type == EntityType.GRENADE and event.event_type == "move":
+            self.resolve_grenade_movement(target, event, flags)
 
         # send renderstate
         if self.state_callback:
@@ -472,6 +482,11 @@ class GameEngine:
         # TELEPORT places a tunnel tile at bomb location
         if target.bomb_type == BombType.TELEPORT:
             self._resolve_teleport(target)
+            return
+
+        # GRENADE is a thrown projectile
+        if target.bomb_type == BombType.GRENADE:
+            self._resolve_grenade(target)
             return
 
         # Grasshopper bombs have special spawning behavior after explosion
@@ -700,6 +715,118 @@ class GameEngine:
         # Remove bomb from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)
+
+    def _resolve_grenade(self, bomb: Bomb) -> None:
+        """Resolve GRENADE - create a grenade projectile entity."""
+        cfg = GRENADE_CONFIG
+        direction = bomb.direction if bomb.direction else Direction.DOWN
+
+        # Create grenade entity at bomb position
+        grenade = DynamicEntity.create_grenade(
+            x=bomb.x + 0.5,  # Center in tile
+            y=bomb.y + 0.5,
+            direction=direction,
+            owner_id=bomb.owner_id,
+            speed=cfg['speed'],
+        )
+
+        # Add grenade to monsters list (for rendering and movement)
+        self.monsters.append(grenade)
+
+        # Start the grenade moving
+        self.move_entity(grenade)
+
+        # Remove bomb from list
+        if bomb in self.bombs:
+            self.bombs.remove(bomb)
+
+    def resolve_grenade_movement(self, grenade: DynamicEntity, event: MoveEvent, flags: ResolveFlags) -> None:
+        """Resolve grenade movement - moves until hitting wall or player."""
+        # Calculate actual distance based on elapsed time
+        current_time = Clock.now()
+        dt = current_time - event.created_at
+        d = dt * grenade.speed
+
+        # Move in stored direction
+        dir = Direction(event.direction)
+        if dir == Direction.RIGHT:
+            grenade.x += d
+        elif dir == Direction.LEFT:
+            grenade.x -= d
+        elif dir == Direction.UP:
+            grenade.y -= d
+        elif dir == Direction.DOWN:
+            grenade.y += d
+
+        self.round_position(grenade)
+
+        # Get current and next tile positions
+        gx, gy = xy_to_tile(grenade.x, grenade.y)
+
+        # Check for teleport at current position
+        current_tile = self.get_tile(gx, gy)
+        if current_tile and current_tile.is_teleport():
+            # Find available teleports (excluding current)
+            available = [(tx, ty) for tx, ty in self.teleports if tx != gx or ty != gy]
+            if available:
+                dest = random.choice(available)
+                grenade.x = dest[0] + 0.5
+                grenade.y = dest[1] + 0.5
+                gx, gy = dest[0], dest[1]
+
+        # Calculate next tile based on direction
+        nx, ny = gx, gy
+        if dir == Direction.RIGHT:
+            nx += 1
+        elif dir == Direction.LEFT:
+            nx -= 1
+        elif dir == Direction.UP:
+            ny -= 1
+        elif dir == Direction.DOWN:
+            ny += 1
+
+        # Check for player in next tile
+        for player in self.players:
+            px, py = xy_to_tile(player.x, player.y)
+            if px == nx and py == ny and player.state != "dead":
+                # Explode in the tile with the player
+                self._explode_grenade(grenade, nx, ny)
+                return
+
+        # Check if next tile is solid
+        next_tile = self.get_tile(nx, ny)
+        if next_tile and next_tile.solid:
+            # Explode in current (non-solid) tile
+            self._explode_grenade(grenade, gx, gy)
+            return
+
+        # Continue moving
+        if flags.spawn:
+            self.move_entity(grenade)
+
+    def _explode_grenade(self, grenade: DynamicEntity, x: int, y: int) -> None:
+        """Trigger a small explosion at the given position and remove grenade."""
+        # Create a small bomb at explosion location
+        explosion_bomb = Bomb(
+            x=x,
+            y=y,
+            bomb_type=BombType.SMALL_BOMB,
+            placed_at=Clock.now(),
+            owner_id=grenade.owner_id,
+            fuse_override=0.0,  # Instant
+        )
+
+        # Schedule immediate explosion
+        explosion_event = Event(
+            trigger_at=Clock.now(),
+            target=explosion_bomb,
+            event_type="explode",
+        )
+        self.event_resolver.schedule_event(explosion_event)
+
+        # Remove grenade from monsters list
+        if grenade in self.monsters:
+            self.monsters.remove(grenade)
 
     def _resolve_flame_barrel(self, bomb: Bomb) -> None:
         """Resolve FLAME_BARREL bomb - flood fill and damage all non-solid tiles in range."""
