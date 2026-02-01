@@ -8,7 +8,7 @@ SPRITE_SIZE = 10
 class MonsterSprite(arcade.Sprite):
     """Extended sprite class for monster entities with animation support"""
 
-    def __init__(self, entity_type: EntityType, monster_textures: dict, transparent_texture, blood_green_texture, zoom: float, screen_height: int, y_offset: float = 0):
+    def __init__(self, entity_type: EntityType, monster_textures: dict, transparent_texture, blood_green_texture, zoom: float, screen_height: int, y_offset: float = 0, map_height: int = 45):
         super().__init__()
         self.entity_type = entity_type
         self.monster_textures = monster_textures
@@ -17,6 +17,7 @@ class MonsterSprite(arcade.Sprite):
         self.zoom = zoom
         self.screen_height = screen_height
         self.y_offset = y_offset
+        self.map_height = map_height
 
         # Animation state - ping-pong pattern: 1,2,3,4,3,2,1,2,3,4...
         self.frame_sequence = [1, 2, 3, 4, 3, 2]
@@ -33,9 +34,9 @@ class MonsterSprite(arcade.Sprite):
 
     def update_from_entity(self, monster: DynamicEntity, delta_time: float):
         """Update sprite position, texture and animation from monster entity data"""
-        # Update position (rounded to pixel grid before zoom)
-        self.center_x = round((monster.x) * SPRITE_SIZE) * self.zoom
-        self.center_y = self.screen_height - self.y_offset - round((monster.y) * SPRITE_SIZE) * self.zoom
+        # Position in world coordinates (Y=0 at bottom in world space)
+        self.center_x = round(monster.x * SPRITE_SIZE) * self.zoom
+        self.center_y = (self.map_height - monster.y) * SPRITE_SIZE * self.zoom
 
         # Handle dead state
         if monster.state == 'dead':

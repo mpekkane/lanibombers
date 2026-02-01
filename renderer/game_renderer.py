@@ -4,6 +4,7 @@ Main graphics processing and display loop.
 """
 
 import os
+import time
 import arcade
 import numpy as np
 
@@ -43,6 +44,10 @@ SPRITE_SIZE = 10
 SPRITE_CENTER_OFFSET = SPRITE_SIZE // 2
 UI_TOP_MARGIN = 30  # Pixels of free space at top for UI (before zoom)
 
+# Viewport constants
+VIEWPORT_WIDTH = 64   # Visible tiles horizontally
+VIEWPORT_HEIGHT = 45  # Visible tiles vertically
+
 # Size of performance graphs and distance between them
 GRAPH_WIDTH = 200
 GRAPH_HEIGHT = 120
@@ -73,10 +78,14 @@ VERTICAL_TRANSITION_TEXTURES = {
 class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
-    def __init__(self, server, width=1708, height=960, client_player_name: str = "", show_stats: bool = False):
+    def __init__(self, server, width=1708, height=960, client_player_name: str = "", show_stats: bool = True):
         super().__init__(width, height, "lanibombers", vsync=VSYNC)
         self.client_player_name = client_player_name
         self.show_stats = show_stats
+
+        # Enable performance timings early if stats are requested
+        if show_stats:
+            arcade.enable_timings()
         EMPTY_TILE_IDS = {
             tile_id
             for tile_id, name in TILE_DICTIONARY.items()
@@ -256,85 +265,100 @@ class GameRenderer(arcade.Window):
                 tile_id, self.textures[sprite_name]
             )
 
-        # Background tile sprite pool
-        self.background_tile_sprite_list = arcade.SpriteList()
-        self.background_tile_sprite_list.initialize()
-        self.background_tile_sprite_list.preload_textures(self.textures.values())
+        # Get initial render state for map dimensions
         state = server.get_render_state()
-        max_sprites = state.width * state.height
-        self.sprites = [arcade.Sprite() for _ in range(max_sprites)]
+        self.map_width = state.width
+        self.map_height = state.height
 
         # Calculate y offset for UI space at top
         self.ui_offset = UI_TOP_MARGIN * self.zoom
-        ui_offset = self.ui_offset
 
-        sprite_idx = 0
-        for y in range(state.height):
-            SPRITE_CENTER_Y = (
-                self.height - ui_offset - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-            )
-            for x in range(state.width):
-                sprite = self.sprites[sprite_idx]
-                sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-                sprite.center_y = SPRITE_CENTER_Y
-                sprite.scale = self.zoom
-                sprite_idx += 1
-
-        self.background_tile_sprite_list.extend(
-            self.sprites[: state.height * state.width]
+        # Create camera for scrolling (will be positioned in on_update)
+        # Camera uses world coordinates where Y=0 is at bottom
+        # Viewport limits render area to 64x45 tiles, positioned at bottom-left of window
+        self.viewport_pixels_x = VIEWPORT_WIDTH * SPRITE_SIZE * self.zoom
+        self.viewport_pixels_y = VIEWPORT_HEIGHT * SPRITE_SIZE * self.zoom
+        self.game_camera = arcade.Camera2D(
+            viewport=arcade.LBWH(0, 0, int(self.viewport_pixels_x), int(self.viewport_pixels_y)),
+        )
+        # Match projection size to viewport so 1 world pixel = 1 screen pixel
+        self.game_camera.projection = arcade.LRBT(
+            -self.viewport_pixels_x / 2, self.viewport_pixels_x / 2,
+            -self.viewport_pixels_y / 2, self.viewport_pixels_y / 2
         )
 
-        # Horizontal transition sprite pool (between columns)
+        # Background tile sprites - one per map tile at world positions
+        self.background_tile_sprite_list = arcade.SpriteList()
+        self.background_tile_sprite_list.initialize()
+        self.background_tile_sprite_list.preload_textures(self.textures.values())
+        tile_sprite_count = state.width * state.height
+        self.sprites = [arcade.Sprite() for _ in range(tile_sprite_count)]
+
+        # Position sprites at world coordinates (Y increases upward in world space)
+        sprite_idx = 0
+        for y in range(state.height):
+            # World Y: row 0 at bottom, row (height-1) at top
+            world_y = (state.height - 1 - y) * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
+            for x in range(state.width):
+                world_x = x * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
+                sprite = self.sprites[sprite_idx]
+                sprite.center_x = world_x
+                sprite.center_y = world_y
+                sprite.scale = self.zoom
+                sprite.texture = self.transparent_texture
+                sprite_idx += 1
+
+        self.background_tile_sprite_list.extend(self.sprites)
+
+        # Horizontal transition sprites - between columns
+        h_transition_count = state.width * state.height
         self.horizontal_transition_sprite_list = arcade.SpriteList()
         self.horizontal_transition_sprite_list.initialize()
         self.horizontal_transition_sprite_list.preload_textures(
             self.horizontal_transition_textures.values()
         )
         self.horizontal_transition_sprites = [
-            arcade.Sprite() for _ in range(max_sprites)
+            arcade.Sprite() for _ in range(h_transition_count)
         ]
 
         sprite_idx = 0
         for y in range(state.height):
-            center_y = (
-                self.height - ui_offset - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-            )
+            world_y = (state.height - 1 - y) * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
             for x in range(state.width):
                 sprite = self.horizontal_transition_sprites[sprite_idx]
-                # Position at midpoint between tile x and tile x+1 (offset by 1)
-                sprite.center_x = (x + 1) * SPRITE_SIZE * self.zoom
-                sprite.center_y = center_y
+                # Position at midpoint between tile x and tile x+1
+                world_x = (x + 1) * SPRITE_SIZE * self.zoom
+                sprite.center_x = world_x
+                sprite.center_y = world_y
                 sprite.scale = self.zoom
                 sprite.texture = self.transparent_texture
                 sprite_idx += 1
 
-        self.horizontal_transition_sprite_list.extend(
-            self.horizontal_transition_sprites[:max_sprites]
-        )
+        self.horizontal_transition_sprite_list.extend(self.horizontal_transition_sprites)
 
-        # Vertical transition sprite pool (between rows)
+        # Vertical transition sprites - between rows
+        v_transition_count = state.width * state.height
         self.vertical_transition_sprite_list = arcade.SpriteList()
         self.vertical_transition_sprite_list.initialize()
         self.vertical_transition_sprite_list.preload_textures(
             self.vertical_transition_textures.values()
         )
-        self.vertical_transition_sprites = [arcade.Sprite() for _ in range(max_sprites)]
+        self.vertical_transition_sprites = [arcade.Sprite() for _ in range(v_transition_count)]
 
         sprite_idx = 0
         for y in range(state.height):
-            # Position at boundary between row y and row y+1 (offset by 1)
-            center_y = self.height - ui_offset - (y + 1) * SPRITE_SIZE * self.zoom
+            # Position at boundary between row y and row y+1
+            world_y = (state.height - 1 - y - 1) * SPRITE_SIZE * self.zoom + SPRITE_SIZE * self.zoom
             for x in range(state.width):
                 sprite = self.vertical_transition_sprites[sprite_idx]
-                sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-                sprite.center_y = center_y
+                world_x = x * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
+                sprite.center_x = world_x
+                sprite.center_y = world_y
                 sprite.scale = self.zoom
                 sprite.texture = self.transparent_texture
                 sprite_idx += 1
 
-        self.vertical_transition_sprite_list.extend(
-            self.vertical_transition_sprites[:max_sprites]
-        )
+        self.vertical_transition_sprite_list.extend(self.vertical_transition_sprites)
 
         # Player sprite pool
         self.player_sprite_list = arcade.SpriteList()
@@ -351,7 +375,7 @@ class GameRenderer(arcade.Window):
                 blood_texture=self.blood_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             self.player_sprites.append(sprite)
 
@@ -371,7 +395,7 @@ class GameRenderer(arcade.Window):
                 blood_green_texture=self.blood_green_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             self.monster_sprites.append(sprite)
 
@@ -398,7 +422,7 @@ class GameRenderer(arcade.Window):
                 transparent_texture=self.transparent_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             sprite.update_from_pickup(pickup)
             self.pickup_sprites.append(sprite)
@@ -421,7 +445,7 @@ class GameRenderer(arcade.Window):
                 transparent_texture=self.transparent_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             sprite.update_from_bomb(bomb)
             self.bomb_sprites.append(sprite)
@@ -436,28 +460,27 @@ class GameRenderer(arcade.Window):
             arcade.load_texture(os.path.join(SPRITES_PATH, "smoke2.png")),
         ]
 
-        # Explosion sprite list (static, one sprite per tile)
+        # Explosion sprite list - one per map tile at world positions
         self.explosion_sprite_list = arcade.SpriteList()
         self.explosion_sprite_list.initialize()
         self.explosion_sprite_list.preload_textures(self.explosion_frame_textures)
+        self.explosion_sprites = []
 
-        sprite_idx = 0
         for y in range(state.height):
-            center_y = (
-                self.height - ui_offset - (y * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-            )
+            world_y = (state.height - 1 - y) * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
             for x in range(state.width):
+                world_x = x * SPRITE_SIZE * self.zoom + SPRITE_CENTER_OFFSET * self.zoom
                 sprite = ExplosionSprite(
                     explosion_textures=self.explosion_frame_textures,
                     transparent_texture=self.transparent_texture,
                     zoom=self.zoom,
                     screen_height=self.height,
                 )
-                sprite.center_x = (x * SPRITE_SIZE + SPRITE_CENTER_OFFSET) * self.zoom
-                sprite.center_y = center_y
+                sprite.center_x = world_x
+                sprite.center_y = world_y
                 sprite.scale = self.zoom
                 sprite.texture = self.transparent_texture
-                sprite_idx += 1
+                self.explosion_sprites.append(sprite)
                 self.explosion_sprite_list.append(sprite)
 
         # Header UI sprite list
@@ -499,8 +522,6 @@ class GameRenderer(arcade.Window):
         # Performance graph (only if show_stats is enabled)
         self.perf_graph_list = arcade.SpriteList()
         if self.show_stats:
-            arcade.enable_timings()
-
             # Calculate position helpers for the row of 3 performance graphs
             row_y = self.height - GRAPH_HEIGHT / 2
             starting_x = GRAPH_WIDTH / 2
@@ -527,111 +548,137 @@ class GameRenderer(arcade.Window):
     def on_update(self, delta_time):
         """Poll server and update tilemap"""
         state = self.server.get_render_state()
+        current_time = time.perf_counter()  # Single timestamp for all updates
 
-        # Update background tiles
-        for y in range(state.height):
-            for x in range(state.width):
-                i = y * state.width + x
-                self.sprites[i].texture = self.tile_id_to_texture_dictionary[
+        # Calculate camera position based on client player
+        client_player = self.find_client_player(state.players)
+        cam_x, cam_y = self.calculate_camera_position(
+            client_player.x if client_player else 0,
+            client_player.y if client_player else 0,
+            state.width, state.height
+        )
+        # Set camera to show 64x45 tile viewport centered on player
+        self.game_camera.position = (cam_x, cam_y)
+
+        # Calculate visible tile range using viewport dimensions (64x45 tiles)
+        tile_size_px = SPRITE_SIZE * self.zoom
+        half_view_x = self.viewport_pixels_x / 2
+        half_view_y = self.viewport_pixels_y / 2
+
+        # Calculate view bounds in world pixels
+        view_left_px = cam_x - half_view_x
+        view_right_px = cam_x + half_view_x
+        view_bottom_world_y = cam_y - half_view_y
+        view_top_world_y = cam_y + half_view_y
+
+        # Convert to tile coordinates (game y=0 at top, world y=0 at bottom)
+        # Add buffer of 1 tile on each side for partially visible tiles
+        view_start_x = max(0, int(view_left_px / tile_size_px) - 1)
+        view_end_x = min(state.width, int(view_right_px / tile_size_px) + 2)
+
+        # World y to game y: game_y = map_height - (world_y / tile_size_px)
+        # Top of view (high world y) = low game y (top rows)
+        # Bottom of view (low world y) = high game y (bottom rows)
+        view_start_y = max(0, int(self.map_height - view_top_world_y / tile_size_px) - 1)
+        view_end_y = min(state.height, int(self.map_height - view_bottom_world_y / tile_size_px) + 2)
+
+        # Update only visible tile textures (no position updates needed - camera handles scrolling)
+        for y in range(view_start_y, view_end_y):
+            for x in range(view_start_x, view_end_x):
+                sprite_idx = y * state.width + x
+                self.sprites[sprite_idx].texture = self.tile_id_to_texture_dictionary[
                     state.tilemap[y, x]
                 ]
 
-        # Update horizontal transitions using sliding window view
-        h_pairs = np.lib.stride_tricks.sliding_window_view(state.tilemap, (1, 2))[:, :, 0, :]
-        h_indices = self.horizontal_transition_lookup[h_pairs[:, :, 0], h_pairs[:, :, 1]].ravel()
+        # Update visible horizontal transitions
+        for y in range(view_start_y, view_end_y):
+            for x in range(view_start_x, min(view_end_x, state.width - 1)):
+                sprite_idx = y * state.width + x
+                tile1 = state.tilemap[y, x]
+                tile2 = state.tilemap[y, x + 1]
+                transition_idx = self.horizontal_transition_lookup[tile1, tile2]
+                self.horizontal_transition_sprites[sprite_idx].texture = \
+                    self.horizontal_transition_textures_list[transition_idx]
 
-        for y in range(state.height):
-            for x in range(state.width - 1):
-                self.horizontal_transition_sprites[y * state.width + x].texture = \
-                    self.horizontal_transition_textures_list[h_indices[y * (state.width - 1) + x]]
-
-        # Update vertical transitions using sliding window view
-        v_pairs = np.lib.stride_tricks.sliding_window_view(state.tilemap, (2, 1))[:, :, :, 0]
-        v_indices = self.vertical_transition_lookup[v_pairs[:, :, 0], v_pairs[:, :, 1]].ravel()
-
-        for i, idx in enumerate(v_indices):
-            self.vertical_transition_sprites[i].texture = self.vertical_transition_textures_list[idx]
+        # Update visible vertical transitions
+        for y in range(view_start_y, min(view_end_y, state.height - 1)):
+            for x in range(view_start_x, view_end_x):
+                sprite_idx = y * state.width + x
+                tile1 = state.tilemap[y, x]
+                tile2 = state.tilemap[y + 1, x]
+                transition_idx = self.vertical_transition_lookup[tile1, tile2]
+                self.vertical_transition_sprites[sprite_idx].texture = \
+                    self.vertical_transition_textures_list[transition_idx]
 
         # Update pickups (dynamic list)
         pickup_count = len(state.pickups)
-        current_count = len(self.pickup_sprites)
 
-        # Add new sprites if needed
         while len(self.pickup_sprites) < pickup_count:
             sprite = PickupSprite(
                 pickup_textures=self.pickup_textures,
                 transparent_texture=self.transparent_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             self.pickup_sprites.append(sprite)
             self.pickup_sprite_list.append(sprite)
 
-        # Remove excess sprites if needed
         while len(self.pickup_sprites) > pickup_count:
             sprite = self.pickup_sprites.pop()
             self.pickup_sprite_list.remove(sprite)
 
-        # Update existing sprites
         for i, pickup in enumerate(state.pickups):
             self.pickup_sprites[i].update_from_pickup(pickup)
 
         # Update bombs (dynamic list)
         bomb_count = len(state.bombs)
 
-        # Add new sprites if needed
         while len(self.bomb_sprites) < bomb_count:
             sprite = BombSprite(
                 bomb_textures=self.bomb_textures,
                 transparent_texture=self.transparent_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             self.bomb_sprites.append(sprite)
             self.bomb_sprite_list.append(sprite)
 
-        # Remove excess sprites if needed
         while len(self.bomb_sprites) > bomb_count:
             sprite = self.bomb_sprites.pop()
             self.bomb_sprite_list.remove(sprite)
 
-        # Update existing sprites
         for i, bomb in enumerate(state.bombs):
-            self.bomb_sprites[i].update_from_bomb(bomb)
+            self.bomb_sprites[i].update_from_bomb(bomb, current_time)
 
-        # Update explosions (static list, texture based on 2D array)
-        for y in range(state.height):
-            for x in range(state.width):
-                i = y * state.width + x
+        # Update visible explosions
+        for y in range(view_start_y, view_end_y):
+            for x in range(view_start_x, view_end_x):
+                sprite_idx = y * state.width + x
                 explosion_type = state.explosions[y, x]
-                self.explosion_sprite_list[i].update_from_type(explosion_type)
+                self.explosion_sprites[sprite_idx].update_from_type(explosion_type, current_time)
 
         # Update monsters (dynamic list)
         monster_count = len(state.monsters)
 
-        # Add new sprites if needed
         while len(self.monster_sprites) < monster_count:
-            # Use a default entity type, will be updated from entity
             sprite = MonsterSprite(
-                entity_type=EntityType.SLIME,  # Default, will be overwritten
+                entity_type=EntityType.SLIME,
                 monster_textures=self.monster_textures,
                 transparent_texture=self.transparent_texture,
                 blood_green_texture=self.blood_green_texture,
                 zoom=self.zoom,
                 screen_height=self.height,
-                y_offset=self.ui_offset,
+                map_height=self.map_height,
             )
             self.monster_sprites.append(sprite)
             self.monster_sprite_list.append(sprite)
 
-        # Remove excess sprites if needed
         while len(self.monster_sprites) > monster_count:
             sprite = self.monster_sprites.pop()
             self.monster_sprite_list.remove(sprite)
 
-        # Update existing sprites
         for i, monster in enumerate(state.monsters):
             self.monster_sprites[i].entity_type = monster.entity_type
             self.monster_sprites[i].update_from_entity(monster, delta_time)
@@ -826,9 +873,67 @@ class GameRenderer(arcade.Window):
         self.bomb_textures[(BombType.GRASSHOPPER_HOP, "defused", 0)] = \
             self.bomb_textures[(BombType.GRASSHOPPER, "defused", 0)]
 
+    def find_client_player(self, players):
+        """Find the client's player by name.
+
+        Args:
+            players: List of player entities from render state
+
+        Returns:
+            The client's player entity, or None if not found
+        """
+        for player in players:
+            if player.name == self.client_player_name:
+                return player
+        return None
+
+    def calculate_camera_position(self, player_x: float, player_y: float,
+                                   map_width: int, map_height: int) -> tuple:
+        """Calculate camera position based on player and map size.
+
+        Args:
+            player_x: Player x position in tile coordinates
+            player_y: Player y position in tile coordinates
+            map_width: Map width in tiles
+            map_height: Map height in tiles
+
+        Returns:
+            (cam_x, cam_y) in world pixel coordinates
+        """
+        # Use viewport dimensions (64x45 tiles), not window dimensions
+        viewport_pixels_x = VIEWPORT_WIDTH * SPRITE_SIZE * self.zoom
+        viewport_pixels_y = VIEWPORT_HEIGHT * SPRITE_SIZE * self.zoom
+        half_view_x = viewport_pixels_x / 2
+        half_view_y = viewport_pixels_y / 2
+        map_pixels_x = map_width * SPRITE_SIZE * self.zoom
+        map_pixels_y = map_height * SPRITE_SIZE * self.zoom
+
+        # Small maps: position so map is at top-left of viewport
+        if map_pixels_x <= viewport_pixels_x and map_pixels_y <= viewport_pixels_y:
+            cam_x = half_view_x
+            cam_y = map_pixels_y - half_view_y
+            return (cam_x, cam_y)
+
+        # Large maps: center on player (in world pixel coords)
+        # Player position in world pixels (Y inverted: row 0 at top in game coords, at bottom in world)
+        player_world_x = player_x * SPRITE_SIZE * self.zoom
+        player_world_y = (map_height - player_y) * SPRITE_SIZE * self.zoom
+
+        cam_x = player_world_x
+        cam_y = player_world_y
+
+        # Clamp camera so we don't see beyond map edges
+        cam_x = max(half_view_x, min(cam_x, map_pixels_x - half_view_x))
+        cam_y = max(half_view_y, min(cam_y, map_pixels_y - half_view_y))
+
+        return (cam_x, cam_y)
+
     def on_draw(self):
         """Render the game"""
         self.clear()
+
+        # Draw game world with camera transformation
+        self.game_camera.use()
         self.background_tile_sprite_list.draw(pixelated=True)
         self.vertical_transition_sprite_list.draw(pixelated=True)
         self.horizontal_transition_sprite_list.draw(pixelated=True)
@@ -837,6 +942,9 @@ class GameRenderer(arcade.Window):
         self.monster_sprite_list.draw(pixelated=True)
         self.player_sprite_list.draw(pixelated=True)
         self.explosion_sprite_list.draw(pixelated=True)
+
+        # Draw UI without camera (use default projection)
+        self.default_camera.use()
         self.header_sprite_list.draw(pixelated=True)
         self.player_name_sprites.draw(pixelated=True)
         self.dig_power_sprites.draw(pixelated=True)
