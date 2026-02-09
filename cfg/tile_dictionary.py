@@ -21,7 +21,7 @@ EMPTY_TILE_NAMES = {
 }
 
 BEDROCK_TILE_NAMES = {'bedrock1', 'bedrock2', 'bedrock3', 'bedrock4'}
-DIRT_TILE_NAMES = {'dirt1', 'dirt2', 'dirt3'}
+DIRT_TILE_NAMES = {'dirt1', 'dirt2', 'dirt3', 'gravel1', 'gravel2'}
 
 # Death sprites
 PLAYER_DEATH_SPRITE = 'blood'

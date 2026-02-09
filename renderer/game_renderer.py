@@ -28,6 +28,10 @@ from cfg.tile_dictionary import (
     MONSTER_DEATH_SPRITE,
     TREASURE_TILES,
     TOOL_TILES,
+    BEDROCK_NW_ID,
+    BEDROCK_NE_ID,
+    BEDROCK_SE_ID,
+    BEDROCK_SW_ID,
 )
 
 
@@ -59,6 +63,10 @@ HORIZONTAL_TRANSITION_TEXTURES = {
     "bedrock_empty": "transition_horizontal_bedrock_empty",
     "empty_dirt": "transition_horizontal_empty_dirt",
     "dirt_empty": "transition_horizontal_dirt_empty",
+    "empty_bedrock_burnt": "transition_horizontal_empty_bedrock_burnt",
+    "bedrock_empty_burnt": "transition_horizontal_bedrock_empty_burnt",
+    "empty_dirt_burnt": "transition_horizontal_empty_dirt_burnt",
+    "dirt_empty_burnt": "transition_horizontal_dirt_empty_burnt",
 }
 
 # Vertical transition textures (10x6 pixels, between rows)
@@ -67,6 +75,10 @@ VERTICAL_TRANSITION_TEXTURES = {
     "bedrock_empty": "transition_vertical_bedrock_empty",
     "empty_dirt": "transition_vertical_empty_dirt",
     "dirt_empty": "transition_vertical_dirt_empty",
+    "empty_bedrock_burnt": "transition_vertical_empty_bedrock_burnt",
+    "bedrock_empty_burnt": "transition_vertical_bedrock_empty_burnt",
+    "empty_dirt_burnt": "transition_vertical_empty_dirt_burnt",
+    "dirt_empty_burnt": "transition_vertical_dirt_empty_burnt",
 }
 
 
@@ -218,41 +230,116 @@ class GameRenderer(arcade.Window):
         self.hatch_texture = arcade.Texture(hatch_image, name="inventory_hatch")
 
         # Build transition texture lookup tables
-        # Index 0 = transparent, other indices map to textures
+        # Index 0 = transparent
+        # Indices 1-4 = normal transitions
+        # Indices 5-8 = burnt transitions (same order, offset by 4)
         self.horizontal_transition_textures_list = [
             self.transparent_texture,
-            self.horizontal_transition_textures["empty_bedrock"],
-            self.horizontal_transition_textures["bedrock_empty"],
-            self.horizontal_transition_textures["empty_dirt"],
-            self.horizontal_transition_textures["dirt_empty"],
+            self.horizontal_transition_textures["empty_bedrock"],      # 1
+            self.horizontal_transition_textures["bedrock_empty"],      # 2
+            self.horizontal_transition_textures["empty_dirt"],         # 3
+            self.horizontal_transition_textures["dirt_empty"],         # 4
+            self.horizontal_transition_textures["empty_bedrock_burnt"],  # 5
+            self.horizontal_transition_textures["bedrock_empty_burnt"],  # 6
+            self.horizontal_transition_textures["empty_dirt_burnt"],     # 7
+            self.horizontal_transition_textures["dirt_empty_burnt"],     # 8
         ]
         self.vertical_transition_textures_list = [
             self.transparent_texture,
-            self.vertical_transition_textures["empty_bedrock"],
-            self.vertical_transition_textures["bedrock_empty"],
-            self.vertical_transition_textures["empty_dirt"],
-            self.vertical_transition_textures["dirt_empty"],
+            self.vertical_transition_textures["empty_bedrock"],      # 1
+            self.vertical_transition_textures["bedrock_empty"],      # 2
+            self.vertical_transition_textures["empty_dirt"],         # 3
+            self.vertical_transition_textures["dirt_empty"],         # 4
+            self.vertical_transition_textures["empty_bedrock_burnt"],  # 5
+            self.vertical_transition_textures["bedrock_empty_burnt"],  # 6
+            self.vertical_transition_textures["empty_dirt_burnt"],     # 7
+            self.vertical_transition_textures["dirt_empty_burnt"],     # 8
         ]
 
-        # Lookup tables: [tile_id_1, tile_id_2] -> texture index
-        self.horizontal_transition_lookup = np.zeros((256, 256), dtype=np.uint8)
-        self.vertical_transition_lookup = np.zeros((256, 256), dtype=np.uint8)
+        # Lookup tables: [effective_tile_id_1, effective_tile_id_2] -> texture index
+        # 512x512 to accommodate burnt empty IDs (normal ID + 256)
+        BURNT_EMPTY_OFFSET = 256
+        self.horizontal_transition_lookup = np.zeros((512, 512), dtype=np.uint8)
+        self.vertical_transition_lookup = np.zeros((512, 512), dtype=np.uint8)
 
         empty_ids = np.array(list(EMPTY_TILE_IDS))
         bedrock_ids = np.array(list(BEDROCK_TILE_IDS))
         dirt_ids = np.array(list(DIRT_TILE_IDS))
+        burnt_empty_ids = empty_ids + BURNT_EMPTY_OFFSET
 
-        # Empty <-> Bedrock transitions
+        # Empty <-> Bedrock transitions (normal)
         self.horizontal_transition_lookup[np.ix_(empty_ids, bedrock_ids)] = 1
         self.horizontal_transition_lookup[np.ix_(bedrock_ids, empty_ids)] = 2
         self.vertical_transition_lookup[np.ix_(empty_ids, bedrock_ids)] = 1
         self.vertical_transition_lookup[np.ix_(bedrock_ids, empty_ids)] = 2
 
-        # Empty <-> Dirt transitions
+        # Empty <-> Dirt transitions (normal)
         self.horizontal_transition_lookup[np.ix_(empty_ids, dirt_ids)] = 3
         self.horizontal_transition_lookup[np.ix_(dirt_ids, empty_ids)] = 4
         self.vertical_transition_lookup[np.ix_(empty_ids, dirt_ids)] = 3
         self.vertical_transition_lookup[np.ix_(dirt_ids, empty_ids)] = 4
+
+        # Burnt empty <-> Bedrock transitions
+        self.horizontal_transition_lookup[np.ix_(burnt_empty_ids, bedrock_ids)] = 5
+        self.horizontal_transition_lookup[np.ix_(bedrock_ids, burnt_empty_ids)] = 6
+        self.vertical_transition_lookup[np.ix_(burnt_empty_ids, bedrock_ids)] = 5
+        self.vertical_transition_lookup[np.ix_(bedrock_ids, burnt_empty_ids)] = 6
+
+        # Burnt empty <-> Dirt transitions
+        self.horizontal_transition_lookup[np.ix_(burnt_empty_ids, dirt_ids)] = 7
+        self.horizontal_transition_lookup[np.ix_(dirt_ids, burnt_empty_ids)] = 8
+        self.vertical_transition_lookup[np.ix_(burnt_empty_ids, dirt_ids)] = 7
+        self.vertical_transition_lookup[np.ix_(dirt_ids, burnt_empty_ids)] = 8
+
+        # Corner bedrock tiles have directional transitions
+        # The direction in the name indicates the dirt side(s)
+        # Horizontal: tile1 exposes RIGHT side, tile2 exposes LEFT side
+        # Vertical: tile1 exposes BOTTOM side, tile2 exposes TOP side
+
+        # bedrock_nw: top=dirt, left=dirt, bottom=bedrock, right=bedrock
+        self.horizontal_transition_lookup[BEDROCK_NW_ID, empty_ids] = 2  # right=bedrock
+        self.horizontal_transition_lookup[empty_ids, BEDROCK_NW_ID] = 3  # left=dirt
+        self.vertical_transition_lookup[BEDROCK_NW_ID, empty_ids] = 2   # bottom=bedrock
+        self.vertical_transition_lookup[empty_ids, BEDROCK_NW_ID] = 3   # top=dirt
+        self.horizontal_transition_lookup[BEDROCK_NW_ID, burnt_empty_ids] = 6
+        self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_NW_ID] = 7
+        self.vertical_transition_lookup[BEDROCK_NW_ID, burnt_empty_ids] = 6
+        self.vertical_transition_lookup[burnt_empty_ids, BEDROCK_NW_ID] = 7
+
+        # bedrock_ne: top=dirt, right=dirt, bottom=bedrock, left=bedrock
+        self.horizontal_transition_lookup[BEDROCK_NE_ID, empty_ids] = 4  # right=dirt
+        self.horizontal_transition_lookup[empty_ids, BEDROCK_NE_ID] = 1  # left=bedrock
+        self.vertical_transition_lookup[BEDROCK_NE_ID, empty_ids] = 2   # bottom=bedrock
+        self.vertical_transition_lookup[empty_ids, BEDROCK_NE_ID] = 3   # top=dirt
+        self.horizontal_transition_lookup[BEDROCK_NE_ID, burnt_empty_ids] = 8
+        self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_NE_ID] = 5
+        self.vertical_transition_lookup[BEDROCK_NE_ID, burnt_empty_ids] = 6
+        self.vertical_transition_lookup[burnt_empty_ids, BEDROCK_NE_ID] = 7
+
+        # bedrock_se: bottom=dirt, right=dirt, top=bedrock, left=bedrock
+        self.horizontal_transition_lookup[BEDROCK_SE_ID, empty_ids] = 4  # right=dirt
+        self.horizontal_transition_lookup[empty_ids, BEDROCK_SE_ID] = 1  # left=bedrock
+        self.vertical_transition_lookup[BEDROCK_SE_ID, empty_ids] = 4   # bottom=dirt
+        self.vertical_transition_lookup[empty_ids, BEDROCK_SE_ID] = 1   # top=bedrock
+        self.horizontal_transition_lookup[BEDROCK_SE_ID, burnt_empty_ids] = 8
+        self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_SE_ID] = 5
+        self.vertical_transition_lookup[BEDROCK_SE_ID, burnt_empty_ids] = 8
+        self.vertical_transition_lookup[burnt_empty_ids, BEDROCK_SE_ID] = 5
+
+        # bedrock_sw: bottom=dirt, left=dirt, top=bedrock, right=bedrock
+        self.horizontal_transition_lookup[BEDROCK_SW_ID, empty_ids] = 2  # right=bedrock
+        self.horizontal_transition_lookup[empty_ids, BEDROCK_SW_ID] = 3  # left=dirt
+        self.vertical_transition_lookup[BEDROCK_SW_ID, empty_ids] = 4   # bottom=dirt
+        self.vertical_transition_lookup[empty_ids, BEDROCK_SW_ID] = 1   # top=bedrock
+        self.horizontal_transition_lookup[BEDROCK_SW_ID, burnt_empty_ids] = 6
+        self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_SW_ID] = 7
+        self.vertical_transition_lookup[BEDROCK_SW_ID, burnt_empty_ids] = 8
+        self.vertical_transition_lookup[burnt_empty_ids, BEDROCK_SW_ID] = 5
+
+        # Precompute which tile IDs are "empty" for effective tilemap building
+        self.is_empty_tile = np.zeros(256, dtype=np.uint16)
+        for eid in EMPTY_TILE_IDS:
+            self.is_empty_tile[eid] = BURNT_EMPTY_OFFSET
 
         # Map tile IDs to textures
         self.tile_id_to_texture_dictionary = list()
@@ -269,6 +356,9 @@ class GameRenderer(arcade.Window):
         state = server.get_render_state()
         self.map_width = state.width
         self.map_height = state.height
+
+        # Track which tiles have ever had an explosion (for burnt transitions)
+        self.explosion_history = np.zeros((self.map_height, self.map_width), dtype=bool)
 
         # Calculate y offset for UI space at top
         self.ui_offset = UI_TOP_MARGIN * self.zoom
@@ -582,6 +672,15 @@ class GameRenderer(arcade.Window):
         view_start_y = max(0, int(self.map_height - view_top_world_y / tile_size_px) - 1)
         view_end_y = min(state.height, int(self.map_height - view_bottom_world_y / tile_size_px) + 2)
 
+        # Accumulate explosion history (OR in new explosions)
+        self.explosion_history |= state.explosions.astype(bool)
+
+        # Build effective tilemap: empty tiles with explosion history get shifted IDs
+        # is_empty_tile[id] = 256 for empty tiles, 0 otherwise
+        # explosion_history is bool, so multiplying gives 256 or 0
+        effective_tilemap = state.tilemap.astype(np.uint16) + \
+            self.is_empty_tile[state.tilemap] * self.explosion_history
+
         # Update only visible tile textures (no position updates needed - camera handles scrolling)
         for y in range(view_start_y, view_end_y):
             for x in range(view_start_x, view_end_x):
@@ -594,9 +693,8 @@ class GameRenderer(arcade.Window):
         for y in range(view_start_y, view_end_y):
             for x in range(view_start_x, min(view_end_x, state.width - 1)):
                 sprite_idx = y * state.width + x
-                tile1 = state.tilemap[y, x]
-                tile2 = state.tilemap[y, x + 1]
-                transition_idx = self.horizontal_transition_lookup[tile1, tile2]
+                transition_idx = self.horizontal_transition_lookup[
+                    effective_tilemap[y, x], effective_tilemap[y, x + 1]]
                 self.horizontal_transition_sprites[sprite_idx].texture = \
                     self.horizontal_transition_textures_list[transition_idx]
 
@@ -604,9 +702,8 @@ class GameRenderer(arcade.Window):
         for y in range(view_start_y, min(view_end_y, state.height - 1)):
             for x in range(view_start_x, view_end_x):
                 sprite_idx = y * state.width + x
-                tile1 = state.tilemap[y, x]
-                tile2 = state.tilemap[y + 1, x]
-                transition_idx = self.vertical_transition_lookup[tile1, tile2]
+                transition_idx = self.vertical_transition_lookup[
+                    effective_tilemap[y, x], effective_tilemap[y + 1, x]]
                 self.vertical_transition_sprites[sprite_idx].texture = \
                     self.vertical_transition_textures_list[transition_idx]
 

@@ -525,6 +525,20 @@ SPRITE_DEFS = [
     (0 , 0, 10, 3, 194, 109, 'transition_vertical_empty_dirt'),
     (0 , 0, 10, 3, 194, 113, 'transition_vertical_dirt_empty'),
 
+    # burnt dirt transitions (19 pixels down from non-burnt dirt)
+    (0 , 0, 4, 10, 194, 117, 'transition_horizontal_empty_dirt_burnt'),
+    (0 , 0, 4, 10, 200, 117, 'transition_horizontal_dirt_empty_burnt'),
+
+    (0 , 0, 10, 3, 194, 128, 'transition_vertical_empty_dirt_burnt'),
+    (0 , 0, 10, 3, 194, 132, 'transition_vertical_dirt_empty_burnt'),
+
+    # burnt bedrock transitions (11 pixels right from burnt dirt)
+    (0 , 0, 4, 10, 205, 117, 'transition_horizontal_empty_bedrock_burnt'),
+    (0 , 0, 4, 10, 211, 117, 'transition_horizontal_bedrock_empty_burnt'),
+
+    (0 , 0, 10, 3, 205, 128, 'transition_vertical_empty_bedrock_burnt'),
+    (0 , 0, 10, 3, 205, 132, 'transition_vertical_bedrock_empty_burnt'),
+
 ]
 
 
@@ -542,6 +556,18 @@ SPRITE_PADDING_DEFS = [
     ('transition_vertical_bedrock_empty', 10, 6, 'bottom'),
     ('transition_vertical_empty_dirt', 10, 6, 'top'),
     ('transition_vertical_dirt_empty', 10, 6, 'bottom'),
+
+    # Burnt horizontal transitions: 4x10 -> 8x10 (4 pixels padding)
+    ('transition_horizontal_empty_dirt_burnt', 8, 10, 'left'),
+    ('transition_horizontal_dirt_empty_burnt', 8, 10, 'right'),
+    ('transition_horizontal_empty_bedrock_burnt', 8, 10, 'left'),
+    ('transition_horizontal_bedrock_empty_burnt', 8, 10, 'right'),
+
+    # Burnt vertical transitions: 10x3 -> 10x6 (3 pixels padding)
+    ('transition_vertical_empty_dirt_burnt', 10, 6, 'top'),
+    ('transition_vertical_dirt_empty_burnt', 10, 6, 'bottom'),
+    ('transition_vertical_empty_bedrock_burnt', 10, 6, 'top'),
+    ('transition_vertical_bedrock_empty_burnt', 10, 6, 'bottom'),
 ]
 
 
