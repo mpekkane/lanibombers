@@ -7,6 +7,7 @@ import os
 
 import arcade
 import numpy as np
+from PIL import Image
 
 from cfg.tile_dictionary import (
     TILE_DICTIONARY,
@@ -54,7 +55,7 @@ BURNT_EMPTY_OFFSET = 256
 class TileRenderer:
     """Handles background tile and transition rendering."""
 
-    def __init__(self, state, transparent_texture, zoom):
+    def __init__(self, state, transparent_texture, zoom, show_grid=False):
         self.zoom = zoom
         self.transparent_texture = transparent_texture
 
@@ -290,6 +291,36 @@ class TileRenderer:
                 sprite_idx += 1
 
         self.vertical_transition_sprite_list.extend(self.vertical_transition_sprites)
+
+        # Grid line overlay for diagnostics
+        self.grid_sprite_list = arcade.SpriteList()
+        if show_grid:
+            grid_image = Image.new("RGBA", (1, 1), (0, 0, 0, 64))
+            grid_texture = arcade.Texture(grid_image, name="grid_line")
+            self.grid_sprite_list.initialize()
+            map_px_w = state.width * SPRITE_SIZE * zoom
+            map_px_h = state.height * SPRITE_SIZE * zoom
+            line_width = 2
+
+            # Vertical lines at column boundaries
+            for x in range(state.width + 1):
+                sprite = arcade.Sprite()
+                sprite.texture = grid_texture
+                sprite.width = line_width
+                sprite.height = map_px_h
+                sprite.center_x = x * SPRITE_SIZE * zoom
+                sprite.center_y = map_px_h / 2
+                self.grid_sprite_list.append(sprite)
+
+            # Horizontal lines at row boundaries
+            for y in range(state.height + 1):
+                sprite = arcade.Sprite()
+                sprite.texture = grid_texture
+                sprite.width = map_px_w
+                sprite.height = line_width
+                sprite.center_x = map_px_w / 2
+                sprite.center_y = (state.height - y) * SPRITE_SIZE * zoom
+                self.grid_sprite_list.append(sprite)
 
     def on_update(self, state, view_start_x, view_end_x, view_start_y, view_end_y):
         """Update visible tile textures and transitions."""
