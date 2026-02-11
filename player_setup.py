@@ -4,7 +4,7 @@ Allows players to configure their name, color, icon, hotkeys, and weapon order.
 """
 
 import os
-import json
+import yaml
 import random
 import arcade
 from PIL import Image
@@ -686,17 +686,17 @@ class PlayerSetup(arcade.Window):
         self.instructions_sprites.draw(pixelated=True)
 
     def _load_config(self):
-        """Load player configuration from cfg/player.json if it exists."""
+        """Load player configuration from cfg/player.yaml if it exists."""
         cfg_path = os.path.join(os.path.dirname(__file__), "cfg")
-        json_path = os.path.join(cfg_path, "player.json")
+        yaml_path = os.path.join(cfg_path, "player.yaml")
 
-        if not os.path.exists(json_path):
+        if not os.path.exists(yaml_path):
             return
 
         try:
-            with open(json_path, "r") as f:
-                config = json.load(f)
-        except (json.JSONDecodeError, IOError):
+            with open(yaml_path, "r") as f:
+                config = yaml.safe_load(f)
+        except (yaml.YAMLError, IOError):
             return
 
         # Load player name
@@ -766,7 +766,7 @@ class PlayerSetup(arcade.Window):
             self.weapon_order = loaded_weapon_order
 
     def _save_config(self):
-        """Save player configuration to cfg/player.json."""
+        """Save player configuration to cfg/player.yaml."""
         # Build items list with name, hotkey, and menu order
         items = []
         for i, bomb_type in enumerate(self.weapon_order):
@@ -791,10 +791,10 @@ class PlayerSetup(arcade.Window):
         cfg_path = os.path.join(os.path.dirname(__file__), "cfg")
         os.makedirs(cfg_path, exist_ok=True)
 
-        # Write to player.json
-        json_path = os.path.join(cfg_path, "player.json")
-        with open(json_path, "w") as f:
-            json.dump(config, f, indent=2)
+        # Write to player.yaml
+        yaml_path = os.path.join(cfg_path, "player.yaml")
+        with open(yaml_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
     def on_key_press(self, key: int, modifiers: int):
         """Handle key presses."""
