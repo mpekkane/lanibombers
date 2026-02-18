@@ -65,6 +65,7 @@ class GameRenderer(arcade.Window):
         self.init_height = height
         self.show_grid = show_grid
         self.input_callback = Optional[Callable[[int, int], None]]
+        self.input_callback_bound = False
 
     def initialize(self):
         """
@@ -291,9 +292,10 @@ class GameRenderer(arcade.Window):
 
     def bind_input_callback(self, callback: Callable[[int, int], None]) -> None:
         self.input_callback = callback
+        self.input_callback_bound = True
 
     def on_key_press(self, symbol: int, modifiers: int):
-        if self.input_callback is not None:
+        if self.input_callback_bound:
             self.input_callback(symbol, modifiers)
 
     def on_key_release(self, symbol: int, modifiers: int):

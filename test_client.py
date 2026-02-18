@@ -18,7 +18,7 @@ from game_engine.agent_state import Action
 from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
 from common.config_reader import ConfigReader
-from common.keymapper import map_keys
+from common.keymapper import map_keys, pynput_to_arcade_key
 from renderer.game_renderer import GameRenderer
 from game_engine.render_state import RenderState
 
@@ -37,7 +37,7 @@ class BomberClient:
             self.choose,
             self.remote,
         ) = map_keys(config)
-
+        self.headless = headless
         self.client = BomberNetworkClient(cfg_path)
         self.listener: Optional[keyboard.Listener] = None
 
@@ -59,24 +59,22 @@ class BomberClient:
         name = input("Name: ")
         self.client.set_name(name)
 
-        renderer = GameRenderer(
-            self.get_render_state_unsafe, window_name="lanibombers client"
-        )
-        renderer.bind_input_callback(self.on_press)
+        if not self.headless:
+            renderer = GameRenderer(
+                self.get_render_state_unsafe, window_name="lanibombers client"
+            )
+            renderer.bind_input_callback(self.on_press)
 
-        while not self.has_state():
-            Clock.sleep(1)
+            while not self.has_state():
+                Clock.sleep(1)
 
-        renderer.initialize()
-        renderer.run()
-
-        # renderer_th = threading.Thread(target=self.render)
-        # renderer_th.start()
-
-        # Create and start the listener
-        # with keyboard.Listener(on_press=self.on_press) as listener:
-        #     self.listener = listener
-        #     listener.join()
+            renderer.initialize()
+            renderer.run()
+        else:
+            # Create and start the listener
+            with keyboard.Listener(on_press=self.on_press_local) as listener:
+                self.listener = listener
+                listener.join()
 
     def on_disconnect(self, reason: str) -> None:
         print(f"Disconnected from server: {reason}")
@@ -139,6 +137,11 @@ class BomberClient:
             action = None
         if action is not None:
             self.client.send(ClientControl(int(action)))
+
+    def on_press_local(self, key: Union[keyboard.Key, keyboard.KeyCode]) -> None:
+        symbol = pynput_to_arcade_key(key)
+        if symbol is not None:
+            self.on_press(symbol, 0)
 
 
 def main() -> None:
