@@ -1,32 +1,95 @@
-from typing import Union
-from pynput import keyboard
-
-_KEY_MAP = {
-    "up": keyboard.Key.up,
-    "down": keyboard.Key.down,
-    "left": keyboard.Key.left,
-    "right": keyboard.Key.right,
-    "enter": keyboard.Key.enter,
-    "space": keyboard.Key.space,
-    "esc": keyboard.Key.esc,
-    "tab": keyboard.Key.tab,
-    "shift_r": keyboard.Key.shift_r,
-    "shift_l": keyboard.Key.shift_l,
-    "ctrl_r": keyboard.Key.ctrl_r,
-    "ctrl_l": keyboard.Key.ctrl_l,
-    "alt": keyboard.Key.alt,
-}
+import arcade
+import re
+from typing import Tuple
+from common.config_reader import ConfigReader
 
 
-def get_key(key: str) -> keyboard.Key:
-    try:
-        return _KEY_MAP[key]
-    except KeyError:
-        return key
+def map_keys(config: ConfigReader) -> Tuple[
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int
+]:
+    up = config.get_config_mandatory("up")
+    down = config.get_config_mandatory("down")
+    left = config.get_config_mandatory("left")
+    right = config.get_config_mandatory("right")
+    fire = config.get_config_mandatory("fire")
+    stop = config.get_config_mandatory("stop")
+    choose = config.get_config_mandatory("choose")
+    remote = config.get_config_mandatory("remote")
+
+    keybind_up = parse_arcade_key(up)
+    keybind_down = parse_arcade_key(down)
+    keybind_left = parse_arcade_key(left)
+    keybind_right = parse_arcade_key(right)
+    keybind_fire = parse_arcade_key(fire)
+    keybind_stop = parse_arcade_key(stop)
+    keybind_choose = parse_arcade_key(choose)
+    keybind_remote = parse_arcade_key(remote)
+
+    return (
+        keybind_up,
+        keybind_down,
+        keybind_left,
+        keybind_right,
+        keybind_fire,
+        keybind_stop,
+        keybind_choose,
+        keybind_remote,
+    )
 
 
-def check_input(pressed: Union[keyboard.Key, keyboard.KeyCode], mapped: str):
-    if isinstance(pressed, keyboard.Key):
-        return pressed == get_key(mapped)
+def parse_arcade_key(name: str) -> int:
+    """
+    Convert a human-readable key string like:
+        "l shift", "left shift", "up", "space", "a"
+    into the corresponding arcade.key constant.
+    """
+
+    # Normalize string
+    key = name.strip().lower()
+    key = re.sub(r"[ \-]+", "_", key)  # replace spaces/hyphens with underscore
+
+    # Manual aliases
+    aliases = {}
+
+    for base in ["ctrl", "shift", "alt", "super", "meta"]:
+        for side, prefix in [("left", "L"), ("right", "R")]:
+            key_const = f"{prefix}{base.upper()}"
+
+            variants = {
+                f"{prefix.lower()}{base}",       # lctrl
+                f"{base}_{prefix.lower()}",      # ctrl_l
+                f"{prefix.lower()}_{base}",      # l_ctrl
+                f"{base}_{side}",                # ctrl_left
+                f"{side}_{base}",                # left_ctrl
+                f"{base}{prefix.lower()}",       # ctrll
+                f"{side}{base}",                 # leftctrl
+                f"{base}{side}",                 # ctrlleft
+            }
+
+            for v in variants:
+                aliases[v] = key_const
+
+    # Common extras
+    aliases.update({
+        "esc": "ESCAPE",
+        "return": "ENTER",
+    })
+
+    # First try alias
+    if key in aliases:
+        key_name = aliases[key]
     else:
-        return pressed.char == mapped
+        key_name = key.upper()
+
+    # Try to fetch from arcade.key
+    try:
+        return getattr(arcade.key, key_name)
+    except AttributeError:
+        raise ValueError(f"Unknown arcade key: '{name}'")

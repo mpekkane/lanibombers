@@ -2,15 +2,21 @@
 Test code for server-side
 """
 
-
 import uuid
-import threading
+import time
 from enum import IntEnum
-from typing import Dict, List
+from typing import Dict, List, Optional
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
-from network_stack.messages.messages import Name, ChatText, Ping, Pong, ClientControl, GameState
+from network_stack.messages.messages import (
+    Name,
+    ChatText,
+    Ping,
+    Pong,
+    ClientControl,
+    GameState,
+)
 from game_engine.clock import Clock
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
@@ -33,7 +39,7 @@ class ServerState(IntEnum):
 
 
 class BomberServer:
-    def __init__(self, cfg: str, map_path: str) -> None:
+    def __init__(self, cfg: str, map_path: str, headless: bool) -> None:
         self.state = ServerState.STARTING
 
         if map_path:
@@ -43,7 +49,7 @@ class BomberServer:
             map_data = random_map_generator.generate()
 
         # game engine
-        self.engine = GameEngine(map_data.width, map_data.height)
+        self.engine = GameEngine(map_data.width, map_data.height, headless)
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(map_data)
 
@@ -64,7 +70,7 @@ class BomberServer:
         self.players: List[str] = []
 
     def render_callback(self, state: RenderState) -> None:
-        self.server.broadcast(GameState.from_render(state), None)
+        self.server.broadcast(GameState.from_render(state), None)  # type: ignore
 
     def run_lobby(self) -> bool:
         self.state = ServerState.LOBBY
@@ -87,6 +93,7 @@ class BomberServer:
         # FIXME: temp to check logic
         self.state = ServerState.GAME
         self.engine.start()
+        self.render_callback(self.engine.get_render_state())
         # update_thread = threading.Thread(target=self.update_state, daemon=True)
         # update_thread.start()
 
@@ -94,10 +101,14 @@ class BomberServer:
     # game engine
     ##################
 
-    def get_render_state(self):
+    def get_render_state(self) -> Optional[RenderState]:
         """Returns RenderState with dimensions and sprite indices"""
         if not self.state.running():
             return
+        return self.engine.get_render_state()
+
+    def get_render_state_unsafe(self) -> RenderState:
+        """Returns RenderState with dimensions and sprite indices"""
         return self.engine.get_render_state()
 
     def update_state(self):
@@ -116,14 +127,19 @@ class BomberServer:
         if not self.state.running():
             return
 
-        player = self.engine.get_player_by_name(ctx.state.name)
+        if ctx.state.name is not None:
+            player = self.engine.get_player_by_name(ctx.state.name)
+        else:
+            player = self.engine.get_player_by_name("unnamed")
+
         if player is None:
             return
 
         if player.state == "dead":
             return
 
-        cmd: Action = msg.command
+        cmd: Action = msg.command  # type: ignore
+        assert isinstance(cmd, Action)
         if cmd.is_move():
             if cmd == Action.RIGHT:
                 if player.direction == Direction.RIGHT and player.state == "walk":
@@ -152,7 +168,8 @@ class BomberServer:
         else:
             if cmd == Action.FIRE:
                 bomb = player.plant_bomb()
-                self.engine.plant_bomb(bomb)
+                if bomb is not None:
+                    self.engine.plant_bomb(bomb)
             elif cmd == Action.CHOOSE:
                 bomb = player.choose()
             elif cmd == Action.REMOTE:
@@ -165,15 +182,17 @@ class BomberServer:
 
     def ping(self) -> None:
         uid = str(uuid.uuid4())
-        ping = Ping(uid)
+        ping = Ping(uid)  # type: ignore
         self._ensure_timestamp(ping)
         self.server.broadcast(ping)
         self.ping_count += 1
-        self.pings[ping.UUID] = ping
+        self.pings[ping.UUID] = ping  # type: ignore
 
         if self.MAX_PING_BUFFER > 1:
             if len(self.pings) > self.MAX_PING_BUFFER:
                 drop_n = self.MAX_PING_BUFFER // 2  # e.g. 50 when MAX=100
+            else:
+                drop_n = len(self.pings)
             oldest_keys = sorted(self.pings, key=lambda k: self.pings[k].timestamp)[
                 :drop_n
             ]
@@ -181,42 +200,32 @@ class BomberServer:
                 self.pings.pop(k, None)
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
-        ctx.name = msg.name
-        self.players.append(msg.name)
-        self.engine.create_player(msg.name)
+        ctx.name = msg.name  # type: ignore
+        self.players.append(msg.name)  # type: ignore
+        self.engine.create_player(msg.name)  # type: ignore
         # FIXME: debug testing
-        player = self.engine.get_player_by_name(msg.name)
-        player._test_inventory()
+        player = self.engine.get_player_by_name(msg.name)  # type: ignore
+        if player is not None:
+            player.test_inventory()
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:
         sender = ctx.name or "?"
-        ctx.broadcast(ChatText(text=f"<{sender}> {msg.text}"), exclude_self=True)
+        ctx.broadcast(ChatText(text=f"<{sender}> {msg.text}"), exclude_self=True)  # type: ignore
 
     def on_pong(self, msg: Pong, ctx: ClientContext) -> None:
-        received = time.time_ns()
-        version = 3
-        ping = self.pings[msg.ping_UUID]
-        # send time
-        if version == 1:
-            dt = msg.received - ping.timestamp
-        # receive time
-        elif version == 2:
-            dt = received - msg.timestamp
-        # roundtrip
-        elif version == 3:
-            dt = received - ping.timestamp
-        else:
-            dt = 0
+        received = Clock.now_ns()
+        ping = self.pings[msg.ping_UUID]  # type: ignore
+        dt = received - ping.timestamp
 
         if self.MAX_PING_BUFFER == 1:
-            self.pings.pop(msg.ping_UUID, None)
+            self.pings.pop(msg.ping_UUID, None)  # type: ignore
 
         self.pong_count += 1
 
         if self.average_ping < 0:
             self.average_ping = dt
         else:
-            self.average_ping = (self.average_ping * (self.ping_count - 1) + dt) / (
+            self.average_ping = (self.average_ping * (self.ping_count - 1) + dt) // (
                 self.ping_count
             )
         avg_s: float = self.average_ping / 1e9
@@ -248,10 +257,13 @@ def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
     parser.add_argument("--map", "-m", type=str, default="")
+    # FIXME: might wanna flip this in final version
+    parser.add_argument("--headless", "-hl", action="store_true", default=False)
     args = parser.parse_args()
     cfg = args.cfg
     map_path = args.map
-    server = BomberServer(cfg, map_path)
+    headless = args.headless
+    server = BomberServer(cfg, map_path, headless)
     ready = server.run_lobby()
     if not ready:
         exit(0)
@@ -262,8 +274,19 @@ def main() -> None:
 
     # state = server.get_render_state()
     server.start_game()
-    renderer = GameRenderer(server)
-    renderer.run()
+    if headless:
+        while True:
+            # FIXME: debug
+            state = server.get_render_state()
+            if state is not None:
+                print(state.players[0].x, state.players[0].y)
+            time.sleep(1)
+    else:
+        renderer = GameRenderer(
+            server.get_render_state_unsafe, window_name="lanibombers server"
+        )
+        renderer.initialize()
+        renderer.run()
 
 
 if __name__ == "__main__":

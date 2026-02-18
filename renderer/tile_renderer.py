@@ -8,6 +8,7 @@ import os
 import arcade
 import numpy as np
 from PIL import Image
+from game_engine.render_state import RenderState
 
 from cfg.tile_dictionary import (
     TILE_DICTIONARY,
@@ -100,25 +101,25 @@ class TileRenderer:
         # Indices 5-8 = burnt transitions (same order, offset by 4)
         self.horizontal_transition_textures_list = [
             transparent_texture,
-            horizontal_transition_textures["empty_bedrock"],      # 1
-            horizontal_transition_textures["bedrock_empty"],      # 2
-            horizontal_transition_textures["empty_dirt"],         # 3
-            horizontal_transition_textures["dirt_empty"],         # 4
+            horizontal_transition_textures["empty_bedrock"],  # 1
+            horizontal_transition_textures["bedrock_empty"],  # 2
+            horizontal_transition_textures["empty_dirt"],  # 3
+            horizontal_transition_textures["dirt_empty"],  # 4
             horizontal_transition_textures["empty_bedrock_burnt"],  # 5
             horizontal_transition_textures["bedrock_empty_burnt"],  # 6
-            horizontal_transition_textures["empty_dirt_burnt"],     # 7
-            horizontal_transition_textures["dirt_empty_burnt"],     # 8
+            horizontal_transition_textures["empty_dirt_burnt"],  # 7
+            horizontal_transition_textures["dirt_empty_burnt"],  # 8
         ]
         self.vertical_transition_textures_list = [
             transparent_texture,
-            vertical_transition_textures["empty_bedrock"],      # 1
-            vertical_transition_textures["bedrock_empty"],      # 2
-            vertical_transition_textures["empty_dirt"],         # 3
-            vertical_transition_textures["dirt_empty"],         # 4
+            vertical_transition_textures["empty_bedrock"],  # 1
+            vertical_transition_textures["bedrock_empty"],  # 2
+            vertical_transition_textures["empty_dirt"],  # 3
+            vertical_transition_textures["dirt_empty"],  # 4
             vertical_transition_textures["empty_bedrock_burnt"],  # 5
             vertical_transition_textures["bedrock_empty_burnt"],  # 6
-            vertical_transition_textures["empty_dirt_burnt"],     # 7
-            vertical_transition_textures["dirt_empty_burnt"],     # 8
+            vertical_transition_textures["empty_dirt_burnt"],  # 7
+            vertical_transition_textures["dirt_empty_burnt"],  # 8
         ]
 
         # Lookup tables: [effective_tile_id_1, effective_tile_id_2] -> texture index
@@ -163,8 +164,8 @@ class TileRenderer:
         # bedrock_nw: top=dirt, left=dirt, bottom=bedrock, right=bedrock
         self.horizontal_transition_lookup[BEDROCK_NW_ID, empty_ids] = 2  # right=bedrock
         self.horizontal_transition_lookup[empty_ids, BEDROCK_NW_ID] = 3  # left=dirt
-        self.vertical_transition_lookup[BEDROCK_NW_ID, empty_ids] = 2   # bottom=bedrock
-        self.vertical_transition_lookup[empty_ids, BEDROCK_NW_ID] = 3   # top=dirt
+        self.vertical_transition_lookup[BEDROCK_NW_ID, empty_ids] = 2  # bottom=bedrock
+        self.vertical_transition_lookup[empty_ids, BEDROCK_NW_ID] = 3  # top=dirt
         self.horizontal_transition_lookup[BEDROCK_NW_ID, burnt_empty_ids] = 6
         self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_NW_ID] = 7
         self.vertical_transition_lookup[BEDROCK_NW_ID, burnt_empty_ids] = 6
@@ -173,8 +174,8 @@ class TileRenderer:
         # bedrock_ne: top=dirt, right=dirt, bottom=bedrock, left=bedrock
         self.horizontal_transition_lookup[BEDROCK_NE_ID, empty_ids] = 4  # right=dirt
         self.horizontal_transition_lookup[empty_ids, BEDROCK_NE_ID] = 1  # left=bedrock
-        self.vertical_transition_lookup[BEDROCK_NE_ID, empty_ids] = 2   # bottom=bedrock
-        self.vertical_transition_lookup[empty_ids, BEDROCK_NE_ID] = 3   # top=dirt
+        self.vertical_transition_lookup[BEDROCK_NE_ID, empty_ids] = 2  # bottom=bedrock
+        self.vertical_transition_lookup[empty_ids, BEDROCK_NE_ID] = 3  # top=dirt
         self.horizontal_transition_lookup[BEDROCK_NE_ID, burnt_empty_ids] = 8
         self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_NE_ID] = 5
         self.vertical_transition_lookup[BEDROCK_NE_ID, burnt_empty_ids] = 6
@@ -183,8 +184,8 @@ class TileRenderer:
         # bedrock_se: bottom=dirt, right=dirt, top=bedrock, left=bedrock
         self.horizontal_transition_lookup[BEDROCK_SE_ID, empty_ids] = 4  # right=dirt
         self.horizontal_transition_lookup[empty_ids, BEDROCK_SE_ID] = 1  # left=bedrock
-        self.vertical_transition_lookup[BEDROCK_SE_ID, empty_ids] = 4   # bottom=dirt
-        self.vertical_transition_lookup[empty_ids, BEDROCK_SE_ID] = 1   # top=bedrock
+        self.vertical_transition_lookup[BEDROCK_SE_ID, empty_ids] = 4  # bottom=dirt
+        self.vertical_transition_lookup[empty_ids, BEDROCK_SE_ID] = 1  # top=bedrock
         self.horizontal_transition_lookup[BEDROCK_SE_ID, burnt_empty_ids] = 8
         self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_SE_ID] = 5
         self.vertical_transition_lookup[BEDROCK_SE_ID, burnt_empty_ids] = 8
@@ -193,8 +194,8 @@ class TileRenderer:
         # bedrock_sw: bottom=dirt, left=dirt, top=bedrock, right=bedrock
         self.horizontal_transition_lookup[BEDROCK_SW_ID, empty_ids] = 2  # right=bedrock
         self.horizontal_transition_lookup[empty_ids, BEDROCK_SW_ID] = 3  # left=dirt
-        self.vertical_transition_lookup[BEDROCK_SW_ID, empty_ids] = 4   # bottom=dirt
-        self.vertical_transition_lookup[empty_ids, BEDROCK_SW_ID] = 1   # top=bedrock
+        self.vertical_transition_lookup[BEDROCK_SW_ID, empty_ids] = 4  # bottom=dirt
+        self.vertical_transition_lookup[empty_ids, BEDROCK_SW_ID] = 1  # top=bedrock
         self.horizontal_transition_lookup[BEDROCK_SW_ID, burnt_empty_ids] = 6
         self.horizontal_transition_lookup[burnt_empty_ids, BEDROCK_SW_ID] = 7
         self.vertical_transition_lookup[BEDROCK_SW_ID, burnt_empty_ids] = 8
@@ -230,7 +231,9 @@ class TileRenderer:
         sprite_idx = 0
         for y in range(state.height):
             # World Y: row 0 at bottom, row (height-1) at top
-            world_y = (state.height - 1 - y) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
+            world_y = (
+                state.height - 1 - y
+            ) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
             for x in range(state.width):
                 world_x = x * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
                 sprite = self.sprites[sprite_idx]
@@ -255,7 +258,9 @@ class TileRenderer:
 
         sprite_idx = 0
         for y in range(state.height):
-            world_y = (state.height - 1 - y) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
+            world_y = (
+                state.height - 1 - y
+            ) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
             for x in range(state.width):
                 sprite = self.horizontal_transition_sprites[sprite_idx]
                 # Position at midpoint between tile x and tile x+1
@@ -266,7 +271,9 @@ class TileRenderer:
                 sprite.texture = transparent_texture
                 sprite_idx += 1
 
-        self.horizontal_transition_sprite_list.extend(self.horizontal_transition_sprites)
+        self.horizontal_transition_sprite_list.extend(
+            self.horizontal_transition_sprites
+        )
 
         # Vertical transition sprites - between rows
         v_transition_count = state.width * state.height
@@ -275,12 +282,16 @@ class TileRenderer:
         self.vertical_transition_sprite_list.preload_textures(
             vertical_transition_textures.values()
         )
-        self.vertical_transition_sprites = [arcade.Sprite() for _ in range(v_transition_count)]
+        self.vertical_transition_sprites = [
+            arcade.Sprite() for _ in range(v_transition_count)
+        ]
 
         sprite_idx = 0
         for y in range(state.height):
             # Position at boundary between row y and row y+1
-            world_y = (state.height - 1 - y - 1) * SPRITE_SIZE * zoom + SPRITE_SIZE * zoom
+            world_y = (
+                state.height - 1 - y - 1
+            ) * SPRITE_SIZE * zoom + SPRITE_SIZE * zoom
             for x in range(state.width):
                 sprite = self.vertical_transition_sprites[sprite_idx]
                 world_x = x * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
@@ -322,7 +333,14 @@ class TileRenderer:
                 sprite.center_y = (state.height - y) * SPRITE_SIZE * zoom
                 self.grid_sprite_list.append(sprite)
 
-    def on_update(self, state, view_start_x, view_end_x, view_start_y, view_end_y):
+    def on_update(
+        self,
+        state: RenderState,
+        view_start_x: int,
+        view_end_x: int,
+        view_start_y: int,
+        view_end_y: int,
+    ) -> None:
         """Update visible tile textures and transitions."""
         # Accumulate explosion history (OR in new explosions)
         self.explosion_history |= state.explosions.astype(bool)
@@ -330,8 +348,10 @@ class TileRenderer:
         # Build effective tilemap: empty tiles with explosion history get shifted IDs
         # is_empty_tile[id] = 256 for empty tiles, 0 otherwise
         # explosion_history is bool, so multiplying gives 256 or 0
-        effective_tilemap = state.tilemap.astype(np.uint16) + \
-            self.is_empty_tile[state.tilemap] * self.explosion_history
+        effective_tilemap = (
+            state.tilemap.astype(np.uint16)
+            + self.is_empty_tile[state.tilemap] * self.explosion_history
+        )
 
         # Update only visible tile textures (no position updates needed - camera handles scrolling)
         for y in range(view_start_y, view_end_y):
@@ -346,15 +366,19 @@ class TileRenderer:
             for x in range(view_start_x, min(view_end_x, state.width - 1)):
                 sprite_idx = y * state.width + x
                 transition_idx = self.horizontal_transition_lookup[
-                    effective_tilemap[y, x], effective_tilemap[y, x + 1]]
-                self.horizontal_transition_sprites[sprite_idx].texture = \
+                    effective_tilemap[y, x], effective_tilemap[y, x + 1]
+                ]
+                self.horizontal_transition_sprites[sprite_idx].texture = (
                     self.horizontal_transition_textures_list[transition_idx]
+                )
 
         # Update visible vertical transitions
         for y in range(view_start_y, min(view_end_y, state.height - 1)):
             for x in range(view_start_x, view_end_x):
                 sprite_idx = y * state.width + x
                 transition_idx = self.vertical_transition_lookup[
-                    effective_tilemap[y, x], effective_tilemap[y + 1, x]]
-                self.vertical_transition_sprites[sprite_idx].texture = \
+                    effective_tilemap[y, x], effective_tilemap[y + 1, x]
+                ]
+                self.vertical_transition_sprites[sprite_idx].texture = (
                     self.vertical_transition_textures_list[transition_idx]
+                )

@@ -7,9 +7,11 @@ import os
 
 import arcade
 from PIL import Image
-
+from typing import List
 from cfg.bomb_dictionary import BOMB_TYPE_TO_ICON
 from renderer.bitmap_text import BitmapText
+from game_engine.entities.dynamic_entity import DynamicEntity
+
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 
@@ -118,7 +120,7 @@ class HeaderRenderer:
             graph.alpha = 128
             self.perf_graph_list.append(graph)
 
-    def on_update(self, players, client_player_name: str):
+    def on_update(self, players: List[DynamicEntity], client_player_name: str):
         """Update header UI elements based on the client player's state.
 
         Args:
@@ -242,7 +244,7 @@ class HeaderRenderer:
                     # Move x position past the separator
                     icon_x += separator_width * self.zoom
 
-    def on_draw(self, show_stats):
+    def on_draw(self, show_stats: bool):
         """Draw all header UI sprite lists."""
         self.header_sprite_list.draw(pixelated=True)
         self.player_name_sprites.draw(pixelated=True)

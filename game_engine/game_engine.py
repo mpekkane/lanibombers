@@ -64,7 +64,7 @@ class SwitchState(Enum):
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
-    def __init__(self, width: int = 64, height: int = 45):
+    def __init__(self, width: int = 64, height: int = 45, headless: bool = False):
         self.width = width
         self.height = height
         self.tiles: list[list[Tile]] = [
@@ -92,7 +92,9 @@ class GameEngine:
             (height - 1, width - 1),
         ]
         self.prev_time = -1
-        self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
+        self.sounds_enabled = not headless
+        if self.sounds_enabled:
+            self.sounds = SoundEngine(music_volume=0.5, fx_volume=1.0)
         self.teleports: List[Tuple[int, int]] = []
         self.switch_state = SwitchState.OFF
         self.security_doors: List[Tuple[int, int, Tile]] = []
@@ -128,12 +130,14 @@ class GameEngine:
 
     def start(self) -> None:
         """Start the game engine and event processing."""
-        self.sounds.game()
+        if self.sounds_enabled:
+            self.sounds.game()
         self.event_resolver.start()
 
     def stop(self) -> None:
         """Stop the game engine and event processing."""
-        self.sounds.stop_all()
+        if self.sounds_enabled:
+            self.sounds.stop_all()
         self.event_resolver.stop()
 
     def create_player(self, name: str) -> None:
@@ -542,11 +546,14 @@ class GameEngine:
         if target.bomb_type == BombType.C4_TILE:
             pass  # No sound for C4 tile chain explosions
         elif target.bomb_type == BombType.SMALL_BOMB:
-            self.sounds.small_explosion()
+            if self.sounds_enabled:
+                self.sounds.small_explosion()
         elif target.explosion_type == ExplosionType.SMALL:
-            self.sounds.small_explosion()
+            if self.sounds_enabled:
+                self.sounds.small_explosion()
         else:
-            self.sounds.explosion()
+            if self.sounds_enabled:
+                self.sounds.explosion()
 
         # Remove bomb from list
         if target in self.bombs:
@@ -568,8 +575,8 @@ class GameEngine:
                     tile = self.get_tile(x, y)
                     if tile and tile.tile_type == TileType.EMPTY:
                         self.set_tile(x, y, Tile.create_c4())
-
-        self.sounds.urethane()
+        if self.sounds_enabled:
+            self.sounds.urethane()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -592,7 +599,8 @@ class GameEngine:
                     if tile and tile.tile_type == TileType.EMPTY:
                         self.set_tile(x, y, Tile.create_urethane())
 
-        self.sounds.urethane()
+        if self.sounds_enabled:
+            self.sounds.urethane()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -604,7 +612,8 @@ class GameEngine:
         if tile and tile.tile_type == TileType.EMPTY:
             self.set_tile(bomb.x, bomb.y, Tile.create_bioslime())
 
-        self.sounds.urethane()  # Use urethane sound for now
+        if self.sounds_enabled:
+            self.sounds.urethane()  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -616,7 +625,8 @@ class GameEngine:
         if tile and tile.tile_type == TileType.EMPTY:
             self.set_tile(bomb.x, bomb.y, Tile.create_concrete())
 
-        self.sounds.urethane()  # Use urethane sound for now
+        if self.sounds_enabled:
+            self.sounds.urethane()  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -655,7 +665,8 @@ class GameEngine:
         # Trigger any bombs in the affected area
         self._trigger_bombs_in_area(bomb, final_mask)
 
-        self.sounds.explosion()
+        if self.sounds_enabled:
+            self.sounds.explosion()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -710,7 +721,8 @@ class GameEngine:
             # Add to teleport list
             self.teleports.append((bomb.x, bomb.y))
 
-        self.sounds.urethane()  # Use urethane sound for now
+        if self.sounds_enabled:
+            self.sounds.urethane()  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -854,7 +866,8 @@ class GameEngine:
         # Trigger any bombs in the affected area
         self._trigger_bombs_in_area(bomb, fill_mask)
 
-        self.sounds.explosion()
+        if self.sounds_enabled:
+            self.sounds.explosion()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -920,7 +933,8 @@ class GameEngine:
             )
             self.event_resolver.schedule_event(explosion_event)
 
-        self.sounds.explosion()
+        if self.sounds_enabled:
+            self.sounds.explosion()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -944,7 +958,8 @@ class GameEngine:
                         # Show explosion visual on the tile
                         self.explosions[y, x] = 1
 
-        self.sounds.explosion()
+        if self.sounds_enabled:
+            self.sounds.explosion()
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -1151,7 +1166,8 @@ class GameEngine:
         target_tile = self.get_neighbor_tile(target)
         dig_power = target.get_dig_power()
         target_tile.take_damage(dig_power)
-        self.sounds.dig()
+        if self.sounds_enabled:
+            self.sounds.dig()
         # print("DIG!")
         # print(target_tile)
 
@@ -1216,7 +1232,8 @@ class GameEngine:
                 assert isinstance(pickup, Treasure)
                 player.pickup_treasure(pickup)
                 # TODO:
-                self.sounds.treasure()
+                if self.sounds_enabled:
+                    self.sounds.treasure()
             self.pickups[py][px] = None
 
         # teleport
@@ -1258,7 +1275,8 @@ class GameEngine:
                 # print(f"Agent health {agent.health}")
                 # print(f"Enemy health {other.health}")
         if agent.state == "dead":
-            self.sounds.die()
+            if self.sounds_enabled:
+                self.sounds.die()
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""

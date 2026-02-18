@@ -13,7 +13,7 @@ class Player(DynamicEntity):
     tools: Dict[ToolType, int] = field(default_factory=lambda: {})
     selected = 0
 
-    def _test_inventory(self) -> None:
+    def test_inventory(self) -> None:
         self.inventory.append((BombType.SMALL_BOMB, 50))
         self.inventory.append((BombType.BIG_BOMB, 50))
         self.inventory.append((BombType.C4, 10))

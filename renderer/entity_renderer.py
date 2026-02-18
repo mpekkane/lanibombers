@@ -9,6 +9,7 @@ import arcade
 
 from game_engine.entities import Direction, EntityType
 from cfg.bomb_dictionary import BombType
+from game_engine.render_state import RenderState
 
 from renderer.sprites import (
     PlayerSprite,
@@ -32,7 +33,9 @@ SPRITE_CENTER_OFFSET = SPRITE_SIZE // 2
 class EntityRenderer:
     """Handles player, monster, pickup, bomb, and explosion rendering."""
 
-    def __init__(self, state, transparent_texture, zoom, screen_height, map_height, sprites_path):
+    def __init__(
+        self, state, transparent_texture, zoom, screen_height, map_height, sprites_path
+    ):
         self.zoom = zoom
         self.transparent_texture = transparent_texture
         self.screen_height = screen_height
@@ -92,7 +95,9 @@ class EntityRenderer:
         grenade_texture = arcade.load_texture(os.path.join(sprites_path, "grenade.png"))
         for direction in Direction:
             for frame in range(1, 5):
-                self.monster_textures[(EntityType.GRENADE, direction, frame)] = grenade_texture
+                self.monster_textures[(EntityType.GRENADE, direction, frame)] = (
+                    grenade_texture
+                )
 
         # Pickup textures: visual_id -> texture (for treasures and tools)
         self.pickup_textures = {}
@@ -201,7 +206,9 @@ class EntityRenderer:
         self.explosion_sprites = []
 
         for y in range(state.height):
-            world_y = (state.height - 1 - y) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
+            world_y = (
+                state.height - 1 - y
+            ) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
             for x in range(state.width):
                 world_x = x * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
                 sprite = ExplosionSprite(
@@ -217,7 +224,16 @@ class EntityRenderer:
                 self.explosion_sprites.append(sprite)
                 self.explosion_sprite_list.append(sprite)
 
-    def on_update(self, state, current_time, delta_time, view_start_x, view_end_x, view_start_y, view_end_y):
+    def on_update(
+        self,
+        state: RenderState,
+        current_time: float,
+        delta_time: float,
+        view_start_x: int,
+        view_end_x: int,
+        view_start_y: int,
+        view_end_y: int,
+    ):
         """Update entity sprites."""
         # Update pickups (dynamic list)
         pickup_count = len(state.pickups)
@@ -266,7 +282,9 @@ class EntityRenderer:
             for x in range(view_start_x, view_end_x):
                 sprite_idx = y * state.width + x
                 explosion_type = state.explosions[y, x]
-                self.explosion_sprites[sprite_idx].update_from_type(explosion_type, current_time)
+                self.explosion_sprites[sprite_idx].update_from_type(
+                    explosion_type, current_time
+                )
 
         # Update monsters (dynamic list)
         monster_count = len(state.monsters)
@@ -298,14 +316,19 @@ class EntityRenderer:
 
     def _load_bomb_textures(self):
         """Load all bomb textures into self.bomb_textures dict."""
+
         # Helper to load animated bomb with 3 frames
         def load_animated(bomb_type, base_name, has_defused=True):
             for frame in range(1, 4):
                 path = os.path.join(self.sprites_path, f"{base_name}{frame}.png")
-                self.bomb_textures[(bomb_type, "active", frame)] = arcade.load_texture(path)
+                self.bomb_textures[(bomb_type, "active", frame)] = arcade.load_texture(
+                    path
+                )
             if has_defused:
                 path = os.path.join(self.sprites_path, f"{base_name}_defused.png")
-                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(path)
+                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(
+                    path
+                )
 
         # Helper to load single-frame bomb (same texture for all frames)
         def load_static(bomb_type, sprite_name, defused_name=None):
@@ -315,7 +338,9 @@ class EntityRenderer:
                 self.bomb_textures[(bomb_type, "active", frame)] = texture
             if defused_name:
                 defused_path = os.path.join(self.sprites_path, f"{defused_name}.png")
-                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(defused_path)
+                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(
+                    defused_path
+                )
             else:
                 self.bomb_textures[(bomb_type, "defused", 0)] = texture
 
@@ -337,10 +362,14 @@ class EntityRenderer:
         # Flame barrel has 2-frame animation like nuke
         for frame in [1, 2]:
             path = os.path.join(self.sprites_path, f"smallbarrel{frame}.png")
-            self.bomb_textures[(BombType.FLAME_BARREL, "active", frame)] = arcade.load_texture(path)
+            self.bomb_textures[(BombType.FLAME_BARREL, "active", frame)] = (
+                arcade.load_texture(path)
+            )
         # Defused state
         defused_path = os.path.join(self.sprites_path, "smallbarrel_defused.png")
-        self.bomb_textures[(BombType.FLAME_BARREL, "defused", 0)] = arcade.load_texture(defused_path)
+        self.bomb_textures[(BombType.FLAME_BARREL, "defused", 0)] = arcade.load_texture(
+            defused_path
+        )
 
         # Cracker barrel (static, no defused state since it's triggered by damage)
         load_static(BombType.CRACKER_BARREL, "crackerbarrel")
@@ -350,7 +379,9 @@ class EntityRenderer:
 
         # GRASSHOPPER_HOP uses same texture as GRASSHOPPER
         for frame in range(1, 4):
-            self.bomb_textures[(BombType.GRASSHOPPER_HOP, "active", frame)] = \
+            self.bomb_textures[(BombType.GRASSHOPPER_HOP, "active", frame)] = (
                 self.bomb_textures[(BombType.GRASSHOPPER, "active", frame)]
-        self.bomb_textures[(BombType.GRASSHOPPER_HOP, "defused", 0)] = \
+            )
+        self.bomb_textures[(BombType.GRASSHOPPER_HOP, "defused", 0)] = (
             self.bomb_textures[(BombType.GRASSHOPPER, "defused", 0)]
+        )

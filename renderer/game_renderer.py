@@ -6,11 +6,13 @@ Main graphics processing and display loop.
 import os
 import time
 import arcade
-
+from typing import Callable, Optional, Tuple, List
+from PIL import Image
 from renderer.tile_renderer import TileRenderer
 from renderer.entity_renderer import EntityRenderer
 from renderer.header_renderer import HeaderRenderer
-
+from game_engine.render_state import RenderState
+from game_engine.entities.dynamic_entity import DynamicEntity
 
 # ============================================================================
 # Configuration
@@ -25,7 +27,7 @@ SPRITE_SIZE = 10
 UI_TOP_MARGIN = 30  # Pixels of free space at top for UI (before zoom)
 
 # Viewport constants
-VIEWPORT_WIDTH = 64   # Visible tiles horizontally
+VIEWPORT_WIDTH = 64  # Visible tiles horizontally
 VIEWPORT_HEIGHT = 45  # Visible tiles vertically
 
 
@@ -37,40 +39,75 @@ VIEWPORT_HEIGHT = 45  # Visible tiles vertically
 class GameRenderer(arcade.Window):
     """Main game window and renderer"""
 
-    def __init__(self, server, width=1708, height=960, client_player_name: str = "", show_stats: bool = True, show_grid: bool = True):
-        super().__init__(width, height, "lanibombers", vsync=VSYNC)
+    # ██╗███╗   ██╗██╗████████╗
+    # ██║████╗  ██║██║╚══██╔══╝
+    # ██║██╔██╗ ██║██║   ██║
+    # ██║██║╚██╗██║██║   ██║
+    # ██║██║ ╚████║██║   ██║
+    # ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝
+
+    def __init__(
+        self,
+        render_state_function: Callable[[], RenderState],
+        width: int = 1708,
+        height: int = 960,
+        client_player_name: str = "",
+        show_stats: bool = True,
+        show_grid: bool = True,
+        window_name: str = "lanibombers"
+    ):
+        super().__init__(width, height, window_name, vsync=VSYNC)
         self.client_player_name = client_player_name
         self.show_stats = show_stats
+        self.render_state_function = render_state_function
+        self.show_stats = show_stats
+        self.init_width = width
+        self.init_height = height
+        self.show_grid = show_grid
+        self.input_callback = Optional[Callable[[int, int], None]]
 
+    def initialize(self):
+        """
+        Function that actually initializes the class.
+        This is needed in client-side rendering, as the client does not initially
+        have the renderstate, which has to be acquired from the server.
+        But now we can open the window to show other stuff in beginning.
+        """
         # Enable performance timings early if stats are requested
-        if show_stats:
+        if self.show_stats:
             arcade.enable_timings()
 
         self.set_update_rate(1 / TARGET_FPS)
         self.set_draw_rate(1 / TARGET_FPS)
-        self.server = server
 
-        self.zoom = min(width // 640, height // 480)
+        self.zoom = min(self.init_width // 640, self.init_height // 480)
 
         # Create transparent texture for empty transitions
-        from PIL import Image
-
         transparent_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
         self.transparent_texture = arcade.Texture(transparent_image)
 
         # Get initial render state for map dimensions
-        state = server.get_render_state()
+        state = self.render_state_function()
         self.map_width = state.width
         self.map_height = state.height
 
         # Create sub-renderers
-        self.tile_renderer = TileRenderer(state, self.transparent_texture, self.zoom, show_grid=show_grid)
+        self.tile_renderer = TileRenderer(
+            state, self.transparent_texture, self.zoom, show_grid=self.show_grid
+        )
         self.entity_renderer = EntityRenderer(
-            state, self.transparent_texture, self.zoom,
-            self.height, self.map_height, SPRITES_PATH,
+            state,
+            self.transparent_texture,
+            self.zoom,
+            self.height,
+            self.map_height,
+            SPRITES_PATH,
         )
         self.header_renderer = HeaderRenderer(
-            self.transparent_texture, self.zoom, self.height, show_stats,
+            self.transparent_texture,
+            self.zoom,
+            self.height,
+            self.show_stats,
         )
 
         # Calculate y offset for UI space at top
@@ -78,21 +115,26 @@ class GameRenderer(arcade.Window):
 
         # Create camera for scrolling (will be positioned in on_update)
         # Camera uses world coordinates where Y=0 is at bottom
-        # Viewport limits render area to 64x45 tiles, positioned at bottom-left of window
+        # Viewport limits render area to 64x45 tiles,
+        # positioned at bottom-left of window
         self.viewport_pixels_x = VIEWPORT_WIDTH * SPRITE_SIZE * self.zoom
         self.viewport_pixels_y = VIEWPORT_HEIGHT * SPRITE_SIZE * self.zoom
         self.game_camera = arcade.Camera2D(
-            viewport=arcade.LBWH(0, 0, int(self.viewport_pixels_x), int(self.viewport_pixels_y)),
+            viewport=arcade.LBWH(
+                0, 0, int(self.viewport_pixels_x), int(self.viewport_pixels_y)
+            ),
         )
         # Match projection size to viewport so 1 world pixel = 1 screen pixel
         self.game_camera.projection = arcade.LRBT(
-            -self.viewport_pixels_x / 2, self.viewport_pixels_x / 2,
-            -self.viewport_pixels_y / 2, self.viewport_pixels_y / 2
+            -self.viewport_pixels_x / 2,
+            self.viewport_pixels_x / 2,
+            -self.viewport_pixels_y / 2,
+            self.viewport_pixels_y / 2,
         )
 
-    def on_update(self, delta_time):
+    def on_update(self, delta_time: float):
         """Poll server and update tilemap"""
-        state = self.server.get_render_state()
+        state = self.render_state_function()
         current_time = time.perf_counter()  # Single timestamp for all updates
 
         # Calculate camera position based on client player
@@ -100,7 +142,8 @@ class GameRenderer(arcade.Window):
         cam_x, cam_y = self.calculate_camera_position(
             client_player.x if client_player else 0,
             client_player.y if client_player else 0,
-            state.width, state.height
+            state.width,
+            state.height,
         )
         # Set camera to show 64x45 tile viewport centered on player
         self.game_camera.position = (cam_x, cam_y)
@@ -124,15 +167,38 @@ class GameRenderer(arcade.Window):
         # World y to game y: game_y = map_height - (world_y / tile_size_px)
         # Top of view (high world y) = low game y (top rows)
         # Bottom of view (low world y) = high game y (bottom rows)
-        view_start_y = max(0, int(self.map_height - view_top_world_y / tile_size_px) - 1)
-        view_end_y = min(state.height, int(self.map_height - view_bottom_world_y / tile_size_px) + 2)
+        view_start_y = max(
+            0, int(self.map_height - view_top_world_y / tile_size_px) - 1
+        )
+        view_end_y = min(
+            state.height, int(self.map_height - view_bottom_world_y / tile_size_px) + 2
+        )
 
         # Delegate to sub-renderers
-        self.tile_renderer.on_update(state, view_start_x, view_end_x, view_start_y, view_end_y)
-        self.entity_renderer.on_update(state, current_time, delta_time, view_start_x, view_end_x, view_start_y, view_end_y)
+        self.tile_renderer.on_update(
+            state, view_start_x, view_end_x, view_start_y, view_end_y
+        )
+        self.entity_renderer.on_update(
+            state,
+            current_time,
+            delta_time,
+            view_start_x,
+            view_end_x,
+            view_start_y,
+            view_end_y,
+        )
         self.header_renderer.on_update(state.players, self.client_player_name)
 
-    def find_client_player(self, players):
+    # ██╗  ██╗███████╗██╗     ██████╗ ███████╗██████╗ ███████╗
+    # ██║  ██║██╔════╝██║     ██╔══██╗██╔════╝██╔══██╗██╔════╝
+    # ███████║█████╗  ██║     ██████╔╝█████╗  ██████╔╝███████╗
+    # ██╔══██║██╔══╝  ██║     ██╔═══╝ ██╔══╝  ██╔══██╗╚════██║
+    # ██║  ██║███████╗███████╗██║     ███████╗██║  ██║███████║
+    # ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝
+
+    def find_client_player(
+        self, players: List[DynamicEntity]
+    ) -> Optional[DynamicEntity]:
         """Find the client's player by name.
 
         Args:
@@ -146,8 +212,9 @@ class GameRenderer(arcade.Window):
                 return player
         return None
 
-    def calculate_camera_position(self, player_x: float, player_y: float,
-                                   map_width: int, map_height: int) -> tuple:
+    def calculate_camera_position(
+        self, player_x: float, player_y: float, map_width: int, map_height: int
+    ) -> Tuple[float, float]:
         """Calculate camera position based on player and map size.
 
         Args:
@@ -174,7 +241,8 @@ class GameRenderer(arcade.Window):
             return (cam_x, cam_y)
 
         # Large maps: center on player (in world pixel coords)
-        # Player position in world pixels (Y inverted: row 0 at top in game coords, at bottom in world)
+        # Player position in world pixels
+        # (Y inverted: row 0 at top in game coords, at bottom in world)
         player_world_x = player_x * SPRITE_SIZE * self.zoom
         player_world_y = (map_height - player_y) * SPRITE_SIZE * self.zoom
 
@@ -187,25 +255,56 @@ class GameRenderer(arcade.Window):
 
         return (cam_x, cam_y)
 
+    # ██████╗ ██████╗  █████╗ ██╗    ██╗
+    # ██╔══██╗██╔══██╗██╔══██╗██║    ██║
+    # ██║  ██║██████╔╝███████║██║ █╗ ██║
+    # ██║  ██║██╔══██╗██╔══██║██║███╗██║
+    # ██████╔╝██║  ██║██║  ██║╚███╔███╔╝
+    # ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝
+
     def on_draw(self):
         """Render the game"""
         self.clear()
 
         # Draw game world with camera transformation
         self.game_camera.use()
-        self.tile_renderer.background_tile_sprite_list.draw(pixelated=True)
-        self.tile_renderer.vertical_transition_sprite_list.draw(pixelated=True)
-        self.tile_renderer.horizontal_transition_sprite_list.draw(pixelated=True)
-        self.tile_renderer.grid_sprite_list.draw(pixelated=True)
-        self.entity_renderer.pickup_sprite_list.draw(pixelated=True)
-        self.entity_renderer.bomb_sprite_list.draw(pixelated=True)
-        self.entity_renderer.monster_sprite_list.draw(pixelated=True)
-        self.entity_renderer.player_sprite_list.draw(pixelated=True)
-        self.entity_renderer.explosion_sprite_list.draw(pixelated=True)
+        self.tile_renderer.background_tile_sprite_list.draw(pixelated=True)  # type: ignore
+        self.tile_renderer.vertical_transition_sprite_list.draw(pixelated=True)  # type: ignore
+        self.tile_renderer.horizontal_transition_sprite_list.draw(pixelated=True)  # type: ignore
+        self.tile_renderer.grid_sprite_list.draw(pixelated=True)  # type: ignore
+        self.entity_renderer.pickup_sprite_list.draw(pixelated=True)  # type: ignore
+        self.entity_renderer.bomb_sprite_list.draw(pixelated=True)  # type: ignore
+        self.entity_renderer.monster_sprite_list.draw(pixelated=True)  # type: ignore
+        self.entity_renderer.player_sprite_list.draw(pixelated=True)  # type: ignore
+        self.entity_renderer.explosion_sprite_list.draw(pixelated=True)  # type: ignore
 
         # Draw UI without camera (use default projection)
         self.default_camera.use()
         self.header_renderer.on_draw(self.show_stats)
+
+    # ██╗███╗   ██╗██████╗ ██╗   ██╗████████╗
+    # ██║████╗  ██║██╔══██╗██║   ██║╚══██╔══╝
+    # ██║██╔██╗ ██║██████╔╝██║   ██║   ██║
+    # ██║██║╚██╗██║██╔═══╝ ██║   ██║   ██║
+    # ██║██║ ╚████║██║     ╚██████╔╝   ██║
+    # ╚═╝╚═╝  ╚═══╝╚═╝      ╚═════╝    ╚═╝
+
+    def bind_input_callback(self, callback: Callable[[int, int], None]) -> None:
+        self.input_callback = callback
+
+    def on_key_press(self, symbol: int, modifiers: int):
+        if self.input_callback is not None:
+            self.input_callback(symbol, modifiers)
+
+    def on_key_release(self, symbol: int, modifiers: int):
+        pass
+
+    # ███╗   ███╗ █████╗ ██╗███╗   ██╗
+    # ████╗ ████║██╔══██╗██║████╗  ██║
+    # ██╔████╔██║███████║██║██╔██╗ ██║
+    # ██║╚██╔╝██║██╔══██║██║██║╚██╗██║
+    # ██║ ╚═╝ ██║██║  ██║██║██║ ╚████║
+    # ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
 
     def run(self):
         arcade.run()
