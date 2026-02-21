@@ -1,8 +1,9 @@
 import arcade
 import re
-from typing import Tuple
+from typing import Tuple, Optional
 from common.config_reader import ConfigReader
 from pynput import keyboard
+
 
 def map_keys(config: ConfigReader) -> Tuple[
     int,
@@ -93,6 +94,27 @@ def parse_arcade_key(name: str) -> int:
         return getattr(arcade.key, key_name)
     except AttributeError:
         raise ValueError(f"Unknown arcade key: '{name}'")
+
+
+def arcade_key_to_string(key_code: int) -> Optional[str]:
+    """
+    Convert an arcade key integer back into a string
+    that parse_arcade_key() can understand.
+    """
+
+    # Find matching constant name in arcade.key
+    for attr in dir(arcade.key):
+        if attr.isupper():
+            if getattr(arcade.key, attr) == key_code:
+                name = attr.lower()
+
+                # KEY_1 → 1
+                if name.startswith("key_"):
+                    return name[4:]
+
+                return name
+
+    return None
 
 
 def pynput_to_arcade_key(key: keyboard.Key | keyboard.KeyCode) -> int | None:

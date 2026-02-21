@@ -10,8 +10,8 @@ import arcade
 from PIL import Image
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
-
+from typing import List, Optional, Tuple, Any
+from common.keymapper import arcade_key_to_string
 from game_engine.entities import Direction
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import (
@@ -51,7 +51,12 @@ DIG_DURATION = 1.0  # seconds to dig
 
 # Player appearance options (sprite_id 1-4)
 PLAYER_APPEARANCES = [1, 2, 3, 4]
-PLAYER_APPEARANCE_NAMES = ["Appearance 1", "Appearance 2", "Appearance 3", "Appearance 4"]
+PLAYER_APPEARANCE_NAMES = [
+    "Appearance 1",
+    "Appearance 2",
+    "Appearance 3",
+    "Appearance 4",
+]
 
 # Icon size (icons are 30x30 pixels)
 ICON_SIZE = 30
@@ -67,12 +72,21 @@ class FieldType(Enum):
 @dataclass
 class MenuField:
     """A configurable field in the setup menu."""
+
     name: str
     field_type: FieldType
-    value: any
-    options: List[any] = field(default_factory=list)
+    value: Any
+    options: List[Any] = field(default_factory=list)
     option_names: List[str] = field(default_factory=list)
     selected_option_index: int = 0
+
+
+# ███╗   ███╗██╗███╗   ██╗██╗███╗   ███╗ █████╗ ██████╗
+# ████╗ ████║██║████╗  ██║██║████╗ ████║██╔══██╗██╔══██╗
+# ██╔████╔██║██║██╔██╗ ██║██║██╔████╔██║███████║██████╔╝
+# ██║╚██╔╝██║██║██║╚██╗██║██║██║╚██╔╝██║██╔══██║██╔═══╝
+# ██║ ╚═╝ ██║██║██║ ╚████║██║██║ ╚═╝ ██║██║  ██║██║
+# ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝
 
 
 class PreviewPlayer:
@@ -91,12 +105,16 @@ class PreviewPlayer:
         self.target_y = 4.0
         self.dig_target = None  # (x, y) of tile being dug
 
-    def update(self, delta_time: float, mini_map: List[List[int]]) -> Optional[Tuple[int, int]]:
+    def update(
+        self, delta_time: float, mini_map: List[List[int]]
+    ) -> Optional[Tuple[int, int]]:
         """Update player state. Returns (x, y) if a tile was destroyed."""
         destroyed_tile = None
 
         # Update animation frame
-        frame_duration = DIG_FRAME_DURATION if self.state == "dig" else WALK_FRAME_DURATION
+        frame_duration = (
+            DIG_FRAME_DURATION if self.state == "dig" else WALK_FRAME_DURATION
+        )
         self.frame_timer += delta_time
         if self.frame_timer >= frame_duration:
             self.frame_timer = 0.0
@@ -151,8 +169,12 @@ class PreviewPlayer:
         diggable = []
         ix, iy = int(self.x), int(self.y)
 
-        for dx, dy, direction in [(1, 0, Direction.RIGHT), (-1, 0, Direction.LEFT),
-                                   (0, 1, Direction.DOWN), (0, -1, Direction.UP)]:
+        for dx, dy, direction in [
+            (1, 0, Direction.RIGHT),
+            (-1, 0, Direction.LEFT),
+            (0, 1, Direction.DOWN),
+            (0, -1, Direction.UP),
+        ]:
             nx, ny = ix + dx, iy + dy
             if 0 <= nx < MINI_MAP_SIZE and 0 <= ny < MINI_MAP_SIZE:
                 if mini_map[ny][nx] == 1:  # Dirt tile
@@ -187,6 +209,14 @@ class PreviewPlayer:
             self.target_x, self.target_y = self.x, self.y
 
 
+# ███████╗███████╗████████╗██╗   ██╗██████╗
+# ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+# ███████╗█████╗     ██║   ██║   ██║██████╔╝
+# ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝
+# ███████║███████╗   ██║   ╚██████╔╝██║
+# ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝
+
+
 class PlayerSetup(arcade.Window):
     """Player setup GUI application."""
 
@@ -207,11 +237,21 @@ class PlayerSetup(arcade.Window):
         # Initialize player settings with defaults
         self.player_name = "Player"
         self.player_appearance_index = 0
-        self.player_color_index = 0  # Default to first color (matches appearance 1's base color)
+        self.player_color_index = (
+            0  # Default to first color (matches appearance 1's base color)
+        )
         self.weapon_order = list(BOMB_TYPES)
         self.hotkeys = dict(DEFAULT_HOTKEYS)
         self.dig_power = 1
         self.money = 100
+        self.up_key = "up arrow"
+        self.down_key = "down arrow"
+        self.left_key = "left arro"
+        self.right_key = "right arrow"
+        self.stop_key = "right ctrl"
+        self.fire_key = "space"
+        self.choose_key = "right shift"
+        self.remote_key = "enter"
 
         # Load saved config if it exists
         self._load_config()
@@ -337,8 +377,16 @@ class PlayerSetup(arcade.Window):
             for tx in range(MINI_MAP_SIZE):
                 sprite = arcade.Sprite()
                 sprite.scale = self.map_zoom
-                sprite.center_x = map_x + tx * SPRITE_SIZE * self.map_zoom + SPRITE_SIZE * self.map_zoom / 2
-                sprite.center_y = map_y - ty * SPRITE_SIZE * self.map_zoom - SPRITE_SIZE * self.map_zoom / 2
+                sprite.center_x = (
+                    map_x
+                    + tx * SPRITE_SIZE * self.map_zoom
+                    + SPRITE_SIZE * self.map_zoom / 2
+                )
+                sprite.center_y = (
+                    map_y
+                    - ty * SPRITE_SIZE * self.map_zoom
+                    - SPRITE_SIZE * self.map_zoom / 2
+                )
                 sprite.texture = self.transparent_texture
                 row.append(sprite)
                 self.minimap_sprite_list.append(sprite)
@@ -377,7 +425,9 @@ class PlayerSetup(arcade.Window):
 
     def _update_instructions(self):
         """Update the instructions text sprites."""
-        instructions = "Up/Down: Navigate | Left/Right: Change | Enter: Edit | Esc: Exit"
+        instructions = (
+            "Up/Down: Navigate | Left/Right: Change | Enter: Edit | Esc: Exit"
+        )
         self.instructions_sprites = self.bitmap_text.create_text_sprites(
             instructions, 20, 30, color=(120, 120, 140, 255)
         )
@@ -390,7 +440,7 @@ class PlayerSetup(arcade.Window):
             name_to_display,
             self.card_left + 8 * self.zoom,
             self.card_top - 1 * self.zoom,
-            color=(255, 255, 255, 255)
+            color=(255, 255, 255, 255),
         )
 
         # Dig power (red)
@@ -398,7 +448,7 @@ class PlayerSetup(arcade.Window):
             str(self.dig_power),
             self.card_left + 26 * self.zoom,
             self.card_top - 11 * self.zoom,
-            color=(255, 0, 0, 255)
+            color=(255, 0, 0, 255),
         )
 
         # Money (yellow)
@@ -406,54 +456,122 @@ class PlayerSetup(arcade.Window):
             str(self.money),
             self.card_left + 26 * self.zoom,
             self.card_top - 21 * self.zoom,
-            color=(255, 255, 0, 255)
+            color=(255, 255, 0, 255),
         )
 
     def _init_menu_fields(self):
         """Initialize the menu fields."""
-        self.fields = []
+        self.fields: List[MenuField] = []
 
         # Player name field
-        self.fields.append(MenuField(
-            name="Player Name",
-            field_type=FieldType.TEXT,
-            value=self.player_name,
-        ))
+        self.fields.append(
+            MenuField(
+                name="Player Name",
+                field_type=FieldType.TEXT,
+                value=self.player_name,
+            )
+        )
 
         # Player appearance field
-        self.fields.append(MenuField(
-            name="Player Appearance",
-            field_type=FieldType.OPTION,
-            value=PLAYER_APPEARANCES[self.player_appearance_index],
-            options=PLAYER_APPEARANCES,
-            option_names=PLAYER_APPEARANCE_NAMES,
-            selected_option_index=self.player_appearance_index,
-        ))
+        self.fields.append(
+            MenuField(
+                name="Player Appearance",
+                field_type=FieldType.OPTION,
+                value=PLAYER_APPEARANCES[self.player_appearance_index],
+                options=PLAYER_APPEARANCES,
+                option_names=PLAYER_APPEARANCE_NAMES,
+                selected_option_index=self.player_appearance_index,
+            )
+        )
 
         # Player color field
-        self.fields.append(MenuField(
-            name="Player Color",
-            field_type=FieldType.OPTION,
-            value=PLAYER_COLORS[self.player_color_index],
-            options=PLAYER_COLORS,
-            option_names=PLAYER_COLOR_NAMES,
-            selected_option_index=self.player_color_index,
-        ))
+        self.fields.append(
+            MenuField(
+                name="Player Color",
+                field_type=FieldType.OPTION,
+                value=PLAYER_COLORS[self.player_color_index],
+                options=PLAYER_COLORS,
+                option_names=PLAYER_COLOR_NAMES,
+                selected_option_index=self.player_color_index,
+            )
+        )
+
+        # Default controls
+        self.fields.append(
+            MenuField(
+                name="Up",
+                field_type=FieldType.HOTKEY,
+                value=self.up_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Down",
+                field_type=FieldType.HOTKEY,
+                value=self.down_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Left",
+                field_type=FieldType.HOTKEY,
+                value=self.left_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Right",
+                field_type=FieldType.HOTKEY,
+                value=self.right_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Stop",
+                field_type=FieldType.HOTKEY,
+                value=self.stop_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Fire",
+                field_type=FieldType.HOTKEY,
+                value=self.fire_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Choose",
+                field_type=FieldType.HOTKEY,
+                value=self.choose_key,
+            )
+        )
+        self.fields.append(
+            MenuField(
+                name="Remote",
+                field_type=FieldType.HOTKEY,
+                value=self.remote_key,
+            )
+        )
 
         # Hotkey fields for each bomb type (in weapon_order)
         for bomb_type in self.weapon_order:
-            self.fields.append(MenuField(
-                name=f"{BOMB_TYPE_NAMES[bomb_type]} Hotkey",
-                field_type=FieldType.HOTKEY,
-                value=self.hotkeys.get(bomb_type, ""),
-            ))
+            self.fields.append(
+                MenuField(
+                    name=f"{BOMB_TYPE_NAMES[bomb_type]} Hotkey",
+                    field_type=FieldType.HOTKEY,
+                    value=self.hotkeys.get(bomb_type, ""),
+                )
+            )
 
         # Save field
-        self.fields.append(MenuField(
-            name="Save",
-            field_type=FieldType.SAVE,
-            value=None,
-        ))
+        self.fields.append(
+            MenuField(
+                name="Save",
+                field_type=FieldType.SAVE,
+                value=None,
+            )
+        )
 
     def _init_mini_map(self):
         """Initialize the mini-map with a simple layout."""
@@ -537,14 +655,20 @@ class PlayerSetup(arcade.Window):
                     self.minimap_sprites[ty][tx].texture = self.transparent_texture
 
         # Update preview player sprite
-        player_key = (sprite_id, self.preview_player.state,
-                      self.preview_player.direction, self.preview_player.frame)
+        player_key = (
+            sprite_id,
+            self.preview_player.state,
+            self.preview_player.direction,
+            self.preview_player.frame,
+        )
 
         if player_key != self.last_player_key:
             self.last_player_key = player_key
             player_texture = self.player_colorizer.get_player_texture(
-                sprite_id, self.preview_player.state,
-                self.preview_player.direction, self.preview_player.frame
+                sprite_id,
+                self.preview_player.state,
+                self.preview_player.direction,
+                self.preview_player.frame,
             )
             if player_texture:
                 self.preview_player_sprite.texture = player_texture
@@ -553,20 +677,22 @@ class PlayerSetup(arcade.Window):
 
         # Update preview player position
         self.preview_player_sprite.center_x = (
-            self.map_origin_x +
-            self.preview_player.x * SPRITE_SIZE * self.map_zoom +
-            SPRITE_SIZE * self.map_zoom / 2
+            self.map_origin_x
+            + self.preview_player.x * SPRITE_SIZE * self.map_zoom
+            + SPRITE_SIZE * self.map_zoom / 2
         )
         self.preview_player_sprite.center_y = (
-            self.map_origin_y -
-            self.preview_player.y * SPRITE_SIZE * self.map_zoom -
-            SPRITE_SIZE * self.map_zoom / 2
+            self.map_origin_y
+            - self.preview_player.y * SPRITE_SIZE * self.map_zoom
+            - SPRITE_SIZE * self.map_zoom / 2
         )
 
         # Update highlight position
         start_y = self.height - 38 * self.zoom
         line_height = 20 * self.zoom
-        highlight_y = start_y - self.current_field_index * line_height - line_height / 2 + 4
+        highlight_y = (
+            start_y - self.current_field_index * line_height - line_height / 2 + 4
+        )
         self.highlight_sprite.center_x = self.width / 2
         self.highlight_sprite.center_y = highlight_y
 
@@ -582,7 +708,7 @@ class PlayerSetup(arcade.Window):
 
         for i, menu_field in enumerate(self.fields):
             y = start_y - i * line_height
-            is_selected = (i == self.current_field_index)
+            is_selected = i == self.current_field_index
 
             # Field name
             name_color = (255, 255, 100, 255) if is_selected else (180, 180, 180, 255)
@@ -593,7 +719,7 @@ class PlayerSetup(arcade.Window):
                 self.menu_text_sprites.append(s)
 
             # Field value
-            value_x = 340
+            value_x = 500
 
             if menu_field.field_type == FieldType.TEXT:
                 value_str = menu_field.value
@@ -603,14 +729,18 @@ class PlayerSetup(arcade.Window):
                     value_color = (255, 255, 255, 255)
                 else:
                     value_color = (200, 200, 200, 255)
-                value_sprites = self.bitmap_text.create_text_sprites(value_str, value_x, y, color=value_color)
+                value_sprites = self.bitmap_text.create_text_sprites(
+                    value_str, value_x, y, color=value_color
+                )
                 for s in value_sprites:
                     self.menu_text_sprites.append(s)
 
                 if is_selected and not self.editing_text:
                     hint_sprites = self.bitmap_text.create_text_sprites(
-                        "<Enter to edit>", value_x + len(menu_field.value) * 8 * self.zoom + 20, y,
-                        color=(100, 100, 100, 255)
+                        "<Enter to edit>",
+                        value_x + len(menu_field.value) * 8 * self.zoom + 20,
+                        y,
+                        color=(100, 100, 100, 255),
                     )
                     for s in hint_sprites:
                         self.menu_text_sprites.append(s)
@@ -623,7 +753,9 @@ class PlayerSetup(arcade.Window):
                 else:
                     display_str = option_name
                     value_color = (200, 200, 200, 255)
-                value_sprites = self.bitmap_text.create_text_sprites(display_str, value_x, y, color=value_color)
+                value_sprites = self.bitmap_text.create_text_sprites(
+                    display_str, value_x, y, color=value_color
+                )
                 for s in value_sprites:
                     self.menu_text_sprites.append(s)
 
@@ -634,12 +766,19 @@ class PlayerSetup(arcade.Window):
                         "Press a key...", value_x, y, color=(255, 200, 100, 255)
                     )
                 else:
-                    value_color = (255, 255, 255, 255) if is_selected else (200, 200, 200, 255)
-                    value_sprites = self.bitmap_text.create_text_sprites(hotkey_str, value_x, y, color=value_color)
+                    value_color = (
+                        (255, 255, 255, 255) if is_selected else (200, 200, 200, 255)
+                    )
+                    value_sprites = self.bitmap_text.create_text_sprites(
+                        hotkey_str, value_x, y, color=value_color
+                    )
 
                     if is_selected and not self.editing_hotkey:
                         hint_sprites = self.bitmap_text.create_text_sprites(
-                            "<Enter to change>", value_x + 80, y, color=(100, 100, 100, 255)
+                            "<Enter to change>",
+                            value_x + len(menu_field.value) * 8 * self.zoom + 20,
+                            y,
+                            color=(100, 100, 100, 255),
                         )
                         for s in hint_sprites:
                             self.menu_text_sprites.append(s)
@@ -650,7 +789,10 @@ class PlayerSetup(arcade.Window):
             elif menu_field.field_type == FieldType.SAVE:
                 if is_selected:
                     value_sprites = self.bitmap_text.create_text_sprites(
-                        "<Press Enter to save and exit>", value_x, y, color=(100, 255, 100, 255)
+                        "<Press Enter to save and exit>",
+                        value_x,
+                        y,
+                        color=(100, 255, 100, 255),
                     )
                     for s in value_sprites:
                         self.menu_text_sprites.append(s)
@@ -723,6 +865,24 @@ class PlayerSetup(arcade.Window):
             except (ValueError, IndexError):
                 pass
 
+        # Default controls
+        if "up" in config:
+            self.up_key = config["up"]
+        if "down" in config:
+            self.down_key = config["down"]
+        if "left" in config:
+            self.left_key = config["left"]
+        if "right" in config:
+            self.right_key = config["right"]
+        if "stop" in config:
+            self.stop_key = config["stop"]
+        if "fire" in config:
+            self.fire_key = config["fire"]
+        if "choose" in config:
+            self.choose_key = config["choose"]
+        if "remote" in config:
+            self.remote_key = config["remote"]
+
         # Load items (weapon order and hotkeys)
         if "items" in config:
             items = config["items"]
@@ -746,7 +906,9 @@ class PlayerSetup(arcade.Window):
                         used_hotkeys.add(hotkey.lower())
 
             # Find any bomb types that are in BOMB_TYPES but not in the config
-            missing_bomb_types = [bt for bt in BOMB_TYPES if bt not in loaded_weapon_order]
+            missing_bomb_types = [
+                bt for bt in BOMB_TYPES if bt not in loaded_weapon_order
+            ]
 
             # Assign hotkeys to missing items from HOTKEY_ORDER
             for bomb_type in missing_bomb_types:
@@ -770,11 +932,13 @@ class PlayerSetup(arcade.Window):
         # Build items list with name, hotkey, and menu order
         items = []
         for i, bomb_type in enumerate(self.weapon_order):
-            items.append({
-                "name": BOMB_TYPE_NAMES[bomb_type],
-                "hotkey": self.hotkeys.get(bomb_type, ""),
-                "menu_order": i
-            })
+            items.append(
+                {
+                    "name": BOMB_TYPE_NAMES[bomb_type],
+                    "hotkey": self.hotkeys.get(bomb_type, ""),
+                    "menu_order": i,
+                }
+            )
 
         # Get the selected color as hex string
         color = PLAYER_COLORS[self.player_color_index]
@@ -784,7 +948,15 @@ class PlayerSetup(arcade.Window):
             "player_name": self.fields[0].value,
             "appearance_id": PLAYER_APPEARANCES[self.player_appearance_index],
             "color": color_hex,
-            "items": items
+            "up": self.fields[3].value,
+            "down": self.fields[4].value,
+            "left": self.fields[5].value,
+            "right": self.fields[6].value,
+            "stop": self.fields[7].value,
+            "fire": self.fields[8].value,
+            "choose": self.fields[9].value,
+            "remote": self.fields[10].value,
+            "items": items,
         }
 
         # Ensure cfg directory exists
@@ -810,7 +982,7 @@ class PlayerSetup(arcade.Window):
                     self.player_name = current_field.value
             else:
                 # Try to get character from key
-                char = self._key_to_char(key, modifiers)
+                char = self._key_to_char(key, modifiers, is_text=True)
                 if char and len(current_field.value) < 20:
                     current_field.value += char
                     self.player_name = current_field.value
@@ -826,7 +998,9 @@ class PlayerSetup(arcade.Window):
                 if char:
                     current_field.value = char
                     # Update hotkeys dict
-                    bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
+                    bomb_index = (
+                        self.current_field_index - 11
+                    )  # Offset for name, appearance, color fields, and regular ctrls
                     if 0 <= bomb_index < len(self.weapon_order):
                         self.hotkeys[self.weapon_order[bomb_index]] = char
                 self.editing_hotkey = False
@@ -841,8 +1015,12 @@ class PlayerSetup(arcade.Window):
 
         elif key == arcade.key.LEFT:
             if current_field.field_type == FieldType.OPTION:
-                current_field.selected_option_index = (current_field.selected_option_index - 1) % len(current_field.options)
-                current_field.value = current_field.options[current_field.selected_option_index]
+                current_field.selected_option_index = (
+                    current_field.selected_option_index - 1
+                ) % len(current_field.options)
+                current_field.value = current_field.options[
+                    current_field.selected_option_index
+                ]
                 # Update the appropriate index based on which field we're on
                 if self.current_field_index == 1:  # Appearance field
                     self.player_appearance_index = current_field.selected_option_index
@@ -851,22 +1029,32 @@ class PlayerSetup(arcade.Window):
 
             elif current_field.field_type == FieldType.HOTKEY:
                 # Move this weapon left in the weapon order
-                bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
+                bomb_index = (
+                    self.current_field_index - 3
+                )  # Offset for name, appearance, and color fields
                 if bomb_index > 0:
                     # Swap in weapon_order
-                    self.weapon_order[bomb_index], self.weapon_order[bomb_index - 1] = \
-                        self.weapon_order[bomb_index - 1], self.weapon_order[bomb_index]
+                    self.weapon_order[bomb_index], self.weapon_order[bomb_index - 1] = (
+                        self.weapon_order[bomb_index - 1],
+                        self.weapon_order[bomb_index],
+                    )
                     # Swap menu fields
                     field_idx = self.current_field_index
-                    self.fields[field_idx], self.fields[field_idx - 1] = \
-                        self.fields[field_idx - 1], self.fields[field_idx]
+                    self.fields[field_idx], self.fields[field_idx - 1] = (
+                        self.fields[field_idx - 1],
+                        self.fields[field_idx],
+                    )
                     # Move cursor to follow the item
                     self.current_field_index -= 1
 
         elif key == arcade.key.RIGHT:
             if current_field.field_type == FieldType.OPTION:
-                current_field.selected_option_index = (current_field.selected_option_index + 1) % len(current_field.options)
-                current_field.value = current_field.options[current_field.selected_option_index]
+                current_field.selected_option_index = (
+                    current_field.selected_option_index + 1
+                ) % len(current_field.options)
+                current_field.value = current_field.options[
+                    current_field.selected_option_index
+                ]
                 # Update the appropriate index based on which field we're on
                 if self.current_field_index == 1:  # Appearance field
                     self.player_appearance_index = current_field.selected_option_index
@@ -875,15 +1063,21 @@ class PlayerSetup(arcade.Window):
 
             elif current_field.field_type == FieldType.HOTKEY:
                 # Move this weapon right in the weapon order
-                bomb_index = self.current_field_index - 3  # Offset for name, appearance, and color fields
+                bomb_index = (
+                    self.current_field_index - 3
+                )  # Offset for name, appearance, and color fields
                 if bomb_index < len(self.weapon_order) - 1:
                     # Swap in weapon_order
-                    self.weapon_order[bomb_index], self.weapon_order[bomb_index + 1] = \
-                        self.weapon_order[bomb_index + 1], self.weapon_order[bomb_index]
+                    self.weapon_order[bomb_index], self.weapon_order[bomb_index + 1] = (
+                        self.weapon_order[bomb_index + 1],
+                        self.weapon_order[bomb_index],
+                    )
                     # Swap menu fields
                     field_idx = self.current_field_index
-                    self.fields[field_idx], self.fields[field_idx + 1] = \
-                        self.fields[field_idx + 1], self.fields[field_idx]
+                    self.fields[field_idx], self.fields[field_idx + 1] = (
+                        self.fields[field_idx + 1],
+                        self.fields[field_idx],
+                    )
                     # Move cursor to follow the item
                     self.current_field_index += 1
 
@@ -903,37 +1097,46 @@ class PlayerSetup(arcade.Window):
         elif key == arcade.key.ESCAPE:
             arcade.close_window()
 
-    def _key_to_char(self, key: int, modifiers: int) -> Optional[str]:
+    def _key_to_char(
+        self, key: int, modifiers: int, is_text: bool = False
+    ) -> Optional[str]:
         """Convert arcade key code to character."""
-        # Letters
-        if arcade.key.A <= key <= arcade.key.Z:
-            char = chr(ord('a') + (key - arcade.key.A))
-            if modifiers & arcade.key.MOD_SHIFT:
-                char = char.upper()
-            return char
+        # Text editing requires different binds than hotkeys
+        if is_text:
+            # Letters
+            if arcade.key.A <= key <= arcade.key.Z:
+                char = chr(ord("a") + (key - arcade.key.A))
+                if modifiers & arcade.key.MOD_SHIFT:
+                    char = char.upper()
+                return char
+            # Numbers
+            if arcade.key.KEY_0 <= key <= arcade.key.KEY_9:
+                return chr(ord("0") + (key - arcade.key.KEY_0))
 
-        # Numbers
-        if arcade.key.KEY_0 <= key <= arcade.key.KEY_9:
-            return chr(ord('0') + (key - arcade.key.KEY_0))
+            # Space
+            if key == arcade.key.SPACE:
+                return " "
 
-        # Space
-        if key == arcade.key.SPACE:
-            return ' '
+            # Common punctuation
+            punctuation = {
+                arcade.key.MINUS: "-",
+                arcade.key.EQUAL: "=",
+                arcade.key.BRACKETLEFT: "[",
+                arcade.key.BRACKETRIGHT: "]",
+                arcade.key.SEMICOLON: ";",
+                arcade.key.APOSTROPHE: "'",
+                arcade.key.COMMA: ",",
+                arcade.key.PERIOD: ".",
+                arcade.key.SLASH: "/",
+            }
+            if key in punctuation:
+                return punctuation[key]
+            return None
 
-        # Common punctuation
-        punctuation = {
-            arcade.key.MINUS: '-',
-            arcade.key.EQUAL: '=',
-            arcade.key.BRACKETLEFT: '[',
-            arcade.key.BRACKETRIGHT: ']',
-            arcade.key.SEMICOLON: ';',
-            arcade.key.APOSTROPHE: "'",
-            arcade.key.COMMA: ',',
-            arcade.key.PERIOD: '.',
-            arcade.key.SLASH: '/',
-        }
-        if key in punctuation:
-            return punctuation[key]
+        # Hotkey binding. Here space = "space" and not " " etc
+        parsed_key = arcade_key_to_string(key)
+        if parsed_key:
+            return parsed_key
 
         return None
 

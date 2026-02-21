@@ -40,6 +40,7 @@ class BomberClient:
         self.headless = headless
         self.client = BomberNetworkClient(cfg_path)
         self.listener: Optional[keyboard.Listener] = None
+        self.name = config.get_config("player_name")
 
         server_found = self.client.find_host()
         if not server_found:
@@ -56,7 +57,14 @@ class BomberClient:
 
     def start(self) -> None:
         self.client.start()
-        name = input("Name: ")
+
+        if not self.name:
+            name = input("Name: ")
+        else:
+            name = self.name
+            print(f"Connecting with {name}")
+            Clock.sleep(1)
+
         self.client.set_name(name)
 
         if not self.headless:
@@ -147,7 +155,7 @@ class BomberClient:
 def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/client_config.yaml")
-    parser.add_argument("--key_cfg", "-k", type=str, default="cfg/key_map.yaml")
+    parser.add_argument("--key_cfg", "-k", type=str, default="cfg/player.yaml")
     parser.add_argument("--headless", "-hl", action="store_true", default=False)
     args = parser.parse_args()
     cfg_path = args.cfg
