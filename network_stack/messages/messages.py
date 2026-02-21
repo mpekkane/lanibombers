@@ -12,7 +12,7 @@ import numpy as np
 from game_engine.clock import Clock
 from typing import ClassVar, Dict, Type, Iterable, List
 from game_engine.agent_state import Action
-from game_engine.entities import Pickup, Bomb, DynamicEntity
+from game_engine.entities import Pickup, Bomb, DynamicEntity, Player
 from game_engine.render_state import RenderState
 
 
@@ -265,7 +265,7 @@ class GameState(Message):
     height: int
     tilemap: np.ndarray
     explosions: np.ndarray
-    players: List[DynamicEntity]
+    players: List[Player]
     monsters: List[DynamicEntity]
     pickups: List[Pickup]
     bombs: List[Bomb]
