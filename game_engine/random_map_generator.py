@@ -37,8 +37,8 @@ class RandomMapGenerator:
         self,
         x: int = 64,
         y: int = 45,
-        feature_size: int = 20,
-        threshold: float = 0.1,
+        feature_sizes: List[int] = [20, 5],
+        threshold: float = 0.3,
         min_treasure: int = 10,
         max_treasure: int = 40,
         min_tools: int = 5,
@@ -59,7 +59,7 @@ class RandomMapGenerator:
         Returns:
             MapData: Map data in renderer-friendly format
         """
-        _, map = generate_and_threshold(x, y, feature_size, threshold)  # type: ignore
+        _, map = generate_and_threshold(x, y, feature_sizes, threshold)  # type: ignore
 
         width: int = map.shape[0]  # type: ignore
         height: int = map.shape[1]  # type: ignore

@@ -1,6 +1,6 @@
 """Generates perlin noise"""
 
-from typing import Tuple
+from typing import Tuple, List
 import numpy as np
 import random
 from tqdm import tqdm
@@ -96,27 +96,32 @@ def threshold_map(perlin: np.ndarray, th: float) -> np.ndarray:
 
 
 def generate_and_threshold(
-    x, y, feature_size, threshold
+    x: int, y: int, feature_sizes: List[int], threshold: float
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate noise and threshold into usable map"""
-    perlin = perlin_noise(x, y, feature_size)
+    maps = []
+    for feature_size in feature_sizes:
+        maps.append(perlin_noise(x, y, feature_size))
+    maps_arr = np.array(maps)
+    perlin = np.sum(maps_arr, axis=0)
     tr = threshold_map(perlin, threshold)
     return perlin, tr
 
 
 # def test_perlin():
 #     import matplotlib.pyplot as plt
-#     x = 64
-#     y = 45
-#     feature_sizes = [2, 3, 5, 10, 20, 50]
+#     x = 45
+#     y = 64
+#     feature_size = [20, 5]
 
-#     # thresholds = [0.05, 0.1, 0.15, 0.2]
-#     fig, ax = plt.subplots(len(feature_sizes), 2)
-#     for i, X in enumerate(feature_sizes):
-#         perlin, th = generate_and_threshold(x, y, X, 0.1)
+#     num = 5
+
+#     fig, ax = plt.subplots(num, 2)
+#     for i in range(num):
+#         perlin, th = generate_and_threshold(x, y, feature_size, 0.3)
 #         ax[i, 0].imshow(perlin)
 #         ax[i, 1].imshow(th)
-#         print(f"generated {i}: {X}")
+#     plt.tight_layout()
 #     plt.show()
 
 
