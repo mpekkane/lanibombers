@@ -200,7 +200,6 @@ class BomberServer:
                 self.pings.pop(k, None)
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
-        print(f"got {msg.name}")
         ctx.name = msg.name  # type: ignore
         self.players.append(msg.name)  # type: ignore
         self.engine.create_player(msg.name)  # type: ignore

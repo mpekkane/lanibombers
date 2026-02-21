@@ -66,30 +66,46 @@ class RandomMapGenerator:
         assert isinstance(width, int)
         assert isinstance(height, int)
 
+        empty_len = 8
+
         tiles: List[List[Tile]] = []
         tilemap = array.array("B")
         for y in range(height):
             tiles.append([])
             for x in range(width):
-                if map[x, y]:
-                    north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
-                    south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
-                    west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
-                    east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
-                    if south and east and not north and not west:
-                        rid = BEDROCK_NW_ID
-                    elif south and west and not north and not east:
-                        rid = BEDROCK_NE_ID
-                    elif north and east and not south and not west:
-                        rid = BEDROCK_SW_ID
-                    elif north and west and not south and not east:
-                        rid = BEDROCK_SE_ID
-                    else:
-                        rid = random.choice(list(BEDROCK_INSIDE_TILES))
-                    tiles[y].append(Tile.create_by_id(tile_id=rid))
+                # empty start locations
+                if (
+                    (y == 0 and x < empty_len)
+                    or (y == 0 and x + empty_len >= width)
+                    or (y == height - 1 and x < empty_len)
+                    or (y == height - 1 and x + empty_len >= width)
+                    or (x == 0 and y < empty_len)
+                    or (x == 0 and y + empty_len >= height)
+                    or (x == width - 1 and y < empty_len)
+                    or (x == width - 1 and y + empty_len >= height)
+                ):
+                    tiles[y].append(Tile.create_empty())
+                # else do regular generated map
                 else:
-                    rid = random.choice(list(DIRT_TILES))
-                    tiles[y].append(Tile.create_by_id(tile_id=rid))
+                    if map[x, y]:
+                        north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
+                        south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
+                        west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
+                        east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
+                        if south and east and not north and not west:
+                            rid = BEDROCK_NW_ID
+                        elif south and west and not north and not east:
+                            rid = BEDROCK_NE_ID
+                        elif north and east and not south and not west:
+                            rid = BEDROCK_SW_ID
+                        elif north and west and not south and not east:
+                            rid = BEDROCK_SE_ID
+                        else:
+                            rid = random.choice(list(BEDROCK_INSIDE_TILES))
+                        tiles[y].append(Tile.create_by_id(tile_id=rid))
+                    else:
+                        rid = random.choice(list(DIRT_TILES))
+                        tiles[y].append(Tile.create_by_id(tile_id=rid))
                 tilemap.append(tiles[y][x].to_byte())
 
         # no monsters in random levels

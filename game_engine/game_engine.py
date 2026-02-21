@@ -82,14 +82,13 @@ class GameEngine:
             {}
         )  # (x, y) -> (start_time, type)
         self.event_resolver = EventResolver(resolve=self.resolve)
-        # FIXME: placeholder
+        # FIXME this has to be set by the map so you don't start in illegal position
+        offset = 0
         self.starting_poses = [
-            (1, 1),
-            # (60, 5),  # debug: close to teleport
-            # (10, 20),  # debug: close to boulder
-            (1, width - 1),
-            (height - 1, 1),
-            (height - 1, width - 1),
+            (offset, offset),
+            (offset, width - offset),
+            (height - offset, offset),
+            (height - offset, width - offset),
         ]
         self.prev_time = -1
         self.sounds_enabled = not headless
