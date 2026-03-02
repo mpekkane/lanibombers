@@ -101,9 +101,9 @@ class BomberNetworkClient:
         return True
 
     # messaging
-    def set_name(self, name: str) -> bool:
+    def set_name(self, name: str, color: tuple = (255, 255, 255), appearance_id: int = 1) -> bool:
         if self.connected:
-            self.client.send(Name(name=name))  # type: ignore
+            self.client.send(Name(name=name, color=color, appearance_id=appearance_id))  # type: ignore
             return True
         else:
             return False

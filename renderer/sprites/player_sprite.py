@@ -8,10 +8,9 @@ SPRITE_SIZE = 10
 class PlayerSprite(arcade.Sprite):
     """Extended sprite class for player entities with animation support"""
 
-    def __init__(self, sprite_id: int, color_variant: tuple, player_textures: dict, transparent_texture, blood_texture, zoom: float, screen_height: int, y_offset: float = 0, map_height: int = 45):
+    def __init__(self, sprite_id: int, player_textures: dict, transparent_texture, blood_texture, zoom: float, screen_height: int, y_offset: float = 0, map_height: int = 45):
         super().__init__()
         self.sprite_id = sprite_id
-        self.color_variant = color_variant
         self.player_textures = player_textures
         self.transparent_texture = transparent_texture
         self.blood_texture = blood_texture

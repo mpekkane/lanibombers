@@ -7,10 +7,11 @@ import os
 
 import arcade
 from PIL import Image
-from typing import List
+from typing import List, Optional
 from cfg.bomb_dictionary import BOMB_TYPE_TO_ICON
 from renderer.bitmap_text import BitmapText
-from game_engine.entities.dynamic_entity import DynamicEntity
+from renderer.player_colorizer import PlayerColorizer
+from game_engine.entities.player import Player
 
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
@@ -29,11 +30,10 @@ class HeaderRenderer:
         self.transparent_texture = transparent_texture
         self.screen_height = screen_height
 
-        # Load player card textures: sprite_id (1-4) -> texture
-        self.player_card_textures = {}
-        for sprite_id in range(1, 5):
-            path = os.path.join(SPRITES_PATH, f"player_card_{sprite_id}.png")
-            self.player_card_textures[sprite_id] = arcade.load_texture(path)
+        # Player colorizer for recolored cards
+        self.colorizer = PlayerColorizer(SPRITES_PATH)
+        self.cached_card_texture: Optional[arcade.Texture] = None
+        self.cached_card_key: Optional[tuple] = None  # (sprite_id, color)
 
         # Load inventory icon textures: BombType -> texture
         self.inventory_icon_textures = {}
@@ -50,6 +50,7 @@ class HeaderRenderer:
         hatch_size = 30
         hatch_image = Image.new('RGBA', (hatch_size, hatch_size), (0, 0, 0, 0))
         hatch_pixels = hatch_image.load()
+        assert hatch_pixels is not None
         hatch_color = (103, 103, 103, 255)  # Grey #676767
         # Draw diagonal hatch pattern - pixel every 4th on diagonals
         for y in range(hatch_size):
@@ -120,7 +121,7 @@ class HeaderRenderer:
             graph.alpha = 128
             self.perf_graph_list.append(graph)
 
-    def on_update(self, players: List[DynamicEntity], client_player_name: str):
+    def on_update(self, players: List[Player], client_player_name: str):
         """Update header UI elements based on the client player's state.
 
         Args:
@@ -151,10 +152,16 @@ class HeaderRenderer:
             self.player_card_sprite.texture = self.transparent_texture
             return
 
-        # Update the player card texture based on sprite_id (1-4)
+        # Update the player card texture (recolored per player color)
         sprite_id = client_player.sprite_id
-        if sprite_id in self.player_card_textures:
-            self.player_card_sprite.texture = self.player_card_textures[sprite_id]
+        card_key = (sprite_id, client_player.color)
+        if card_key != self.cached_card_key:
+            self.cached_card_key = card_key
+            self.cached_card_texture = self.colorizer.create_recolored_card(
+                sprite_id, client_player.color
+            )
+        if self.cached_card_texture is not None:
+            self.player_card_sprite.texture = self.cached_card_texture
         else:
             self.player_card_sprite.texture = self.transparent_texture
 

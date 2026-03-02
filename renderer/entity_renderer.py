@@ -18,6 +18,7 @@ from renderer.sprites import (
     BombSprite,
     ExplosionSprite,
 )
+from renderer.player_colorizer import PlayerColorizer
 from cfg.tile_dictionary import (
     TILE_DICTIONARY,
     PLAYER_DEATH_SPRITE,
@@ -50,30 +51,8 @@ class EntityRenderer:
             os.path.join(sprites_path, f"{MONSTER_DEATH_SPRITE}.png")
         )
 
-        # Load player textures: (sprite_id, state, direction, frame) -> texture
-        self.player_textures = {}
-        for sprite_id in range(1, 5):
-            for direction in Direction:
-                for frame in range(1, 5):
-                    # Walking sprites
-                    sprite_name = f"player{sprite_id}_{direction.value}_{frame}"
-                    path = os.path.join(sprites_path, f"{sprite_name}.png")
-                    walk_texture = arcade.load_texture(path)
-                    self.player_textures[(sprite_id, "walk", direction, frame)] = (
-                        walk_texture
-                    )
-
-                    # Idle sprites (same as walk, but won't animate)
-                    self.player_textures[(sprite_id, "idle", direction, frame)] = (
-                        walk_texture
-                    )
-
-                    # Digging sprites
-                    sprite_name = f"player{sprite_id}_dig_{direction.value}_{frame}"
-                    path = os.path.join(sprites_path, f"{sprite_name}.png")
-                    self.player_textures[(sprite_id, "dig", direction, frame)] = (
-                        arcade.load_texture(path)
-                    )
+        # Use PlayerColorizer for per-player recolored textures
+        self.colorizer = PlayerColorizer(sprites_path)
 
         # Load monster textures: (entity_type, direction, frame) -> texture
         self.monster_textures = {}
@@ -120,17 +99,19 @@ class EntityRenderer:
             arcade.load_texture(os.path.join(sprites_path, "smoke2.png")),
         ]
 
-        # Player sprite pool
+        # Player sprite pool - each player gets their own recolored textures
         self.player_sprite_list = arcade.SpriteList()
         self.player_sprite_list.initialize()
-        self.player_sprite_list.preload_textures(self.player_textures.values())
         self.player_sprites = []
 
         for player in state.players:
+            player_textures = self.colorizer.create_recolored_textures(
+                player.sprite_id, player.color
+            )
+            self.player_sprite_list.preload_textures(player_textures.values())
             sprite = PlayerSprite(
                 sprite_id=player.sprite_id,
-                color_variant=player.color,
-                player_textures=self.player_textures,
+                player_textures=player_textures,
                 transparent_texture=transparent_texture,
                 blood_texture=self.blood_texture,
                 zoom=zoom,

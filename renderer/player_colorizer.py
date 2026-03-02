@@ -6,7 +6,7 @@ Handles color swapping for player sprites and cards.
 import os
 import arcade
 from PIL import Image
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from game_engine.entities import Direction
 
@@ -126,6 +126,7 @@ class PlayerColorizer:
         """
         img = image.copy()
         data = img.load()
+        assert data is not None
 
         for y in range(img.height):
             for x in range(img.width):
@@ -158,7 +159,7 @@ class PlayerColorizer:
             self.player_card_textures[sprite_id] = arcade.Texture(recolored_card)
 
     def get_player_texture(self, sprite_id: int, state: str, direction: Direction,
-                           frame: int) -> arcade.Texture:
+                           frame: int) -> Optional[arcade.Texture]:
         """Get a player sprite texture.
 
         Args:
@@ -173,7 +174,7 @@ class PlayerColorizer:
         key = (sprite_id, state, direction, frame)
         return self.player_textures.get(key)
 
-    def get_card_texture(self, sprite_id: int) -> arcade.Texture:
+    def get_card_texture(self, sprite_id: int) -> Optional[arcade.Texture]:
         """Get a player card texture.
 
         Args:
@@ -183,3 +184,37 @@ class PlayerColorizer:
             The arcade Texture for the specified card
         """
         return self.player_card_textures.get(sprite_id)
+
+    def create_recolored_textures(self, sprite_id: int, color: Tuple[int, int, int]) -> Dict[Tuple, arcade.Texture]:
+        """Create a full set of recolored textures for given sprite_id and RGB color.
+
+        Args:
+            sprite_id: The player appearance (1-4)
+            color: RGB tuple of the target color
+
+        Returns:
+            Dict mapping (sprite_id, state, direction, frame) -> recolored arcade.Texture
+        """
+        base_color = SPRITE_BASE_COLORS[sprite_id]
+        textures = {}
+        for key, img in self.player_images.items():
+            if key[0] == sprite_id:
+                recolored = self._swap_color(img, base_color, color)
+                textures[key] = arcade.Texture(recolored)
+        return textures
+
+    def create_recolored_card(self, sprite_id: int, color: Tuple[int, int, int]) -> Optional[arcade.Texture]:
+        """Create a recolored player card texture.
+
+        Args:
+            sprite_id: The player appearance (1-4)
+            color: RGB tuple of the target color
+
+        Returns:
+            Recolored arcade.Texture for the player card
+        """
+        base_color = CARD_BASE_COLORS[sprite_id]
+        if sprite_id in self.player_card_images:
+            recolored = self._swap_color(self.player_card_images[sprite_id], base_color, color)
+            return arcade.Texture(recolored)
+        return None

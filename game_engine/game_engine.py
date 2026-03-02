@@ -699,6 +699,14 @@ class GameEngine:
                 # Reschedule explosion to 24 hours from now
                 self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay)
 
+        # Show smoke effect in affected area
+        for y in range(self.height):
+            for x in range(self.width):
+                if final_mask[y, x]:
+                    tile = self.get_tile(x, y)
+                    if tile and not tile.solid:
+                        self.explosions[y, x] = 4
+
         # Remove fire extinguisher from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)

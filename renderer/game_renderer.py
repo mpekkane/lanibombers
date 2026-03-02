@@ -13,6 +13,7 @@ from renderer.entity_renderer import EntityRenderer
 from renderer.header_renderer import HeaderRenderer
 from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import DynamicEntity
+from game_engine.entities.player import Player
 
 # ============================================================================
 # Configuration
@@ -198,8 +199,8 @@ class GameRenderer(arcade.Window):
     # ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝
 
     def find_client_player(
-        self, players: List[DynamicEntity]
-    ) -> Optional[DynamicEntity]:
+        self, players: List[Player]
+    ) -> Optional[Player]:
         """Find the client's player by name.
 
         Args:

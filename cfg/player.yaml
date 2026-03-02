@@ -1,13 +1,13 @@
-player_name: Matti
-appearance_id: 2
-color: '#00A300'
+player_name: Panu
+appearance_id: 3
+color: '#FF0091'
 up: motion_up
 down: down
 left: left
 right: motion_right
-stop: mod_windows
-fire: rctrl
-choose: rshift
+stop: backspace
+fire: mod_windows
+choose: tab
 remote: enter
 items:
 - name: Small Bomb

@@ -2,8 +2,6 @@
 Test code for client-side
 """
 
-import sys
-import arcade
 from typing import Union, Optional
 from argparse import ArgumentParser
 from network_stack.messages.messages import (
@@ -41,6 +39,8 @@ class BomberClient:
         self.client = BomberNetworkClient(cfg_path)
         self.listener: Optional[keyboard.Listener] = None
         self.name = config.get_config("player_name")
+        self.color = self._parse_color(config.get_config("color"))
+        self.appearance_id = int(config.get_config("appearance_id") or 1)
 
         server_found = self.client.find_host()
         if not server_found:
@@ -55,6 +55,16 @@ class BomberClient:
         self.renderer = None
         self.running = False
 
+    @staticmethod
+    def _parse_color(color_str) -> tuple:
+        """Convert hex color string '#FF0091' to RGB tuple (255, 0, 145)."""
+        if not color_str or not isinstance(color_str, str):
+            return (255, 255, 255)
+        color_str = color_str.lstrip("#")
+        if len(color_str) != 6:
+            return (255, 255, 255)
+        return (int(color_str[0:2], 16), int(color_str[2:4], 16), int(color_str[4:6], 16))
+
     def start(self) -> None:
         self.client.start()
 
@@ -65,11 +75,13 @@ class BomberClient:
             print(f"Connecting with {name}")
             Clock.sleep(1)
 
-        self.client.set_name(name)
+        self.client.set_name(name, self.color, self.appearance_id)
 
         if not self.headless:
             renderer = GameRenderer(
-                self.get_render_state_unsafe, window_name="lanibombers client"
+                self.get_render_state_unsafe,
+                client_player_name=name,
+                window_name="lanibombers client",
             )
             renderer.bind_input_callback(self.on_press)
 
@@ -90,7 +102,7 @@ class BomberClient:
             self.listener.stop()
         # sys.exit(0)
 
-    def on_chattxt(self, msg: ChatText):
+    def on_chattxt(self, msg: ChatText) -> None:
         print(f"{msg.timestamp}: {msg.text}")
 
     def render(self) -> None:
@@ -146,7 +158,9 @@ class BomberClient:
         if action is not None:
             self.client.send(ClientControl(int(action)))
 
-    def on_press_local(self, key: Union[keyboard.Key, keyboard.KeyCode]) -> None:
+    def on_press_local(self, key: Union[keyboard.Key, keyboard.KeyCode, None]) -> None:
+        if key is None:
+            return
         symbol = pynput_to_arcade_key(key)
         if symbol is not None:
             self.on_press(symbol, 0)

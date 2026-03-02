@@ -82,17 +82,30 @@ def decode_message(frame: bytes) -> Message:
 @register_message
 @dataclass(frozen=True)
 class Name(Message):
-    """This is demo message, TO BE REMOVED"""
+    """Client sends name, color and appearance when joining."""
 
     TYPE: ClassVar[int] = 1
     name: str
+    color: tuple = (255, 255, 255)  # (r, g, b)
+    appearance_id: int = 1  # 1-4
 
     def to_bytes(self) -> bytes:
-        return self.name.encode("utf-8")
+        name_bytes = self.name.encode("utf-8")
+        return (
+            bytes([len(name_bytes)])
+            + name_bytes
+            + bytes([self.color[0], self.color[1], self.color[2]])
+            + bytes([self.appearance_id])
+        )
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> Name:
-        return cls(name=payload.decode("utf-8", errors="replace"))
+        name_len = payload[0]
+        name = payload[1 : 1 + name_len].decode("utf-8", errors="replace")
+        off = 1 + name_len
+        color = (payload[off], payload[off + 1], payload[off + 2])
+        appearance_id = payload[off + 3]
+        return cls(name=name, color=color, appearance_id=appearance_id)
 
 
 @register_message
@@ -348,7 +361,7 @@ class GameState(Message):
         )
 
     @classmethod
-    def from_bytes(cls, payload: bytes) -> ClientControl:
+    def from_bytes(cls, payload: bytes) -> GameState:
         # width = int.from_bytes(payload[0], "big")
         # height = int.from_bytes(payload[1], "big")
         # num_players = int.from_bytes(payload[2], "big")
@@ -372,12 +385,12 @@ class GameState(Message):
         tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
             (height, width)
         )
-        start = stop + 1
+        start = stop
         stop = start + explosions_size
         explosions = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
             (height, width)
         )
-        start = stop + 1
+        start = stop
         stop = start + players_size
         players = pickle.loads(payload[start:stop])
         start = stop

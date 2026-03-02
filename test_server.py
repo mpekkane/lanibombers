@@ -203,9 +203,10 @@ class BomberServer:
         ctx.name = msg.name  # type: ignore
         self.players.append(msg.name)  # type: ignore
         self.engine.create_player(msg.name)  # type: ignore
-        # FIXME: debug testing
         player = self.engine.get_player_by_name(msg.name)  # type: ignore
         if player is not None:
+            player.color = msg.color  # type: ignore
+            player.sprite_id = msg.appearance_id  # type: ignore
             player.test_inventory()
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:

@@ -9,7 +9,7 @@ FRAME_DURATION = 0.10
 class ExplosionSprite(arcade.Sprite):
     """Sprite class for explosion effects with timed animation"""
 
-    def __init__(self, explosion_textures: dict, transparent_texture, zoom: float, screen_height: int):
+    def __init__(self, explosion_textures: list, transparent_texture, zoom: float, screen_height: int):
         super().__init__()
         self.explosion_textures = explosion_textures
         self.transparent_texture = transparent_texture
@@ -36,12 +36,21 @@ class ExplosionSprite(arcade.Sprite):
         elapsed = current_time - self.started_at
         frame_index = int(elapsed / FRAME_DURATION)
 
-        # Animation sequence: explosion -> smoke1 -> smoke2 -> transparent
-        if frame_index == 0:
-            self.texture = self.explosion_textures[1]
-        elif frame_index == 1:
-            self.texture = self.explosion_textures[2]
-        elif frame_index == 2:
-            self.texture = self.explosion_textures[3]
+        if self.explosion_type == 4:
+            # Extinguisher smoke: smoke2 -> smoke1 -> transparent
+            if frame_index == 0:
+                self.texture = self.explosion_textures[3]
+            elif frame_index == 1:
+                self.texture = self.explosion_textures[2]
+            else:
+                self.texture = self.explosion_textures[0]
         else:
-            self.texture = self.explosion_textures[0]
+            # Normal explosion: explosion -> smoke1 -> smoke2 -> transparent
+            if frame_index == 0:
+                self.texture = self.explosion_textures[1]
+            elif frame_index == 1:
+                self.texture = self.explosion_textures[2]
+            elif frame_index == 2:
+                self.texture = self.explosion_textures[3]
+            else:
+                self.texture = self.explosion_textures[0]
