@@ -632,6 +632,58 @@ SPRITES_WITH_BACKGROUND = [
 ]
 
 
+# Sprites that need empty-tile background removal (pixel-by-pixel match against empty.png)
+SPRITES_WITH_EMPTY_BACKGROUND = [
+    'explosion',
+    'smoke1',
+    'smoke2',
+    'grenade',
+]
+
+
+def remove_empty_tile_background(output_base):
+    """Remove empty-tile background from sprites by pixel-matching against empty.png.
+
+    For each pixel that matches the corresponding pixel in the empty tile,
+    sets the alpha to fully transparent.
+    """
+    sprites_dir = os.path.join(output_base, 'sprites')
+    empty_path = os.path.join(sprites_dir, 'empty.png')
+
+    if not os.path.exists(empty_path):
+        print("  empty.png not found, skipping empty-tile background removal")
+        return 0
+
+    empty_img = Image.open(empty_path).convert('RGBA')
+    empty_pixels = empty_img.load()
+    empty_w, empty_h = empty_img.size
+
+    count = 0
+    for name in SPRITES_WITH_EMPTY_BACKGROUND:
+        sprite_path = os.path.join(sprites_dir, f"{name}.png")
+        if not os.path.exists(sprite_path):
+            continue
+
+        sprite = Image.open(sprite_path).convert('RGBA')
+        pixels = sprite.load()
+        w, h = sprite.size
+
+        for y in range(min(h, empty_h)):
+            for x in range(min(w, empty_w)):
+                r, g, b, a = pixels[x, y]
+                er, eg, eb, _ = empty_pixels[x, y]
+                if (r, g, b) == (er, eg, eb):
+                    pixels[x, y] = (0, 0, 0, 0)
+
+        sprite.save(sprite_path)
+        count += 1
+
+    if count > 0:
+        print(f"  Removed empty-tile background from {count} sprites")
+
+    return count
+
+
 def remove_background_color(output_base):
     """Remove background color from sprites and make it transparent.
 
@@ -1021,6 +1073,7 @@ def main():
     font_count = extract_bitmap_font(zip_path, output_base)
     padded_count = pad_sprites(output_base)
     bg_removed_count = remove_background_color(output_base)
+    empty_bg_removed_count = remove_empty_tile_background(output_base)
 
     print(f"\nExtraction complete!")
     print(f"  Graphics:     {stats['graphics']}")

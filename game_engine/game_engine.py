@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import numpy as np
 from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union, Callable
 from itertools import chain
@@ -235,6 +236,10 @@ class GameEngine:
             )
             self.event_resolver.schedule_event(explosion_event)
 
+        # send renderstate
+        if self.state_callback:
+            self.state_callback(self.get_render_state())
+
     def detonate_remotes(self, player: Player) -> None:
         for bomb in self.bombs:
             if bomb.bomb_type in (BombType.SMALL_REMOTE, BombType.BIG_REMOTE) and bomb.owner_id == player.id:
@@ -260,6 +265,33 @@ class GameEngine:
             if affected_area[other_bomb.y, other_bomb.x]:
                 self.event_resolver.reschedule_events_by_target(other_bomb, "explode", delay)
 
+    def _damage_entities_in_area(self, damage_array: np.ndarray) -> None:
+        """Damage players, monsters, and pickups in the affected area.
+
+        Args:
+            damage_array: Numeric numpy array where values indicate damage per tile.
+        """
+        for player in self.players:
+            if player.state == "dead":
+                continue
+            px, py = xy_to_tile(player.x, player.y)
+            dmg = damage_array[py, px]
+            if dmg > 0:
+                player.take_damage(int(dmg))
+
+        for monster in self.monsters:
+            if monster.state == "dead":
+                continue
+            mx, my = xy_to_tile(monster.x, monster.y)
+            dmg = damage_array[my, mx]
+            if dmg > 0:
+                monster.take_damage(int(dmg))
+
+        for y in range(len(self.pickups)):
+            for x in range(len(self.pickups[y])):
+                if self.pickups[y][x] is not None and damage_array[y, x] > 0:
+                    self.pickups[y][x] = None
+
     def clear_entity_move_events(self, player: DynamicEntity) -> None:
         """Clear all move actions by the player"""
         # Note: We assume that this is not needed. However, in the original game,
@@ -267,9 +299,9 @@ class GameEngine:
         # Up for discussion.
         # First resolve undergoing events, i.e., stop to the place the entity
         # has already made progress to
-        # self.event_resolver.resolve_object_events(
-        #     player.id, "move", ResolveFlags(spawn=False)
-        # )
+        self.event_resolver.resolve_object_events(
+            player.id, "move", ResolveFlags(spawn=False)
+        )
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
         self.event_resolver.cancel_object_events(player.id, "push")
@@ -308,9 +340,14 @@ class GameEngine:
             # Create new movement
             self.move_entity(player)
 
+        # send renderstate
+        if self.state_callback:
+            self.state_callback(self.get_render_state())
+
     def collision_check(self, entity: DynamicEntity, next_tile: Tile):
         # dig
         if next_tile.diggable:
+            entity.state = "dig"
             self.dig(entity)
         # interact
         elif next_tile.interactable:
@@ -333,25 +370,25 @@ class GameEngine:
         # When walking, calculate distance
         if entity.state == "walk":
             if entity.direction == Direction.RIGHT:
-                decimal = entity.x - (int)(entity.x)
+                decimal = entity.x - round(entity.x)
                 if decimal > 0.5:
                     d = 1 - decimal
                 else:
                     d = 0.5 - decimal
             elif entity.direction == Direction.LEFT:
-                decimal = entity.x - (int)(entity.x)
+                decimal = entity.x - round(entity.x)
                 if decimal < 0.5:
                     d = decimal
                 else:
                     d = decimal - 0.5
             elif entity.direction == Direction.UP:
-                decimal = entity.y - (int)(entity.y)
+                decimal = entity.y - round(entity.y)
                 if decimal < 0.5:
                     d = decimal
                 else:
                     d = decimal - 0.5
             elif entity.direction == Direction.DOWN:
-                decimal = entity.y - (int)(entity.y)
+                decimal = entity.y - round(entity.y)
                 if decimal > 0.5:
                     d = 1 - decimal
                 else:
@@ -377,6 +414,7 @@ class GameEngine:
 
             event = "move" if not push else "push"
 
+            caller = sys._getframe(1).f_code.co_name
             movement_event = MoveEvent(
                 trigger_at=Clock.now() + dt,
                 target=entity,
@@ -384,6 +422,7 @@ class GameEngine:
                 created_at=Clock.now(),
                 created_by=entity.id,
                 direction=str(entity.direction.value),
+                source=f"move_entity<-{caller}",
             )
             self.event_resolver.schedule_event(movement_event)
 
@@ -538,6 +577,9 @@ class GameEngine:
         # Trigger any bombs in the damage area
         self._trigger_bombs_in_area(target, damage_array)
 
+        # Damage players, monsters, and pickups
+        self._damage_entities_in_area(damage_array)
+
         # Grasshopper: spawn next hop if we haven't reached 13 explosions
         if is_grasshopper:
             self._spawn_grasshopper_hop(target, current_time)
@@ -664,6 +706,9 @@ class GameEngine:
         # Trigger any bombs in the affected area
         self._trigger_bombs_in_area(bomb, final_mask)
 
+        # Damage players, monsters, and pickups
+        self._damage_entities_in_area(final_mask * cfg['damage'])
+
         if self.sounds_enabled:
             self.sounds.explosion()
 
@@ -777,7 +822,7 @@ class GameEngine:
         elif dir == Direction.DOWN:
             grenade.y += d
 
-        self.round_position(grenade)
+        # self.round_position(grenade)
 
         # Get current and next tile positions
         gx, gy = xy_to_tile(grenade.x, grenade.y)
@@ -873,6 +918,9 @@ class GameEngine:
         # Trigger any bombs in the affected area
         self._trigger_bombs_in_area(bomb, fill_mask)
 
+        # Damage players, monsters, and pickups
+        self._damage_entities_in_area(fill_mask * cfg['damage'])
+
         if self.sounds_enabled:
             self.sounds.explosion()
 
@@ -905,6 +953,9 @@ class GameEngine:
 
         # Trigger any bombs in the flood fill area
         self._trigger_bombs_in_area(bomb, fill_mask)
+
+        # Damage players, monsters, and pickups
+        self._damage_entities_in_area(fill_mask * cfg['flood_fill_damage'])
 
         # Schedule scattered medium explosions
         scatter_count = cfg['scatter_explosions']
@@ -1118,7 +1169,7 @@ class GameEngine:
         else:
             raise ValueError("Invalid move direction")
         # print(f"to  : {target.x}, {target.y}")
-        self.round_position(target)
+        # self.round_position(target)
         # print(f"cntr: {target.x}, {target.y}")
         # print(f"ms: {self.width} {self.height}")
 
@@ -1162,10 +1213,6 @@ class GameEngine:
         if entity.direction in (Direction.RIGHT, Direction.LEFT):
             entity.y = round(entity.y - 0.5) + 0.5
 
-    def round_position(self, entity: DynamicEntity) -> None:
-        entity.x = int(round(entity.x * 2)) / 2
-        entity.y = int(round(entity.y * 2)) / 2
-
     def resolve_dig(self, target: Player, event: Event, flags: ResolveFlags) -> None:
         if target.state == "dead":
             return
@@ -1181,6 +1228,7 @@ class GameEngine:
         if target_tile.health > 0:
             self.dig(target)
         else:
+            target.state = "walk"
             self.move_entity(target)
 
     def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tile:
@@ -1309,6 +1357,40 @@ class GameEngine:
             player.y += dy
         self.prev_time = Clock.now()
 
+    def _interpolate_entity_position(self, entity: DynamicEntity, render_entity: DynamicEntity) -> None:
+        """Update render_entity position based on pending move event progress.
+
+        Uses progress fraction (elapsed / total_duration) to interpolate exactly
+        0.5 tiles per move segment. This naturally handles push speed modifiers
+        (baked into trigger_at) and caps at the tile boundary.
+
+        Looks up events by target identity on `entity` (the authoritative object)
+        and writes the interpolated position to `render_entity` (the deep copy).
+        """
+        move_events = self.event_resolver.get_events_by_target(entity, "move")
+        if not move_events:
+            move_events = self.event_resolver.get_events_by_target(entity, "push")
+        if not move_events:
+            return
+
+        assert len(move_events) <= 1, f"Expected at most 1 move event, got {len(move_events)}"
+        event: MoveEvent = move_events[0]  # type: ignore[assignment]
+        total_duration = event.trigger_at - event.created_at
+        if total_duration <= 0:
+            return
+        progress = min((Clock.now() - event.created_at) / total_duration, 1.0)
+        d = progress * 0.5
+
+        direction = Direction(event.direction)
+        if direction == Direction.RIGHT:
+            render_entity.x = entity.x + d
+        elif direction == Direction.LEFT:
+            render_entity.x = entity.x - d
+        elif direction == Direction.UP:
+            render_entity.y = entity.y - d
+        elif direction == Direction.DOWN:
+            render_entity.y = entity.y + d
+
     def get_render_state(self) -> RenderState:
         """Build and return a RenderState for the renderer."""
 
@@ -1321,13 +1403,23 @@ class GameEngine:
 
         self.cleanup_render_state()
 
+        # Deep copy entities and interpolate positions for rendering
+        render_players = [deepcopy(p) for p in self.players]
+        render_monsters = [deepcopy(m) for m in self.monsters]
+
+        for player, render_player in zip(self.players, render_players):
+            self._interpolate_entity_position(player, render_player)
+
+        for monster, render_monster in zip(self.monsters, render_monsters):
+            self._interpolate_entity_position(monster, render_monster)
+
         return RenderState(
             width=self.width,
             height=self.height,
             tilemap=tilemap,
             explosions=explosions_copy,
-            players=self.players,
-            monsters=self.monsters,
+            players=render_players,
+            monsters=render_monsters,
             pickups=list(
                 filter(lambda x: x is not None, chain.from_iterable(self.pickups))
             ),

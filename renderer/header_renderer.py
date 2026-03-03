@@ -74,6 +74,15 @@ class HeaderRenderer:
         self.player_card_sprite.center_y = screen_height - (card_height / 2) * zoom
         self.header_sprite_list.append(self.player_card_sprite)
 
+        # Damage overlay (black rectangle over health bar on player card)
+        self.damage_overlay_sprites = arcade.SpriteList()
+        black_image = Image.new('RGBA', (1, 1), (0, 0, 0, 255))
+        self.damage_overlay = arcade.Sprite()
+        self.damage_overlay.texture = arcade.Texture(black_image, name="damage_overlay")
+        self.damage_overlay.visible = False
+        self.damage_overlay_sprites.append(self.damage_overlay)
+        self.current_health = None
+
         # Bitmap text for header
         font_path = os.path.join(SPRITES_PATH, "font.png")
         self.bitmap_text = BitmapText(font_path, zoom=zoom)
@@ -185,6 +194,20 @@ class HeaderRenderer:
                 f"{client_player.money}", text_x, text_y, color=(255, 255, 0, 255)
             )
 
+        # Update damage overlay on health bar (right edge of card)
+        if client_player.health != self.current_health:
+            self.current_health = client_player.health
+            damage_ratio = (100 - client_player.health) / 100
+            if damage_ratio > 0:
+                overlay_height = 26 * damage_ratio
+                self.damage_overlay.width = 8 * self.zoom
+                self.damage_overlay.height = overlay_height * self.zoom
+                self.damage_overlay.center_x = 104 * self.zoom
+                self.damage_overlay.center_y = self.screen_height - (2 + overlay_height / 2) * self.zoom
+                self.damage_overlay.visible = True
+            else:
+                self.damage_overlay.visible = False
+
         # Update inventory icons (only recreate if changed)
         # inventory is List[Tuple[BombType, int]]
         inventory = getattr(client_player, 'inventory', [])
@@ -254,6 +277,7 @@ class HeaderRenderer:
     def on_draw(self, show_stats: bool):
         """Draw all header UI sprite lists."""
         self.header_sprite_list.draw(pixelated=True)
+        self.damage_overlay_sprites.draw(pixelated=True)
         self.player_name_sprites.draw(pixelated=True)
         self.dig_power_sprites.draw(pixelated=True)
         self.money_sprites.draw(pixelated=True)

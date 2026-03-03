@@ -46,7 +46,8 @@ class PlayerSprite(arcade.Sprite):
         # Update animation frame if walking or digging (ping-pong: 1,2,3,4,3,2...)
         if player.state in ('walk', 'dig'):
             self.frame_timer += delta_time
-            frame_duration = 1.0 / self.frames_per_second
+            fps = player.get_dig_power() * 3 if player.state == 'dig' else self.frames_per_second
+            frame_duration = 1.0 / fps
             if self.frame_timer >= frame_duration:
                 self.frame_timer -= frame_duration
                 self.frame_index = (self.frame_index + 1) % len(self.frame_sequence)

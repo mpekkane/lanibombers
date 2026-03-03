@@ -18,6 +18,7 @@ class Event:
     created_at: float = 0.0                 # Timestamp when created
     created_by: UUID = None                 # GameObject that created it
     event_type: str = ''                    # Optional type identifier
+    source: str = ''                        # Method that created this event
 
     def __lt__(self, other: 'Event') -> bool:
         """Comparison for heapq ordering."""

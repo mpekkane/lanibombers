@@ -2,7 +2,7 @@
 Test code for client-side
 """
 
-from typing import Union, Optional
+from typing import Optional, Union
 from argparse import ArgumentParser
 from network_stack.messages.messages import (
     ChatText,
@@ -19,6 +19,7 @@ from common.config_reader import ConfigReader
 from common.keymapper import map_keys, pynput_to_arcade_key
 from renderer.game_renderer import GameRenderer
 from game_engine.render_state import RenderState
+from game_engine.client_simulation import ClientSimulation
 
 
 class BomberClient:
@@ -51,7 +52,7 @@ class BomberClient:
         self.client.set_callback(Ping, self.on_ping)
         self.client.set_callback(GameState, self.on_game_state)
         self.client.set_on_disconnect(self.on_disconnect)
-        self.state: Optional[RenderState] = None
+        self.simulation = ClientSimulation()
         self.renderer = None
         self.running = False
 
@@ -113,23 +114,14 @@ class BomberClient:
                 Clock.sleep(1)
 
     def on_game_state(self, msg: GameState):
-        self.state = msg.to_render()
-        # if self.renderer is None:
-        #     self.renderer = GameRenderer(self)
-
-    def get_render_state(self) -> Optional[RenderState]:
-        """Returns RenderState with dimensions and sprite indices"""
-        if self.state is not None:
-            return self.state
-        return None
+        self.simulation.receive_state(msg.to_render())
 
     def get_render_state_unsafe(self) -> RenderState:
-        """Returns RenderState with dimensions and sprite indices"""
-        assert self.state is not None
-        return self.state
+        """Returns extrapolated RenderState for smooth rendering."""
+        return self.simulation.get_render_state_unsafe()
 
     def has_state(self) -> bool:
-        return self.state is not None
+        return self.simulation.has_state()
 
     def on_ping(self, msg: Ping):
         received = Clock.now_ns()

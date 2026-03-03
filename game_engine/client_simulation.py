@@ -4,7 +4,9 @@ Receives RenderState from server and extrapolates between updates.
 """
 
 from dataclasses import replace
-from typing import Optional
+from typing import Any, Optional
+
+import numpy as np
 
 from game_engine.clock import Clock
 from game_engine.render_state import RenderState
@@ -19,6 +21,8 @@ DIRECTION_VELOCITY = {
     Direction.RIGHT: (1, 0),
 }
 
+MAX_EXTRAPOLATION_TIME = 0.5  # Don't extrapolate beyond this
+
 
 class ClientSimulation:
     """
@@ -31,6 +35,7 @@ class ClientSimulation:
     def __init__(self):
         self._server_state: Optional[RenderState] = None
         self._server_state_time: float = 0.0
+        self._accumulated_explosions: Optional[np.ndarray] = None
 
     def receive_state(self, state: RenderState) -> None:
         """
@@ -39,8 +44,19 @@ class ClientSimulation:
         Args:
             state: The authoritative state from the game server
         """
+        if self._accumulated_explosions is not None:
+            # Merge: new explosions take priority, keep old where new is zero
+            self._accumulated_explosions = np.where(
+                state.explosions > 0, state.explosions, self._accumulated_explosions
+            )
+        else:
+            self._accumulated_explosions = state.explosions.copy()
         self._server_state = state
         self._server_state_time = Clock.now()
+
+    def has_state(self) -> bool:
+        """Whether at least one server state has been received."""
+        return self._server_state is not None
 
     def get_render_state(self) -> Optional[RenderState]:
         """
@@ -53,7 +69,7 @@ class ClientSimulation:
             return None
 
         current_time = Clock.now()
-        delta_time = current_time - self._server_state_time
+        delta_time = min(current_time - self._server_state_time, MAX_EXTRAPOLATION_TIME)
 
         # Create extrapolated copies of dynamic entities
         extrapolated_players = [
@@ -65,6 +81,10 @@ class ClientSimulation:
             for monster in self._server_state.monsters
         ]
 
+        # Use accumulated explosions and clear for next frame
+        explosions = self._accumulated_explosions
+        self._accumulated_explosions = np.zeros_like(explosions)
+
         return RenderState(
             width=self._server_state.width,
             height=self._server_state.height,
@@ -73,8 +93,19 @@ class ClientSimulation:
             monsters=extrapolated_monsters,
             pickups=self._server_state.pickups,
             bombs=self._server_state.bombs,
-            explosions=self._server_state.explosions,
+            explosions=explosions,
         )
+
+    def get_render_state_unsafe(self) -> RenderState:
+        """Get extrapolated RenderState, asserting that state exists."""
+        assert self._server_state is not None
+        state = self.get_render_state()
+        assert state is not None
+        return state
+
+    def apply_input(self, action: Any) -> None:
+        """Placeholder for future client-side input prediction."""
+        pass
 
     def _extrapolate_entity(self, entity, delta_time: float):
         """

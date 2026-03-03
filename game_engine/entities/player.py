@@ -11,7 +11,7 @@ from game_engine.utils import xy_to_tile
 class Player(DynamicEntity):
     inventory: List[Tuple[BombType, int]] = field(default_factory=lambda: [])
     tools: Dict[ToolType, int] = field(default_factory=lambda: {})
-    selected = 0
+    selected: int = 0
 
     def test_inventory(self) -> None:
         self.inventory.append((BombType.SMALL_BOMB, 50))

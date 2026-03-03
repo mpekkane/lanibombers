@@ -85,6 +85,8 @@ class EventResolver:
         events = self.get_object_events(creator, type)
         for event in events:
             self._resolve_event(event, flags)
+            # Remove from queue so the timer can't resolve it again
+            self.cancel_event(event.id)
 
     def _schedule_next_wakeup(self) -> None:
         """Internal: schedule timer for next event."""

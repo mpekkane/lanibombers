@@ -15,6 +15,19 @@ class EventQueue:
 
     def add_event(self, event: Event) -> None:
         """Add an event to the queue."""
+        # Check for duplicate move/push events targeting the same entity
+        if event.event_type in ("move", "push"):
+            existing = self.get_events_by_target(event.target, "move") + \
+                       self.get_events_by_target(event.target, "push")
+            if existing:
+                print(f"[DUPLICATE MOVE] Adding {event.event_type} for entity {event.created_by} "
+                      f"but {len(existing)} already queued:")
+                for e in existing:
+                    print(f"  existing: type={e.event_type} dir={getattr(e, 'direction', '?')} "
+                          f"source={e.source} trigger_at={e.trigger_at:.4f} created_at={e.created_at:.4f} id={e.id}")
+                print(f"  new:      type={event.event_type} dir={getattr(event, 'direction', '?')} "
+                      f"source={event.source} trigger_at={event.trigger_at:.4f} created_at={event.created_at:.4f} id={event.id}")
+                return  # Reject duplicate — the existing event (from user input) wins
         heapq.heappush(self._events, event)
         self._event_map[event.id] = event
 
