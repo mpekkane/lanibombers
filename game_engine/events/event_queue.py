@@ -73,21 +73,24 @@ class EventQueue:
                     found.append(event)
         return found
 
-    def reschedule_events_by_target(self, target, event_type: str, relative_time: float) -> int:
+    def reschedule_events_by_target(self, target, event_type: str, relative_time: float, base_time: float = 0.0) -> int:
         """
-        Reschedule all events for a target to trigger at current_time + relative_time.
+        Reschedule all events for a target to trigger at base_time + relative_time.
         If no existing event is found, schedules a new one.
 
         Args:
             target: The target object to find events for
             event_type: The event type to match (e.g., "explode")
             relative_time: Time from now when the event should trigger
+            base_time: Base timestamp (0 = use Clock.now())
 
         Returns:
             Number of events rescheduled or created
         """
         events = self.get_events_by_target(target, event_type)
-        new_trigger_time = Clock.now() + relative_time
+        if base_time <= 0:
+            base_time = Clock.now()
+        new_trigger_time = base_time + relative_time
 
         if events:
             # Reschedule existing events

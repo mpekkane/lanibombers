@@ -59,15 +59,15 @@ class EventResolver:
         with self._lock:
             return self.queue.get_events_by_target(target, event_type)
 
-    def reschedule_events_by_target(self, target, event_type: str, relative_time: float) -> int:
+    def reschedule_events_by_target(self, target, event_type: str, relative_time: float, base_time: float = 0.0) -> int:
         """
-        Reschedule all events for a target to trigger at current_time + relative_time.
+        Reschedule all events for a target to trigger at base_time + relative_time.
 
         Returns:
             Number of events rescheduled
         """
         with self._lock:
-            count = self.queue.reschedule_events_by_target(target, event_type, relative_time)
+            count = self.queue.reschedule_events_by_target(target, event_type, relative_time, base_time)
             if self._running:
                 self._schedule_next_wakeup()
             return count

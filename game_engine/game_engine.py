@@ -206,7 +206,7 @@ class GameEngine:
         elif bomb.bomb_type == BombType.FLAMETHROWER:
             # Flamethrower fires immediately
             explosion_event = Event(
-                trigger_at=Clock.now(),
+                trigger_at=bomb.placed_at,
                 target=bomb,
                 event_type="explode",
             )
@@ -214,7 +214,7 @@ class GameEngine:
         elif bomb.bomb_type == BombType.FIRE_EXTINGUISHER:
             # Fire extinguisher fires immediately
             explosion_event = Event(
-                trigger_at=Clock.now(),
+                trigger_at=bomb.placed_at,
                 target=bomb,
                 event_type="explode",
             )
@@ -222,7 +222,7 @@ class GameEngine:
         elif bomb.bomb_type == BombType.CLONE:
             # Clone fires immediately
             explosion_event = Event(
-                trigger_at=Clock.now(),
+                trigger_at=bomb.placed_at,
                 target=bomb,
                 event_type="explode",
             )
@@ -230,7 +230,7 @@ class GameEngine:
         elif bomb.bomb_type == BombType.GRENADE:
             # Grenade fires immediately
             explosion_event = Event(
-                trigger_at=Clock.now(),
+                trigger_at=bomb.placed_at,
                 target=bomb,
                 event_type="explode",
             )
@@ -238,19 +238,20 @@ class GameEngine:
 
         # send renderstate
         if self.state_callback:
-            self.state_callback(self.get_render_state())
+            self.state_callback(self.get_render_state(bomb.placed_at))
 
     def detonate_remotes(self, player: Player) -> None:
+        now = Clock.now()
         for bomb in self.bombs:
             if bomb.bomb_type in (BombType.SMALL_REMOTE, BombType.BIG_REMOTE) and bomb.owner_id == player.id:
                 explosion_event = Event(
-                    trigger_at=Clock.now() + 0,
+                    trigger_at=now,
                     target=bomb,
                     event_type="explode",
                 )
                 self.event_resolver.schedule_event(explosion_event)
 
-    def _trigger_bombs_in_area(self, source_bomb: Bomb, affected_area: np.ndarray, delay: float = 1.0 / 60.0) -> None:
+    def _trigger_bombs_in_area(self, source_bomb: Bomb, affected_area: np.ndarray, delay: float = 1.0 / 60.0, now: float = 0.0) -> None:
         """
         Trigger all bombs in the affected area to explode after a delay.
 
@@ -258,12 +259,13 @@ class GameEngine:
             source_bomb: The bomb causing the explosion (will be skipped)
             affected_area: Boolean or numeric numpy array where truthy values indicate affected tiles
             delay: Time delay before triggered bombs explode (default 1/60s)
+            now: Base timestamp for scheduling (0 = use Clock.now())
         """
         for other_bomb in self.bombs:
             if other_bomb is source_bomb:
                 continue
             if affected_area[other_bomb.y, other_bomb.x]:
-                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", delay)
+                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", delay, now)
 
     def _damage_entities_in_area(self, damage_array: np.ndarray) -> None:
         """Damage players, monsters, and pickups in the affected area.
@@ -324,13 +326,13 @@ class GameEngine:
         # Capture wall-clock time once for premature event resolution.
         # This is the single place where Clock.now() is used for movement
         # resolution, making future lag compensation straightforward.
-        resolve_time = Clock.now()
+        now = Clock.now()
 
         # Cancel dig events, this needs to be done first as the resolve
         # init a move event
         self.clear_entity_dig_events(player)
         # When changing dir, all previous movement events are cleared
-        self.clear_entity_move_events(player, resolve_time)
+        self.clear_entity_move_events(player, now)
 
         # print("Centralize")
         # print(player.x, player.y)
@@ -340,20 +342,20 @@ class GameEngine:
         # collision check
         next_tile = self.get_neighbor_tile(player)
         if next_tile.solid:
-            self.collision_check(player, next_tile)
+            self.collision_check(player, next_tile, now)
         else:
             # Create new movement
-            self.move_entity(player)
+            self.move_entity(player, now=now)
 
         # send renderstate
         if self.state_callback:
-            self.state_callback(self.get_render_state())
+            self.state_callback(self.get_render_state(now))
 
-    def collision_check(self, entity: DynamicEntity, next_tile: Tile):
+    def collision_check(self, entity: DynamicEntity, next_tile: Tile, now: float = 0.0):
         # dig
         if next_tile.diggable:
             entity.state = "dig"
-            self.dig(entity)
+            self.dig(entity, now)
         # interact
         elif next_tile.interactable:
             if next_tile.is_switch():
@@ -362,12 +364,12 @@ class GameEngine:
                 # TODO: can you push boulders on top of items?
                 tile_behind_push = self.get_neighbor_tile(entity, range=2)
                 if not tile_behind_push.solid:
-                    self.move_entity(entity, push=True)
+                    self.move_entity(entity, push=True, now=now)
         # if nothing can be done: stop
         else:
             entity.state = "idle"
 
-    def move_entity(self, entity: DynamicEntity, push: bool = False):
+    def move_entity(self, entity: DynamicEntity, push: bool = False, now: float = 0.0):
         """Main movement generator function from dynamic entities"""
         if entity.state == "dead":
             return
@@ -413,23 +415,23 @@ class GameEngine:
 
             caller = sys._getframe(1).f_code.co_name
             movement_event = MoveEvent(
-                trigger_at=Clock.now() + dt,
+                trigger_at=now + dt,
                 target=entity,
                 event_type=event,
-                created_at=Clock.now(),
+                created_at=now,
                 created_by=entity.id,
                 direction=str(entity.direction.value),
                 source=f"move_entity<-{caller}",
             )
             self.event_resolver.schedule_event(movement_event)
 
-    def dig(self, entity: DynamicEntity) -> None:
+    def dig(self, entity: DynamicEntity, now: float = 0.0) -> None:
         self.event_resolver.cancel_object_events(entity.id, "move")
         dig_event = Event(
-            trigger_at=Clock.now() + 0.1,
+            trigger_at=now + 0.1,
             target=entity,
             event_type="dig",
-            created_at=Clock.now(),
+            created_at=now,
             created_by=entity.id,
         )
         self.event_resolver.schedule_event(dig_event)
@@ -480,12 +482,12 @@ class GameEngine:
 
         # FLAME_BARREL flood fills and damages all non-solid tiles in range
         if target.bomb_type == BombType.FLAME_BARREL:
-            self._resolve_flame_barrel(target)
+            self._resolve_flame_barrel(target, now=event.trigger_at)
             return
 
         # CRACKER_BARREL does flood fill damage + scattered medium explosions
         if target.bomb_type == BombType.CRACKER_BARREL:
-            self._resolve_cracker_barrel(target)
+            self._resolve_cracker_barrel(target, event.trigger_at)
             return
 
         # DIGGER_BOMB only damages bedrock tiles using large explosion radius
@@ -505,12 +507,12 @@ class GameEngine:
 
         # FLAMETHROWER does a 90-degree cone flame in player's facing direction
         if target.bomb_type == BombType.FLAMETHROWER:
-            self._resolve_flamethrower(target)
+            self._resolve_flamethrower(target, now=event.trigger_at)
             return
 
         # FIRE_EXTINGUISHER defuses bombs in a 90-degree cone
         if target.bomb_type == BombType.FIRE_EXTINGUISHER:
-            self._resolve_fire_extinguisher(target)
+            self._resolve_fire_extinguisher(target, now=event.trigger_at)
             return
 
         # CLONE spawns a decoy entity
@@ -525,7 +527,7 @@ class GameEngine:
 
         # GRENADE is a thrown projectile
         if target.bomb_type == BombType.GRENADE:
-            self._resolve_grenade(target)
+            self._resolve_grenade(target, now=event.trigger_at)
             return
 
         # Grasshopper bombs have special spawning behavior after explosion
@@ -555,7 +557,7 @@ class GameEngine:
 
         # Schedule chain explosions for C4 tiles that were hit (1/60s delay)
         chain_delay = 1.0 / 60.0
-        current_time = Clock.now()
+        current_time = event.trigger_at
         for cx, cy in c4_tiles_hit:
             c4_bomb = Bomb(
                 x=cx,
@@ -572,7 +574,7 @@ class GameEngine:
             self.event_resolver.schedule_event(explosion_event)
 
         # Trigger any bombs in the damage area
-        self._trigger_bombs_in_area(target, damage_array)
+        self._trigger_bombs_in_area(target, damage_array, now=event.trigger_at)
 
         # Damage players, monsters, and pickups
         self._damage_entities_in_area(damage_array)
@@ -670,7 +672,7 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
-    def _resolve_flamethrower(self, bomb: Bomb) -> None:
+    def _resolve_flamethrower(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve FLAMETHROWER - 90-degree cone flame in player's facing direction."""
         cfg = FLAMETHROWER_CONFIG
         direction = bomb.direction if bomb.direction else Direction.DOWN
@@ -701,7 +703,7 @@ class GameEngine:
                             self.explosions[y, x] = 1
 
         # Trigger any bombs in the affected area
-        self._trigger_bombs_in_area(bomb, final_mask)
+        self._trigger_bombs_in_area(bomb, final_mask, now=now)
 
         # Damage players, monsters, and pickups
         self._damage_entities_in_area(final_mask * cfg['damage'])
@@ -713,7 +715,7 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
-    def _resolve_fire_extinguisher(self, bomb: Bomb) -> None:
+    def _resolve_fire_extinguisher(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve FIRE_EXTINGUISHER - 90-degree cone that defuses bombs."""
         cfg = FIRE_EXTINGUISHER_CONFIG
         direction = bomb.direction if bomb.direction else Direction.DOWN
@@ -739,7 +741,7 @@ class GameEngine:
             if final_mask[other_bomb.y, other_bomb.x]:
                 other_bomb.state = 'defused'
                 # Reschedule explosion to 24 hours from now
-                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay)
+                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay, now)
 
         # Show smoke effect in affected area
         for y in range(self.height):
@@ -777,7 +779,7 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
-    def _resolve_grenade(self, bomb: Bomb) -> None:
+    def _resolve_grenade(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve GRENADE - create a grenade projectile entity."""
         cfg = GRENADE_CONFIG
         direction = bomb.direction if bomb.direction else Direction.DOWN
@@ -795,7 +797,7 @@ class GameEngine:
         self.monsters.append(grenade)
 
         # Start the grenade moving
-        self.move_entity(grenade)
+        self.move_entity(grenade, now=now)
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -804,7 +806,7 @@ class GameEngine:
     def resolve_grenade_movement(self, grenade: DynamicEntity, event: MoveEvent, flags: ResolveFlags) -> None:
         """Resolve grenade movement - moves until hitting wall or player."""
         # Calculate actual distance based on elapsed time
-        current_time = Clock.now()
+        current_time = event.trigger_at
         dt = current_time - event.created_at
         d = dt * grenade.speed
 
@@ -851,35 +853,35 @@ class GameEngine:
             px, py = xy_to_tile(player.x, player.y)
             if px == nx and py == ny and player.state != "dead":
                 # Explode in the tile with the player
-                self._explode_grenade(grenade, nx, ny)
+                self._explode_grenade(grenade, nx, ny, now=current_time)
                 return
 
         # Check if next tile is solid
         next_tile = self.get_tile(nx, ny)
         if next_tile and next_tile.solid:
             # Explode in current (non-solid) tile
-            self._explode_grenade(grenade, gx, gy)
+            self._explode_grenade(grenade, gx, gy, now=current_time)
             return
 
         # Continue moving
         if flags.spawn:
-            self.move_entity(grenade)
+            self.move_entity(grenade, now=current_time)
 
-    def _explode_grenade(self, grenade: DynamicEntity, x: int, y: int) -> None:
+    def _explode_grenade(self, grenade: DynamicEntity, x: int, y: int, now: float = 0.0) -> None:
         """Trigger a small explosion at the given position and remove grenade."""
         # Create a small bomb at explosion location
         explosion_bomb = Bomb(
             x=x,
             y=y,
             bomb_type=BombType.SMALL_BOMB,
-            placed_at=Clock.now(),
+            placed_at=now,
             owner_id=grenade.owner_id,
             fuse_override=0.0,  # Instant
         )
 
         # Schedule immediate explosion
         explosion_event = Event(
-            trigger_at=Clock.now(),
+            trigger_at=now,
             target=explosion_bomb,
             event_type="explode",
         )
@@ -889,7 +891,7 @@ class GameEngine:
         if grenade in self.monsters:
             self.monsters.remove(grenade)
 
-    def _resolve_flame_barrel(self, bomb: Bomb) -> None:
+    def _resolve_flame_barrel(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve FLAME_BARREL bomb - flood fill and damage all non-solid tiles in range."""
         cfg = FLAME_BARREL_CONFIG
 
@@ -913,7 +915,7 @@ class GameEngine:
                             self.explosions[y, x] = 1
 
         # Trigger any bombs in the affected area
-        self._trigger_bombs_in_area(bomb, fill_mask)
+        self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
         self._damage_entities_in_area(fill_mask * cfg['damage'])
@@ -925,10 +927,10 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
-    def _resolve_cracker_barrel(self, bomb: Bomb) -> None:
+    def _resolve_cracker_barrel(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve CRACKER_BARREL bomb - flood fill damage + scattered medium explosions."""
         cfg = CRACKER_BARREL_CONFIG
-        current_time = Clock.now()
+        current_time = now
 
         # Get solid map for flood fill
         solid_map = get_solid_map(self.tiles, self.height, self.width)
@@ -949,7 +951,7 @@ class GameEngine:
                             self.explosions[y, x] = 1
 
         # Trigger any bombs in the flood fill area
-        self._trigger_bombs_in_area(bomb, fill_mask)
+        self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
         self._damage_entities_in_area(fill_mask * cfg['flood_fill_damage'])
@@ -1186,7 +1188,7 @@ class GameEngine:
             or abs(moved - int(moved) - 1) < tolerance
         ):
             # print(f"enter tile   {px} {py}")
-            self.entity_enter_tile(target)
+            self.entity_enter_tile(target, now=current_time)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
             # print(f"enter center {px} {py}")
@@ -1200,10 +1202,10 @@ class GameEngine:
             if next_tile.solid:
                 blocked = True
                 px, py = xy_to_tile(target.x, target.y)
-                self.collision_check(target, next_tile)
+                self.collision_check(target, next_tile, current_time)
 
         if flags.spawn and not blocked:
-            self.move_entity(target)
+            self.move_entity(target, now=current_time)
 
         # fight monsters
         self.fight(target)
@@ -1227,10 +1229,10 @@ class GameEngine:
         # print(target_tile)
 
         if target_tile.health > 0:
-            self.dig(target)
+            self.dig(target, event.trigger_at)
         else:
             target.state = "walk"
-            self.move_entity(target)
+            self.move_entity(target, now=event.trigger_at)
 
     def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tile:
         px, py = xy_to_tile(entity.x, entity.y)
@@ -1260,7 +1262,7 @@ class GameEngine:
         return next_tile
 
     # TODO: tile entering logic
-    def entity_enter_tile(self, target: DynamicEntity) -> None:
+    def entity_enter_tile(self, target: DynamicEntity, now: float = 0.0) -> None:
         """Events that happen when entity enters a tile"""
         # check for mines
         px, py = xy_to_tile(target.x, target.y)
@@ -1268,7 +1270,7 @@ class GameEngine:
             if bomb.bomb_type == BombType.LANDMINE:
                 if bomb.x == px and bomb.y == py:
                     explosion_event = Event(
-                        trigger_at=Clock.now() + 0,
+                        trigger_at=now,
                         target=bomb,
                         event_type="explode",
                     )
