@@ -292,7 +292,7 @@ class GameEngine:
                 if self.pickups[y][x] is not None and damage_array[y, x] > 0:
                     self.pickups[y][x] = None
 
-    def clear_entity_move_events(self, player: DynamicEntity) -> None:
+    def clear_entity_move_events(self, player: DynamicEntity, resolve_time: float = 0.0) -> None:
         """Clear all move actions by the player"""
         # Note: We assume that this is not needed. However, in the original game,
         # the move is sometimes rounded up, i.e., you gain speed by turning.
@@ -300,7 +300,7 @@ class GameEngine:
         # First resolve undergoing events, i.e., stop to the place the entity
         # has already made progress to
         self.event_resolver.resolve_object_events(
-            player.id, "move", ResolveFlags(spawn=False)
+            player.id, "move", ResolveFlags(spawn=False, resolve_time=resolve_time)
         )
         # Safety: clear all movement events from the queue
         self.event_resolver.cancel_object_events(player.id, "move")
@@ -321,11 +321,16 @@ class GameEngine:
         if player.state == "dead":
             return
 
+        # Capture wall-clock time once for premature event resolution.
+        # This is the single place where Clock.now() is used for movement
+        # resolution, making future lag compensation straightforward.
+        resolve_time = Clock.now()
+
         # Cancel dig events, this needs to be done first as the resolve
         # init a move event
         self.clear_entity_dig_events(player)
         # When changing dir, all previous movement events are cleared
-        self.clear_entity_move_events(player)
+        self.clear_entity_move_events(player, resolve_time)
 
         # print("Centralize")
         # print(player.x, player.y)
@@ -367,39 +372,31 @@ class GameEngine:
         if entity.state == "dead":
             return
 
-        # When walking, calculate distance
+        # When walking, calculate distance to the next half-tile boundary
+        # (0.0 or 0.5 fractional) in the movement direction.
+        # d is always positive; direction is stored separately in the event.
         if entity.state == "walk":
-            if entity.direction == Direction.RIGHT:
-                decimal = entity.x - round(entity.x)
-                if decimal > 0.5:
-                    d = 1 - decimal
-                else:
-                    d = 0.5 - decimal
-            elif entity.direction == Direction.LEFT:
-                decimal = entity.x - round(entity.x)
-                if decimal < 0.5:
-                    d = decimal
-                else:
-                    d = decimal - 0.5
-            elif entity.direction == Direction.UP:
-                decimal = entity.y - round(entity.y)
-                if decimal < 0.5:
-                    d = decimal
-                else:
-                    d = decimal - 0.5
-            elif entity.direction == Direction.DOWN:
-                decimal = entity.y - round(entity.y)
-                if decimal > 0.5:
-                    d = 1 - decimal
-                else:
-                    d = 0.5 - decimal
+            if entity.direction in (Direction.RIGHT, Direction.LEFT):
+                frac = entity.x % 1.0
+            elif entity.direction in (Direction.DOWN, Direction.UP):
+                frac = entity.y % 1.0
             else:
                 return
 
-            # print(f"d {d}")
+            if entity.direction in (Direction.RIGHT, Direction.DOWN):
+                # Moving toward higher values: next stop is 0.5 or 1.0
+                if frac < 0.5:
+                    d = 0.5 - frac
+                else:
+                    d = 1.0 - frac
+            else:
+                # Moving toward lower values: next stop is 0.0 or 0.5
+                if frac > 0.5:
+                    d = frac - 0.5
+                else:
+                    d = frac
 
-            # this is the boundary condition
-            if d == 0:
+            if d < 1e-9:
                 d = 0.5
 
             # this is the required time to cross the thershold
@@ -465,9 +462,9 @@ class GameEngine:
         elif isinstance(target, DynamicEntity) and target.entity_type == EntityType.GRENADE and event.event_type == "move":
             self.resolve_grenade_movement(target, event, flags)
 
-        # send renderstate
+        # send renderstate — use event's logical time for consistent interpolation
         if self.state_callback:
-            self.state_callback(self.get_render_state())
+            self.state_callback(self.get_render_state(event.trigger_at))
 
     def resolve_bomb(self, target: Bomb, event: Event, flags: ResolveFlags) -> None:
         """Resolve explosion events"""
@@ -1137,9 +1134,13 @@ class GameEngine:
         if target.state == "dead":
             return
 
-        # because events might have been cleared, i.e., triggered at times
-        # other than planned, calculate actual traveled distance
-        current_time = Clock.now()
+        # Use event's scheduled time for normal resolution (timer-fired).
+        # For premature resolution (direction change), use the resolve_time
+        # captured in change_entity_direction.
+        if flags.resolve_time > 0:
+            current_time = flags.resolve_time
+        else:
+            current_time = event.trigger_at
         dt = current_time - event.created_at
         speedmod = 1
         if event.event_type == "push":
@@ -1357,7 +1358,7 @@ class GameEngine:
             player.y += dy
         self.prev_time = Clock.now()
 
-    def _interpolate_entity_position(self, entity: DynamicEntity, render_entity: DynamicEntity) -> None:
+    def _interpolate_entity_position(self, entity: DynamicEntity, render_entity: DynamicEntity, now: float) -> None:
         """Update render_entity position based on pending move event progress.
 
         Uses progress fraction (elapsed / total_duration) to interpolate exactly
@@ -1378,7 +1379,7 @@ class GameEngine:
         total_duration = event.trigger_at - event.created_at
         if total_duration <= 0:
             return
-        progress = min((Clock.now() - event.created_at) / total_duration, 1.0)
+        progress = min((now - event.created_at) / total_duration, 1.0)
         d = progress * 0.5
 
         direction = Direction(event.direction)
@@ -1391,7 +1392,7 @@ class GameEngine:
         elif direction == Direction.DOWN:
             render_entity.y = entity.y + d
 
-    def get_render_state(self) -> RenderState:
+    def get_render_state(self, now: Optional[float] = None) -> RenderState:
         """Build and return a RenderState for the renderer."""
 
         # Build tilemap as 2D numpy array
@@ -1407,11 +1408,13 @@ class GameEngine:
         render_players = [deepcopy(p) for p in self.players]
         render_monsters = [deepcopy(m) for m in self.monsters]
 
+        if now is None:
+            now = Clock.now()
         for player, render_player in zip(self.players, render_players):
-            self._interpolate_entity_position(player, render_player)
+            self._interpolate_entity_position(player, render_player, now)
 
         for monster, render_monster in zip(self.monsters, render_monsters):
-            self._interpolate_entity_position(monster, render_monster)
+            self._interpolate_entity_position(monster, render_monster, now)
 
         return RenderState(
             width=self.width,
@@ -1424,6 +1427,7 @@ class GameEngine:
                 filter(lambda x: x is not None, chain.from_iterable(self.pickups))
             ),
             bombs=self.bombs,
+            server_time=now,
         )
 
     def cleanup_render_state(self):

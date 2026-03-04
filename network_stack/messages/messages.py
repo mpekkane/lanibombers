@@ -271,6 +271,22 @@ class ClientControl(Message):
 
 @register_message
 @dataclass(frozen=True)
+class ClientSelect(Message):
+    """Client sends specific weapon selection by BombType enum value."""
+
+    TYPE: ClassVar[int] = 10
+    bomb_type: int
+
+    def to_bytes(self) -> bytes:
+        return self.bomb_type.to_bytes(1, "big")
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ClientSelect:
+        return cls(bomb_type=int.from_bytes(payload, "big"))
+
+
+@register_message
+@dataclass(frozen=True)
 class GameState(Message):
 
     TYPE: ClassVar[int] = 9
@@ -282,27 +298,20 @@ class GameState(Message):
     monsters: List[DynamicEntity]
     pickups: List[Pickup]
     bombs: List[Bomb]
+    server_time: float
 
     @staticmethod
     def from_render(state: RenderState) -> GameState:
-        width = state.width
-        height = state.height
-        tilemap = state.tilemap
-        explosions = state.explosions
-        players = state.players
-        monsters = state.monsters
-        pickups = state.pickups
-        bombs = state.bombs
-
         return GameState(
-            width=width,
-            height=height,
-            tilemap=tilemap,
-            explosions=explosions,
-            players=players,
-            monsters=monsters,
-            pickups=pickups,
-            bombs=bombs,
+            width=state.width,
+            height=state.height,
+            tilemap=state.tilemap,
+            explosions=state.explosions,
+            players=state.players,
+            monsters=state.monsters,
+            pickups=state.pickups,
+            bombs=state.bombs,
+            server_time=state.server_time,
         )
 
     def to_render(self) -> RenderState:
@@ -315,12 +324,14 @@ class GameState(Message):
             monsters=self.monsters,
             pickups=self.pickups,
             bombs=self.bombs,
+            server_time=self.server_time,
         )
 
     def to_bytes(self) -> bytes:
         # main data
         b_width = self.width.to_bytes(1, "big")
         b_height = self.height.to_bytes(1, "big")
+        b_server_time = struct.pack("!d", self.server_time)  # 8 bytes double
         b_tilemap = self.tilemap.tobytes()
         b_explosions = self.explosions.tobytes()
         b_players = pickle.dumps(self.players)
@@ -342,6 +353,7 @@ class GameState(Message):
         return (
             b_width
             + b_height
+            + b_server_time
             + b_num_players
             + b_num_monsters
             + b_num_pickups
@@ -362,26 +374,21 @@ class GameState(Message):
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> GameState:
-        # width = int.from_bytes(payload[0], "big")
-        # height = int.from_bytes(payload[1], "big")
-        # num_players = int.from_bytes(payload[2], "big")
-        # num_monsters = int.from_bytes(payload[3], "big")
-        # num_pickups = int.from_bytes(payload[4], "big")
-        # num_bombs = int.from_bytes(payload[5], "big")
         width = int(payload[0])
         height = int(payload[1])
-        num_players = int(payload[2])
-        num_monsters = int(payload[3])
-        num_pickups = int(payload[4])
-        num_bombs = int(payload[5])
-        tilemap_size = int.from_bytes(payload[6:10], "big")
-        explosions_size = int.from_bytes(payload[10:14], "big")
-        players_size = int.from_bytes(payload[14:16], "big")
-        monsters_size = int.from_bytes(payload[16:18], "big")
-        pickups_size = int.from_bytes(payload[18:20], "big")
-        bombs_size = int.from_bytes(payload[20:22], "big")
-        start = 22
-        stop = 22 + tilemap_size
+        (server_time,) = struct.unpack("!d", payload[2:10])
+        num_players = int(payload[10])
+        num_monsters = int(payload[11])
+        num_pickups = int(payload[12])
+        num_bombs = int(payload[13])
+        tilemap_size = int.from_bytes(payload[14:18], "big")
+        explosions_size = int.from_bytes(payload[18:22], "big")
+        players_size = int.from_bytes(payload[22:24], "big")
+        monsters_size = int.from_bytes(payload[24:26], "big")
+        pickups_size = int.from_bytes(payload[26:28], "big")
+        bombs_size = int.from_bytes(payload[28:30], "big")
+        start = 30
+        stop = start + tilemap_size
         tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
             (height, width)
         )
@@ -421,4 +428,5 @@ class GameState(Message):
             monsters=monsters,
             pickups=pickups,
             bombs=bombs,
+            server_time=server_time,
         )

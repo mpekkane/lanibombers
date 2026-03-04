@@ -17,3 +17,4 @@ class RenderState:
     monsters: List[DynamicEntity] = field(default_factory=list)
     pickups: List[Pickup] = field(default_factory=list)
     bombs: List[Bomb] = field(default_factory=list)
+    server_time: float = 0.0  # Server clock at interpolation time

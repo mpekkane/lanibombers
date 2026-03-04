@@ -15,12 +15,14 @@ from network_stack.messages.messages import (
     Ping,
     Pong,
     ClientControl,
+    ClientSelect,
     GameState,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
+from cfg.bomb_dictionary import BombType
 from game_engine.map_loader import load_map
 from game_engine import GameEngine
 from game_engine.random_map_generator import RandomMapGenerator
@@ -60,6 +62,7 @@ class BomberServer:
         self.server.set_callback(ChatText, self.on_chat)
         self.server.set_callback(Pong, self.on_pong)
         self.server.set_callback(ClientControl, self.on_control)
+        self.server.set_callback(ClientSelect, self.on_select)
         self.server.start()
 
         self.pings: Dict[str, Ping] = {}
@@ -175,6 +178,28 @@ class BomberServer:
             elif cmd == Action.REMOTE:
                 # TODO: trigger remote bomb
                 self.engine.detonate_remotes(player)
+
+    def on_select(self, msg: ClientSelect, ctx: ClientContext):
+        """Handle weapon selection by bomb type."""
+        if not self.state.running():
+            return
+
+        if ctx.state.name is not None:
+            player = self.engine.get_player_by_name(ctx.state.name)
+        else:
+            player = self.engine.get_player_by_name("unnamed")
+
+        if player is None:
+            return
+
+        all_types = list(BombType)
+        if msg.bomb_type < 0 or msg.bomb_type >= len(all_types):
+            return
+        target_type = all_types[msg.bomb_type]
+        for i, (bomb_type, _count) in enumerate(player.inventory):
+            if bomb_type == target_type:
+                player.selected = i
+                return
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:

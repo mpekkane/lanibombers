@@ -35,14 +35,15 @@ class ClientSimulation:
     def __init__(self):
         self._server_state: Optional[RenderState] = None
         self._server_state_time: float = 0.0
+        self._prev_server_time: float = 0.0  # Previous state's server_time
         self._accumulated_explosions: Optional[np.ndarray] = None
 
     def receive_state(self, state: RenderState) -> None:
         """
         Receive a new RenderState from the server.
 
-        Args:
-            state: The authoritative state from the game server
+        Re-times state arrival using server clock deltas so that
+        client-side extrapolation is immune to variable network/processing delays.
         """
         if self._accumulated_explosions is not None:
             # Merge: new explosions take priority, keep old where new is zero
@@ -51,8 +52,18 @@ class ClientSimulation:
             )
         else:
             self._accumulated_explosions = state.explosions.copy()
+
+        # Re-time: advance client state time by the server's own time delta
+        # instead of using raw Clock.now() which includes variable network delay
+        if self._prev_server_time > 0 and state.server_time > 0:
+            server_delta = state.server_time - self._prev_server_time
+            self._server_state_time += server_delta
+        else:
+            # First state — bootstrap with client clock
+            self._server_state_time = Clock.now()
+
+        self._prev_server_time = state.server_time
         self._server_state = state
-        self._server_state_time = Clock.now()
 
     def has_state(self) -> bool:
         """Whether at least one server state has been received."""

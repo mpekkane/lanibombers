@@ -6,7 +6,7 @@ Main graphics processing and display loop.
 import os
 import time
 import arcade
-from typing import Callable, Optional, Tuple, List
+from typing import Callable, Dict, Optional, Tuple, List
 from PIL import Image
 from renderer.tile_renderer import TileRenderer
 from renderer.entity_renderer import EntityRenderer
@@ -14,6 +14,7 @@ from renderer.header_renderer import HeaderRenderer
 from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
+from cfg.bomb_dictionary import BombType
 
 # ============================================================================
 # Configuration
@@ -55,10 +56,12 @@ class GameRenderer(arcade.Window):
         client_player_name: str = "",
         show_stats: bool = True,
         show_grid: bool = True,
-        window_name: str = "lanibombers"
+        window_name: str = "lanibombers",
+        item_hotkeys: Optional[Dict[BombType, str]] = None,
     ):
         super().__init__(width, height, window_name, vsync=VSYNC)
         self.client_player_name = client_player_name
+        self.item_hotkeys = item_hotkeys or {}
         self.show_stats = show_stats
         self.render_state_function = render_state_function
         self.show_stats = show_stats
@@ -110,6 +113,7 @@ class GameRenderer(arcade.Window):
             self.zoom,
             self.height,
             self.show_stats,
+            self.item_hotkeys,
         )
 
         # Calculate y offset for UI space at top

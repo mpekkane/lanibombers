@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 class ResolveFlags:
     """This enables message passing from forced resolvation"""
     spawn: bool = True
+    resolve_time: float = 0.0  # Wall-clock time for premature resolution (0 = use event.trigger_at)
 
 
 @dataclass

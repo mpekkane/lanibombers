@@ -89,6 +89,10 @@ def parse_arcade_key(name: str) -> int:
     else:
         key_name = key.upper()
 
+    # Single digit -> KEY_0..KEY_9 (arcade uses KEY_ prefix for digits)
+    if len(key_name) == 1 and key_name.isdigit():
+        key_name = f"KEY_{key_name}"
+
     # Try to fetch from arcade.key
     try:
         return getattr(arcade.key, key_name)

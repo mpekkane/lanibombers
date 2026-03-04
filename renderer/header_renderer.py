@@ -7,8 +7,8 @@ import os
 
 import arcade
 from PIL import Image
-from typing import List, Optional
-from cfg.bomb_dictionary import BOMB_TYPE_TO_ICON
+from typing import Dict, List, Optional
+from cfg.bomb_dictionary import BombType, BOMB_TYPE_TO_ICON
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import PlayerColorizer
 from game_engine.entities.player import Player
@@ -25,10 +25,12 @@ GRAPH_MARGIN = 5
 class HeaderRenderer:
     """Handles header UI rendering: player card, inventory, stats, perf graphs."""
 
-    def __init__(self, transparent_texture, zoom, screen_height, show_stats):
+    def __init__(self, transparent_texture, zoom, screen_height, show_stats,
+                 item_hotkeys: Optional[Dict[BombType, str]] = None):
         self.zoom = zoom
         self.transparent_texture = transparent_texture
         self.screen_height = screen_height
+        self.item_hotkeys = item_hotkeys or {}
 
         # Player colorizer for recolored cards
         self.colorizer = PlayerColorizer(SPRITES_PATH)
@@ -103,6 +105,7 @@ class HeaderRenderer:
         self.inventory_hatch_sprites = arcade.SpriteList()  # Hatch overlay for non-selected
         self.current_inventory = None  # Track inventory to detect changes
         self.current_selected = None  # Track selected index to detect changes
+        self.hotkey_text_sprites = arcade.SpriteList()  # Hotkey labels on icons
 
         # Performance graph (only if show_stats is enabled)
         self.perf_graph_list = arcade.SpriteList()
@@ -220,6 +223,7 @@ class HeaderRenderer:
             self.inventory_sprites = arcade.SpriteList()
             self.inventory_count_sprites = arcade.SpriteList()
             self.inventory_hatch_sprites = arcade.SpriteList()
+            self.hotkey_text_sprites = arcade.SpriteList()
 
             # Start position: just past the player card (110 pixels from left)
             icon_x = 110 * self.zoom
@@ -260,6 +264,19 @@ class HeaderRenderer:
                 for sprite in count_text_sprites:
                     self.inventory_count_sprites.append(sprite)
 
+                # Add hotkey label at bottom-right of icon
+                hotkey_label = self.item_hotkeys.get(bomb_type, "")
+                if hotkey_label:
+                    char_width = self.bitmap_text.char_width
+                    text_width = char_width * len(hotkey_label)
+                    hotkey_x = icon_left_x + (icon_size * self.zoom) - text_width - 1 * self.zoom
+                    hotkey_y = self.screen_height - (icon_size - self.bitmap_text.char_height / self.zoom - 1) * self.zoom
+                    hotkey_sprites = self.bitmap_text.create_text_sprites(
+                        hotkey_label, hotkey_x, hotkey_y
+                    )
+                    for sprite in hotkey_sprites:
+                        self.hotkey_text_sprites.append(sprite)
+
                 # Move x position past the icon
                 icon_x += icon_size * self.zoom
 
@@ -284,5 +301,6 @@ class HeaderRenderer:
         self.inventory_sprites.draw(pixelated=True)
         self.inventory_hatch_sprites.draw(pixelated=True)
         self.inventory_count_sprites.draw(pixelated=True)
+        self.hotkey_text_sprites.draw(pixelated=True)
         if show_stats:
             self.perf_graph_list.draw()
