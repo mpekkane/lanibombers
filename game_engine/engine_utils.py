@@ -7,7 +7,7 @@ from typing import Tuple, List
 
 import numpy as np
 
-from game_engine.entities.tile import Tile
+from game_engine.entities.tile import Tile, TileType
 
 
 def get_solid_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarray:
@@ -27,6 +27,25 @@ def get_solid_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarra
         for x in range(width):
             solid_map[y, x] = tiles[y][x].solid
     return solid_map
+
+
+def get_bioslime_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarray:
+    """
+    Return a numpy boolean array where True indicates a bioslime tile.
+
+    Args:
+        tiles: 2D list of Tile objects
+        height: Map height
+        width: Map width
+
+    Returns:
+        Boolean array with shape (height, width) where True = bioslime
+    """
+    bioslime_map = np.zeros((height, width), dtype=bool)
+    for y in range(height):
+        for x in range(width):
+            bioslime_map[y, x] = tiles[y][x].tile_type == TileType.BIOSLIME
+    return bioslime_map
 
 
 def flood_fill(mask: np.ndarray, start: Tuple[int, int], max_dist: int) -> np.ndarray:

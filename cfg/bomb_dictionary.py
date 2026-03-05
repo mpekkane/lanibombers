@@ -56,8 +56,8 @@ BOMB_PROPERTIES = {
     BombType.FLAME_BARREL: (3.0, ExplosionType.NONE),  # Flood fills and damages tiles
     BombType.CRACKER_BARREL: (-1.0, ExplosionType.NONE),  # Triggered by damage, not timed
     BombType.DIGGER_BOMB: (3.0, ExplosionType.LARGE),  # Only damages bedrock tiles
-    BombType.BIOSLIME: (0.3, ExplosionType.NONE),  # Places bioslime tile at bomb location
-    BombType.METAL_PLATE: (0.3, ExplosionType.NONE),  # Places concrete tile at bomb location
+    BombType.BIOSLIME: (0.15, ExplosionType.NONE),  # Places bioslime tile at bomb location
+    BombType.METAL_PLATE: (0.15, ExplosionType.NONE),  # Places concrete tile at bomb location
     BombType.FLAMETHROWER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant 90-degree cone flame
     BombType.FIRE_EXTINGUISHER: (-1.0, ExplosionType.DIRECTED_FLAME),  # Instant cone that defuses bombs
     BombType.CLONE: (-1.0, ExplosionType.NONE),  # Instant: spawns a decoy entity

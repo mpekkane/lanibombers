@@ -9,7 +9,7 @@ from copy import deepcopy
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
-from game_engine.engine_utils import flood_fill, get_solid_map
+from game_engine.engine_utils import flood_fill, get_solid_map, get_bioslime_map
 from cfg.tile_dictionary import (
     C4_TILE_ID,
     URETHANE_TILE_ID,
@@ -48,6 +48,11 @@ from game_engine.utils import xy_to_tile, clamp
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
+
+
+class _BioslimeTick:
+    """Sentinel target for bioslime tick events."""
+    pass
 
 
 class SwitchState(Enum):
@@ -96,6 +101,8 @@ class GameEngine:
         self.switch_state = SwitchState.OFF
         self.security_doors: List[Tuple[int, int, Tile]] = []
         self.state_callback: Optional[Callable[[RenderState], None]] = None
+        self._bioslime_tick_active = False
+        self._bioslime_sentinel = _BioslimeTick()
 
     def set_render_callback(
         self, callback: Callable[[RenderState], None]
@@ -456,6 +463,8 @@ class GameEngine:
             self.resolve_dig(target, event, flags)
         elif isinstance(target, DynamicEntity) and target.entity_type == EntityType.GRENADE and event.event_type == "move":
             self.resolve_grenade_movement(target, event, flags)
+        elif isinstance(target, _BioslimeTick) and event.event_type == "bioslime_tick":
+            self._bioslime_tick(event.trigger_at)
 
         # send renderstate — use event's logical time for consistent interpolation
         if self.state_callback:
@@ -639,12 +648,75 @@ class GameEngine:
         tile = self.get_tile(bomb.x, bomb.y)
         if tile and tile.tile_type == TileType.EMPTY:
             self.set_tile(bomb.x, bomb.y, Tile.create_bioslime())
+            self._schedule_bioslime_tick(bomb.placed_at)
 
         self.pending_sounds.append(SoundType.URETHANE)  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
             self.bombs.remove(bomb)
+
+    def _schedule_bioslime_tick(self, now: float) -> None:
+        """Schedule the next bioslime tick if not already active."""
+        if self._bioslime_tick_active:
+            return
+        self._bioslime_tick_active = True
+        event = Event(
+            trigger_at=now + 0.25,
+            target=self._bioslime_sentinel,
+            event_type="bioslime_tick",
+        )
+        self.event_resolver.schedule_event(event)
+
+    def _bioslime_tick(self, now: float) -> None:
+        """Process one bioslime spreading tick."""
+        self._bioslime_tick_active = False
+
+        bioslime = get_bioslime_map(self.tiles, self.height, self.width)
+
+        # Stop if all bioslime is gone
+        if not bioslime.any():
+            return
+
+        walkable = ~get_solid_map(self.tiles, self.height, self.width)
+
+        # Frontier: bioslime tiles with at least one walkable cardinal neighbor
+        # Pad walkable with False border, then slice to check all 4 neighbors
+        padded = np.pad(walkable, 1, constant_values=False)
+        has_walkable_neighbor = (
+            padded[:-2, 1:-1]    # up
+            | padded[2:, 1:-1]   # down
+            | padded[1:-1, :-2]  # left
+            | padded[1:-1, 2:]   # right
+        )
+        frontier = bioslime & has_walkable_neighbor
+
+        # Process frontier tiles
+        ys, xs = np.where(frontier)
+        for y, x in zip(ys, xs):
+            tile = self.tiles[y][x]
+            tile.spread_ticks -= 1
+            if tile.spread_ticks <= 0:
+                # Find walkable cardinal neighbors
+                neighbors = []
+                if y > 0 and walkable[y - 1, x]:
+                    neighbors.append((x, y - 1))
+                if y < self.height - 1 and walkable[y + 1, x]:
+                    neighbors.append((x, y + 1))
+                if x > 0 and walkable[y, x - 1]:
+                    neighbors.append((x - 1, y))
+                if x < self.width - 1 and walkable[y, x + 1]:
+                    neighbors.append((x + 1, y))
+
+                if neighbors:
+                    nx, ny = random.choice(neighbors)
+                    self.set_tile(nx, ny, Tile.create_bioslime())
+
+                # Reset timer so it can spread again
+                tile.spread_ticks = random.randint(4, 8)
+
+        # Always reschedule as long as bioslime exists
+        self._schedule_bioslime_tick(now)
 
     def _resolve_metal_plate(self, bomb: Bomb) -> None:
         """Resolve METAL_PLATE bomb - place a concrete tile at bomb location."""

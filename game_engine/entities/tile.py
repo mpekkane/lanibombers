@@ -1,4 +1,5 @@
 from __future__ import annotations
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, TYPE_CHECKING, Optional
@@ -70,6 +71,7 @@ class Tile(GameObject):
     solid: bool = False
     interactable: bool = False
     diggable: bool = False
+    spread_ticks: int = 0
 
     @staticmethod
     def create(tile_type: TileType, tile_id: Optional[int] = None) -> Tile:
@@ -203,6 +205,7 @@ class Tile(GameObject):
             interactable=False,
             diggable=True,
             visual_id=BIOSLIME_TILE_ID,
+            spread_ticks=random.randint(4, 8),
         )
 
     @staticmethod
