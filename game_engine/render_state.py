@@ -1,9 +1,19 @@
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import List
 
 import numpy as np
 
 from game_engine.entities import DynamicEntity, Pickup, Bomb, Player
+
+
+class SoundType(IntEnum):
+    EXPLOSION = 1
+    SMALL_EXPLOSION = 2
+    URETHANE = 3
+    DIG = 4
+    TREASURE = 5
+    DIE = 6
 
 
 @dataclass
@@ -18,3 +28,4 @@ class RenderState:
     pickups: List[Pickup] = field(default_factory=list)
     bombs: List[Bomb] = field(default_factory=list)
     server_time: float = 0.0  # Server clock at interpolation time
+    sounds: List[int] = field(default_factory=list)

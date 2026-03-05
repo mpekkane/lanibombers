@@ -26,6 +26,8 @@ from cfg.bomb_dictionary import BombType
 from game_engine.map_loader import load_map
 from game_engine import GameEngine
 from game_engine.random_map_generator import RandomMapGenerator
+from game_engine.sound_engine import SoundEngine
+from game_engine.render_state import SoundType
 from renderer.game_renderer import GameRenderer
 
 
@@ -51,9 +53,12 @@ class BomberServer:
             map_data = random_map_generator.generate()
 
         # game engine
-        self.engine = GameEngine(map_data.width, map_data.height, headless)
+        self.engine = GameEngine(map_data.width, map_data.height)
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(map_data)
+
+        # local sound engine for server-side rendering
+        self.sound_engine = SoundEngine(music_volume=0.5, fx_volume=1.0) if not headless else None
 
         # networking
         self.server = BomberNetworkServer(cfg)
@@ -96,6 +101,8 @@ class BomberServer:
         # FIXME: temp to check logic
         self.state = ServerState.GAME
         self.engine.start()
+        if self.sound_engine:
+            self.sound_engine.game()
         self.render_callback(self.engine.get_render_state())
         # update_thread = threading.Thread(target=self.update_state, daemon=True)
         # update_thread.start()
@@ -112,7 +119,27 @@ class BomberServer:
 
     def get_render_state_unsafe(self) -> RenderState:
         """Returns RenderState with dimensions and sprite indices"""
-        return self.engine.get_render_state()
+        state = self.engine.get_render_state()
+        if self.sound_engine and state.sounds:
+            for sound in state.sounds:
+                self._play_sound(sound)
+        return state
+
+    def _play_sound(self, sound_type: int) -> None:
+        """Play a sound effect locally via the server's sound engine."""
+        se = self.sound_engine
+        if sound_type == SoundType.EXPLOSION:
+            se.explosion()
+        elif sound_type == SoundType.SMALL_EXPLOSION:
+            se.small_explosion()
+        elif sound_type == SoundType.URETHANE:
+            se.urethane()
+        elif sound_type == SoundType.DIG:
+            se.dig()
+        elif sound_type == SoundType.TREASURE:
+            se.treasure()
+        elif sound_type == SoundType.DIE:
+            se.die()
 
     def update_state(self):
         if not self.state.running():

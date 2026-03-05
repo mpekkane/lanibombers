@@ -9,7 +9,7 @@ from typing import Any, Optional
 import numpy as np
 
 from game_engine.clock import Clock
-from game_engine.render_state import RenderState
+from game_engine.render_state import RenderState, SoundType
 from game_engine.entities.dynamic_entity import Direction
 
 
@@ -32,11 +32,12 @@ class ClientSimulation:
     state for smooth rendering. Currently extrapolates DynamicEntity movement.
     """
 
-    def __init__(self):
+    def __init__(self, sound_engine=None):
         self._server_state: Optional[RenderState] = None
         self._server_state_time: float = 0.0
         self._prev_server_time: float = 0.0  # Previous state's server_time
         self._accumulated_explosions: Optional[np.ndarray] = None
+        self._sound_engine = sound_engine
 
     def receive_state(self, state: RenderState) -> None:
         """
@@ -64,6 +65,26 @@ class ClientSimulation:
 
         self._prev_server_time = state.server_time
         self._server_state = state
+
+        if self._sound_engine and state.sounds:
+            for sound in state.sounds:
+                self._play_sound(sound)
+
+    def _play_sound(self, sound_type: int) -> None:
+        """Play a sound effect via the sound engine."""
+        se = self._sound_engine
+        if sound_type == SoundType.EXPLOSION:
+            se.explosion()
+        elif sound_type == SoundType.SMALL_EXPLOSION:
+            se.small_explosion()
+        elif sound_type == SoundType.URETHANE:
+            se.urethane()
+        elif sound_type == SoundType.DIG:
+            se.dig()
+        elif sound_type == SoundType.TREASURE:
+            se.treasure()
+        elif sound_type == SoundType.DIE:
+            se.die()
 
     def has_state(self) -> bool:
         """Whether at least one server state has been received."""

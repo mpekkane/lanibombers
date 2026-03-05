@@ -21,6 +21,7 @@ from common.keymapper import map_keys, parse_arcade_key, pynput_to_arcade_key
 from renderer.game_renderer import GameRenderer
 from game_engine.render_state import RenderState
 from game_engine.client_simulation import ClientSimulation
+from game_engine.sound_engine import SoundEngine
 from cfg.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 
 
@@ -76,7 +77,8 @@ class BomberClient:
         self.client.set_callback(Ping, self.on_ping)
         self.client.set_callback(GameState, self.on_game_state)
         self.client.set_on_disconnect(self.on_disconnect)
-        self.simulation = ClientSimulation()
+        self.sound_engine = SoundEngine(music_volume=0.5, fx_volume=1.0) if not headless else None
+        self.simulation = ClientSimulation(sound_engine=self.sound_engine)
         self.renderer = None
         self.running = False
 
@@ -113,6 +115,9 @@ class BomberClient:
 
             while not self.has_state():
                 Clock.sleep(1)
+
+            if self.sound_engine:
+                self.sound_engine.game()
 
             renderer.initialize()
             renderer.run()

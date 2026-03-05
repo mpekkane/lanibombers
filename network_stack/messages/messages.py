@@ -299,6 +299,7 @@ class GameState(Message):
     pickups: List[Pickup]
     bombs: List[Bomb]
     server_time: float
+    sounds: tuple = ()
 
     @staticmethod
     def from_render(state: RenderState) -> GameState:
@@ -312,6 +313,7 @@ class GameState(Message):
             pickups=state.pickups,
             bombs=state.bombs,
             server_time=state.server_time,
+            sounds=tuple(state.sounds),
         )
 
     def to_render(self) -> RenderState:
@@ -325,6 +327,7 @@ class GameState(Message):
             pickups=self.pickups,
             bombs=self.bombs,
             server_time=self.server_time,
+            sounds=list(self.sounds),
         )
 
     def to_bytes(self) -> bytes:
@@ -338,6 +341,7 @@ class GameState(Message):
         b_monsters = pickle.dumps(self.monsters)
         b_pickups = pickle.dumps(self.pickups)
         b_bombs = pickle.dumps(self.bombs)
+        b_sounds = bytes(self.sounds)
         # auxiliary data
         b_num_players = len(self.players).to_bytes(1, "big")
         b_num_monsters = len(self.monsters).to_bytes(1, "big")
@@ -349,6 +353,7 @@ class GameState(Message):
         b_monsters_size = len(b_monsters).to_bytes(2, "big")
         b_pickups_size = len(b_pickups).to_bytes(2, "big")
         b_bombs_size = len(b_bombs).to_bytes(2, "big")
+        b_sounds_size = len(b_sounds).to_bytes(2, "big")
 
         return (
             b_width
@@ -364,12 +369,14 @@ class GameState(Message):
             + b_monsters_size
             + b_pickups_size
             + b_bombs_size
+            + b_sounds_size
             + b_tilemap
             + b_explosions
             + b_players
             + b_monsters
             + b_pickups
             + b_bombs
+            + b_sounds
         )
 
     @classmethod
@@ -387,7 +394,8 @@ class GameState(Message):
         monsters_size = int.from_bytes(payload[24:26], "big")
         pickups_size = int.from_bytes(payload[26:28], "big")
         bombs_size = int.from_bytes(payload[28:30], "big")
-        start = 30
+        sounds_size = int.from_bytes(payload[30:32], "big")
+        start = 32
         stop = start + tilemap_size
         tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
             (height, width)
@@ -418,6 +426,9 @@ class GameState(Message):
             bombs = []
         else:
             bombs = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + sounds_size
+        sounds = tuple(payload[start:stop])
 
         return cls(
             width=width,
@@ -429,4 +440,5 @@ class GameState(Message):
             pickups=pickups,
             bombs=bombs,
             server_time=server_time,
+            sounds=sounds,
         )
