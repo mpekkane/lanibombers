@@ -2,7 +2,7 @@
 
 import array
 import random
-from typing import List
+from typing import List, Tuple
 import numpy as np
 from game_engine.map_loader import MapData
 from game_engine.entities.tile import Tile
@@ -66,6 +66,38 @@ class RandomMapGenerator:
         assert isinstance(width, int)
         assert isinstance(height, int)
 
+        placed_items: List[Tuple[int, int]] = []
+
+        # no monsters in random levels
+        monsters: List[DynamicEntity] = []
+
+        treasures: List[Treasure] = []
+        dist_from_edge = 3
+        num_treasure = random.randint(min_treasure, max_treasure)
+        for _ in range(num_treasure):
+            ok = False
+            while not ok:
+                x = random.randint(dist_from_edge, width - dist_from_edge)
+                y = random.randint(dist_from_edge, height - dist_from_edge)
+                if (x, y) not in placed_items:
+                    ok = True
+            type = random.choice(list(TreasureType))
+            treasures.append(Treasure.create(x, y, type))
+            placed_items.append((x, y))
+
+        tools: List[Tool] = []
+        num_tool = random.randint(min_tools, max_tools)
+        for _ in range(num_tool):
+            ok = False
+            while not ok:
+                x = random.randint(dist_from_edge, width - dist_from_edge)
+                y = random.randint(dist_from_edge, height - dist_from_edge)
+                if (x, y) not in placed_items:
+                    ok = True
+            type = random.choice(list(ToolType))
+            tools.append(Tool.create(x, y, type))
+            placed_items.append((x, y))
+
         empty_len = 8
 
         tiles: List[List[Tile]] = []
@@ -87,46 +119,29 @@ class RandomMapGenerator:
                     tiles[y].append(Tile.create_empty())
                 # else do regular generated map
                 else:
-                    if map[x, y]:
-                        north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
-                        south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
-                        west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
-                        east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
-                        if south and east and not north and not west:
-                            rid = BEDROCK_NW_ID
-                        elif south and west and not north and not east:
-                            rid = BEDROCK_NE_ID
-                        elif north and east and not south and not west:
-                            rid = BEDROCK_SW_ID
-                        elif north and west and not south and not east:
-                            rid = BEDROCK_SE_ID
-                        else:
-                            rid = random.choice(list(BEDROCK_INSIDE_TILES))
-                        tiles[y].append(Tile.create_by_id(tile_id=rid))
+                    if (x, y) in placed_items:
+                        tiles[y].append(Tile.create_empty())
                     else:
-                        rid = random.choice(list(DIRT_TILES))
-                        tiles[y].append(Tile.create_by_id(tile_id=rid))
+                        if map[x, y]:
+                            north = self.is_bedrock(map, x, y - 1, width, height)  # type: ignore
+                            south = self.is_bedrock(map, x, y + 1, width, height)  # type: ignore
+                            west = self.is_bedrock(map, x - 1, y, width, height)  # type: ignore
+                            east = self.is_bedrock(map, x + 1, y, width, height)  # type: ignore
+                            if south and east and not north and not west:
+                                rid = BEDROCK_NW_ID
+                            elif south and west and not north and not east:
+                                rid = BEDROCK_NE_ID
+                            elif north and east and not south and not west:
+                                rid = BEDROCK_SW_ID
+                            elif north and west and not south and not east:
+                                rid = BEDROCK_SE_ID
+                            else:
+                                rid = random.choice(list(BEDROCK_INSIDE_TILES))
+                            tiles[y].append(Tile.create_by_id(tile_id=rid))
+                        else:
+                            rid = random.choice(list(DIRT_TILES))
+                            tiles[y].append(Tile.create_by_id(tile_id=rid))
                 tilemap.append(tiles[y][x].to_byte())
-
-        # no monsters in random levels
-        monsters: List[DynamicEntity] = []
-
-        treasures: List[Treasure] = []
-        dist_from_edge = 3
-        num_treasure = random.randint(min_treasure, max_treasure)
-        for _ in range(num_treasure):
-            x = random.randint(dist_from_edge, width - dist_from_edge)
-            y = random.randint(dist_from_edge, height - dist_from_edge)
-            type = random.choice(list(TreasureType))
-            treasures.append(Treasure.create(x, y, type))
-
-        tools: List[Tool] = []
-        num_tool = random.randint(min_tools, max_tools)
-        for _ in range(num_tool):
-            x = random.randint(dist_from_edge, width - dist_from_edge)
-            y = random.randint(dist_from_edge, height - dist_from_edge)
-            type = random.choice(list(ToolType))
-            tools.append(Tool.create(x, y, type))
 
         return MapData(
             width=width,

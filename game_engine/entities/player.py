@@ -1,17 +1,19 @@
+import random
 from typing import List, Tuple, Dict
 from game_engine.clock import Clock
 from game_engine.entities import DynamicEntity
 from game_engine.entities import Bomb, BombType
 from game_engine.entities import Tool, ToolType, Treasure
+from cfg.bomb_dictionary import BOMB_TYPES
 from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
-
 
 @dataclass
 class Player(DynamicEntity):
     inventory: List[Tuple[BombType, int]] = field(default_factory=lambda: [])
     tools: Dict[ToolType, int] = field(default_factory=lambda: {})
     selected: int = 0
+    dig_power: int = 10
 
     def test_inventory(self) -> None:
         self.inventory.append((BombType.SMALL_BOMB, 50))
@@ -86,8 +88,24 @@ class Player(DynamicEntity):
             self.tools[tool.tool_type] = 1
         else:
             self.tools[tool.tool_type] += 1
+
+        # update dig power
+        self.dig_power += tool.dig_power
+
+        # heal with medpack
+        if tool.tool_type == ToolType.MEDPACK:
+            self.health = 100
+
+        # random weapons from a crate
+        if tool.tool_type == ToolType.CRATE:
+            got_type = random.choice(BOMB_TYPES)
+            got_amount = random.randint(0, 10)
+            self.inventory.append((got_type, got_amount))
+            print(f"Picked up {got_amount} {got_type}")
+
         print(f"Picked up {tool.tool_type}")
         print(f"Tools: {self.tools}")
+        print(f"Health: {self.health}")
 
     def pickup_treasure(self, treasure: Treasure) -> None:
         self.add_money(treasure.value)
@@ -95,6 +113,4 @@ class Player(DynamicEntity):
         print(f"Money: {self.money}")
 
     def get_dig_power(self) -> int:
-        default = 10
-        #TODO: add tools
-        return default
+        return self.dig_power
