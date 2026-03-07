@@ -19,7 +19,14 @@ from cfg.tile_dictionary import (
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
-from cfg.bomb_dictionary import GRASSHOPPER_CONFIG, FLAME_BARREL_CONFIG, CRACKER_BARREL_CONFIG, FLAMETHROWER_CONFIG, FIRE_EXTINGUISHER_CONFIG, GRENADE_CONFIG
+from cfg.bomb_dictionary import (
+    GRASSHOPPER_CONFIG,
+    FLAME_BARREL_CONFIG,
+    CRACKER_BARREL_CONFIG,
+    FLAMETHROWER_CONFIG,
+    FIRE_EXTINGUISHER_CONFIG,
+    GRENADE_CONFIG,
+)
 from game_engine.entities.explosion import (
     ExplosionType,
     SmallExplosion,
@@ -52,6 +59,7 @@ if TYPE_CHECKING:
 
 class _BioslimeTick:
     """Sentinel target for bioslime tick events."""
+
     pass
 
 
@@ -104,9 +112,7 @@ class GameEngine:
         self._bioslime_tick_active = False
         self._bioslime_sentinel = _BioslimeTick()
 
-    def set_render_callback(
-        self, callback: Callable[[RenderState], None]
-    ) -> None:
+    def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self.state_callback = callback
 
     def load_map(self, map_data: MapData) -> None:
@@ -243,7 +249,10 @@ class GameEngine:
     def detonate_remotes(self, player: Player) -> None:
         now = Clock.now()
         for bomb in self.bombs:
-            if bomb.bomb_type in (BombType.SMALL_REMOTE, BombType.BIG_REMOTE) and bomb.owner_id == player.id:
+            if (
+                bomb.bomb_type in (BombType.SMALL_REMOTE, BombType.BIG_REMOTE)
+                and bomb.owner_id == player.id
+            ):
                 explosion_event = Event(
                     trigger_at=now,
                     target=bomb,
@@ -251,7 +260,13 @@ class GameEngine:
                 )
                 self.event_resolver.schedule_event(explosion_event)
 
-    def _trigger_bombs_in_area(self, source_bomb: Bomb, affected_area: np.ndarray, delay: float = 1.0 / 60.0, now: float = 0.0) -> None:
+    def _trigger_bombs_in_area(
+        self,
+        source_bomb: Bomb,
+        affected_area: np.ndarray,
+        delay: float = 1.0 / 60.0,
+        now: float = 0.0,
+    ) -> None:
         """
         Trigger all bombs in the affected area to explode after a delay.
 
@@ -265,7 +280,9 @@ class GameEngine:
             if other_bomb is source_bomb:
                 continue
             if affected_area[other_bomb.y, other_bomb.x]:
-                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", delay, now)
+                self.event_resolver.reschedule_events_by_target(
+                    other_bomb, "explode", delay, now
+                )
 
     def _damage_entities_in_area(self, damage_array: np.ndarray) -> None:
         """Damage players, monsters, and pickups in the affected area.
@@ -294,7 +311,9 @@ class GameEngine:
                 if self.pickups[y][x] is not None and damage_array[y, x] > 0:
                     self.pickups[y][x] = None
 
-    def clear_entity_move_events(self, player: DynamicEntity, resolve_time: float = 0.0) -> None:
+    def clear_entity_move_events(
+        self, player: DynamicEntity, resolve_time: float = 0.0
+    ) -> None:
         """Clear all move actions by the player"""
         # Note: We assume that this is not needed. However, in the original game,
         # the move is sometimes rounded up, i.e., you gain speed by turning.
@@ -462,7 +481,11 @@ class GameEngine:
             self.resolve_push(target, event, flags)
         elif isinstance(target, Player) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
-        elif isinstance(target, DynamicEntity) and target.entity_type == EntityType.GRENADE and event.event_type == "move":
+        elif (
+            isinstance(target, DynamicEntity)
+            and target.entity_type == EntityType.GRENADE
+            and event.event_type == "move"
+        ):
             self.resolve_grenade_movement(target, event, flags)
         elif isinstance(target, _BioslimeTick) and event.event_type == "bioslime_tick":
             self._bioslime_tick(event.trigger_at)
@@ -534,7 +557,10 @@ class GameEngine:
             return
 
         # Grasshopper bombs have special spawning behavior after explosion
-        is_grasshopper = target.bomb_type in (BombType.GRASSHOPPER, BombType.GRASSHOPPER_HOP)
+        is_grasshopper = target.bomb_type in (
+            BombType.GRASSHOPPER,
+            BombType.GRASSHOPPER_HOP,
+        )
 
         # Get explosion instance and calculate damage pattern
         explosion = EXPLOSION_MAP[target.explosion_type]
@@ -651,7 +677,9 @@ class GameEngine:
             self.set_tile(bomb.x, bomb.y, Tile.create_bioslime())
             self._schedule_bioslime_tick(bomb.placed_at)
 
-        self.pending_sounds.append(SoundType.URETHANE)  # FIXME: Use urethane sound for now
+        self.pending_sounds.append(
+            SoundType.URETHANE
+        )  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -685,10 +713,10 @@ class GameEngine:
         # Pad walkable with False border, then slice to check all 4 neighbors
         padded = np.pad(walkable, 1, constant_values=False)
         has_walkable_neighbor = (
-            padded[:-2, 1:-1]    # up
-            | padded[2:, 1:-1]   # down
+            padded[:-2, 1:-1]  # up
+            | padded[2:, 1:-1]  # down
             | padded[1:-1, :-2]  # left
-            | padded[1:-1, 2:]   # right
+            | padded[1:-1, 2:]  # right
         )
         frontier = bioslime & has_walkable_neighbor
 
@@ -725,7 +753,9 @@ class GameEngine:
         if tile and tile.tile_type == TileType.EMPTY:
             self.set_tile(bomb.x, bomb.y, Tile.create_concrete())
 
-        self.pending_sounds.append(SoundType.URETHANE)  # FIXME: Use urethane sound for now
+        self.pending_sounds.append(
+            SoundType.URETHANE
+        )  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -739,8 +769,8 @@ class GameEngine:
         # Create directed flame explosion
         directed_flame = DirectedFlameExplosion(
             direction=direction,
-            max_distance=cfg['max_distance'],
-            base_damage=cfg['damage']
+            max_distance=cfg["max_distance"],
+            base_damage=cfg["damage"],
         )
 
         # Get walkable map
@@ -748,7 +778,9 @@ class GameEngine:
         walkable_map = ~solid_map
 
         # Calculate affected area
-        final_mask = directed_flame.calculate_area(bomb.x, bomb.y, walkable_map, flood_fill)
+        final_mask = directed_flame.calculate_area(
+            bomb.x, bomb.y, walkable_map, flood_fill
+        )
 
         # Apply damage to tiles in the final mask
         for y in range(self.height):
@@ -756,7 +788,7 @@ class GameEngine:
                 if final_mask[y, x]:
                     tile = self.get_tile(x, y)
                     if tile:
-                        tile.take_damage(cfg['damage'])
+                        tile.take_damage(cfg["damage"])
                         # Mark explosion visual
                         if not tile.solid:
                             self.explosions[y, x] = 1
@@ -765,7 +797,7 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, final_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(final_mask * cfg['damage'])
+        self._damage_entities_in_area(final_mask * cfg["damage"])
 
         self.pending_sounds.append(SoundType.EXPLOSION)
 
@@ -780,8 +812,7 @@ class GameEngine:
 
         # Create directed flame explosion (reuse the cone calculation)
         directed_flame = DirectedFlameExplosion(
-            direction=direction,
-            max_distance=cfg['max_distance']
+            direction=direction, max_distance=cfg["max_distance"]
         )
 
         # Get walkable map
@@ -789,7 +820,9 @@ class GameEngine:
         walkable_map = ~solid_map
 
         # Calculate affected area
-        final_mask = directed_flame.calculate_area(bomb.x, bomb.y, walkable_map, flood_fill)
+        final_mask = directed_flame.calculate_area(
+            bomb.x, bomb.y, walkable_map, flood_fill
+        )
 
         # Defuse any bombs in the final mask area
         defuse_delay = 24 * 60 * 60  # 24 hours in seconds
@@ -797,9 +830,11 @@ class GameEngine:
             if other_bomb is bomb:
                 continue  # Skip the fire extinguisher itself
             if final_mask[other_bomb.y, other_bomb.x]:
-                other_bomb.state = 'defused'
+                other_bomb.state = "defused"
                 # Reschedule explosion to 24 hours from now
-                self.event_resolver.reschedule_events_by_target(other_bomb, "explode", defuse_delay, now)
+                self.event_resolver.reschedule_events_by_target(
+                    other_bomb, "explode", defuse_delay, now
+                )
 
         # Show smoke effect in affected area
         for y in range(self.height):
@@ -830,7 +865,9 @@ class GameEngine:
             # Add to teleport list
             self.teleports.append((bomb.x, bomb.y))
 
-        self.pending_sounds.append(SoundType.URETHANE)  # FIXME: Use urethane sound for now
+        self.pending_sounds.append(
+            SoundType.URETHANE
+        )  # FIXME: Use urethane sound for now
 
         # Remove bomb from list
         if bomb in self.bombs:
@@ -847,7 +884,7 @@ class GameEngine:
             y=bomb.y + 0.5,
             direction=direction,
             owner_id=bomb.owner_id,
-            speed=cfg['speed'],
+            speed=cfg["speed"],
         )
 
         # Add grenade to monsters list (for rendering and movement)
@@ -860,7 +897,9 @@ class GameEngine:
         if bomb in self.bombs:
             self.bombs.remove(bomb)
 
-    def resolve_grenade_movement(self, grenade: DynamicEntity, event: MoveEvent, flags: ResolveFlags) -> None:
+    def resolve_grenade_movement(
+        self, grenade: DynamicEntity, event: MoveEvent, flags: ResolveFlags
+    ) -> None:
         """Resolve grenade movement - moves until hitting wall or player."""
         # Calculate actual distance based on elapsed time
         current_time = event.trigger_at
@@ -924,7 +963,9 @@ class GameEngine:
         if flags.spawn:
             self.move_entity(grenade, now=current_time)
 
-    def _explode_grenade(self, grenade: DynamicEntity, x: int, y: int, now: float = 0.0) -> None:
+    def _explode_grenade(
+        self, grenade: DynamicEntity, x: int, y: int, now: float = 0.0
+    ) -> None:
         """Trigger a small explosion at the given position and remove grenade."""
         # Create a small bomb at explosion location
         explosion_bomb = Bomb(
@@ -957,10 +998,12 @@ class GameEngine:
         walkable_map = ~solid_map  # Invert: True = empty/walkable
 
         # Flood fill from bomb position
-        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=cfg['max_distance'])
+        fill_mask = flood_fill(
+            walkable_map, (bomb.y, bomb.x), max_dist=cfg["max_distance"]
+        )
 
         # Apply damage to all tiles in the flood fill area
-        damage = cfg['damage']
+        damage = cfg["damage"]
         for y in range(self.height):
             for x in range(self.width):
                 if fill_mask[y, x]:
@@ -975,7 +1018,7 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(fill_mask * cfg['damage'])
+        self._damage_entities_in_area(fill_mask * cfg["damage"])
 
         self.pending_sounds.append(SoundType.EXPLOSION)
 
@@ -993,10 +1036,12 @@ class GameEngine:
         walkable_map = ~solid_map
 
         # Flood fill from bomb position (like flame barrel but shorter range)
-        fill_mask = flood_fill(walkable_map, (bomb.y, bomb.x), max_dist=cfg['flood_fill_distance'])
+        fill_mask = flood_fill(
+            walkable_map, (bomb.y, bomb.x), max_dist=cfg["flood_fill_distance"]
+        )
 
         # Apply damage to all tiles in the flood fill area
-        damage = cfg['flood_fill_damage']
+        damage = cfg["flood_fill_damage"]
         for y in range(self.height):
             for x in range(self.width):
                 if fill_mask[y, x]:
@@ -1010,12 +1055,12 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(fill_mask * cfg['flood_fill_damage'])
+        self._damage_entities_in_area(fill_mask * cfg["flood_fill_damage"])
 
         # Schedule scattered medium explosions
-        scatter_count = cfg['scatter_explosions']
-        scatter_dist = cfg['scatter_distance']
-        interval = cfg['scatter_interval']
+        scatter_count = cfg["scatter_explosions"]
+        scatter_dist = cfg["scatter_distance"]
+        interval = cfg["scatter_interval"]
 
         for i in range(scatter_count):
             # Random position up to scatter_dist away
@@ -1087,11 +1132,11 @@ class GameEngine:
         new_hop_count = source_bomb.hop_count + 1
 
         # Stop after max hops
-        if new_hop_count >= cfg['max_hops']:
+        if new_hop_count >= cfg["max_hops"]:
             return
 
         # Calculate new position: random offset up to max_hop_distance in each direction
-        max_dist = cfg['max_hop_distance']
+        max_dist = cfg["max_hop_distance"]
         offset_x = random.randint(-max_dist, max_dist)
         offset_y = random.randint(-max_dist, max_dist)
         new_x = source_bomb.x + offset_x
@@ -1104,33 +1149,35 @@ class GameEngine:
         # Determine explosion type for next hop
         if source_bomb.bomb_type == BombType.GRASSHOPPER:
             # First hop after initial bomb: random from first_hop_explosions
-            next_explosion = random.choice(cfg['first_hop_explosions'])
+            next_explosion = random.choice(cfg["first_hop_explosions"])
         else:
             # Subsequent hops: shrink/stay/grow based on configured chances
             current_explosion = source_bomb.explosion_type
-            explosion_order = cfg['explosion_order']
+            explosion_order = cfg["explosion_order"]
             roll = random.random()
 
-            if roll < cfg['shrink_chance']:
+            if roll < cfg["shrink_chance"]:
                 # Shrink: move down in explosion_order, stay at minimum
                 try:
                     idx = explosion_order.index(current_explosion)
                     next_explosion = explosion_order[max(0, idx - 1)]
                 except ValueError:
                     next_explosion = explosion_order[0]
-            elif roll < cfg['shrink_chance'] + cfg['stay_chance']:
+            elif roll < cfg["shrink_chance"] + cfg["stay_chance"]:
                 # Stay same
                 next_explosion = current_explosion
             else:
                 # Grow: move up in explosion_order, stay at maximum
                 try:
                     idx = explosion_order.index(current_explosion)
-                    next_explosion = explosion_order[min(len(explosion_order) - 1, idx + 1)]
+                    next_explosion = explosion_order[
+                        min(len(explosion_order) - 1, idx + 1)
+                    ]
                 except ValueError:
                     next_explosion = explosion_order[-1]
 
         # Random fuse between configured min and max
-        fuse_time = random.uniform(cfg['fuse_min'], cfg['fuse_max'])
+        fuse_time = random.uniform(cfg["fuse_min"], cfg["fuse_max"])
 
         # Create the hop bomb
         hop_bomb = Bomb(
@@ -1156,23 +1203,7 @@ class GameEngine:
     def resolve_push(
         self, target: DynamicEntity, event: MoveEvent, flags: ResolveFlags
     ) -> None:
-        player_x, player_y = xy_to_tile(target.x, target.y)
-        target_x, target_y = player_x, player_y
-        new_x, new_y = target_x, target_y
-        if target.direction == Direction.RIGHT:
-            target_x = player_x + 1
-            new_x = target_x + 1
-        elif target.direction == Direction.LEFT:
-            target_x = player_x - 1
-            new_x = target_x - 1
-        elif target.direction == Direction.UP:
-            target_y = player_y - 1
-            new_y = target_y - 1
-        elif target.direction == Direction.DOWN:
-            target_y = player_y + 1
-            new_y = target_y + 1
-        else:
-            raise ValueError("Invalid move direction")
+        target_x, target_y, new_x, new_y = self.get_entity_movement_vector(target)
 
         # TODO: do boulders crush items?
         self.tiles[new_y][new_x] = deepcopy(self.tiles[target_y][target_x])
@@ -1236,7 +1267,6 @@ class GameEngine:
             target.y = self.height - min_allowed
         if target.x > self.width - min_allowed:
             target.x = self.width - min_allowed
-
 
         # print(f"to  : {target.x}, {target.y}")
         # self.round_position(target)
@@ -1306,7 +1336,9 @@ class GameEngine:
             target.state = "walk"
             self.move_entity(target, now=event.trigger_at)
 
-    def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tuple[bool, Tile]:
+    def get_neighbor_tile(
+        self, entity: DynamicEntity, range: int = 1
+    ) -> Tuple[bool, Tile]:
         px, py = xy_to_tile(entity.x, entity.y)
         nx, ny = px, py
         dir = Direction(entity.direction)
@@ -1322,19 +1354,11 @@ class GameEngine:
             print(entity)
             raise ValueError("Invalid move direction")
 
-        #nx, ny = self.clamp_to_map_size(nx, ny)
-        if nx >= 0 and nx <= self.width and ny >= 0 and ny < self.height:
-            next_tile: Tile = self.tiles[ny][nx]
-
-            # print("-" * 20)
-            # print("pp:", entity.x, entity.y)
-            # print("px:", px, py)
-            # print("nx:", nx, ny)
-            # print(next_tile)
-
-            return True, next_tile
-        else:
+        tile = self.get_tile(nx, ny)
+        if tile is None:
             return False, Tile()
+        else:
+            return True, tile
 
     # TODO: tile entering logic
     def entity_enter_tile(self, target: DynamicEntity, now: float = 0.0) -> None:
@@ -1381,6 +1405,25 @@ class GameEngine:
                 val = random.choice(available)
                 player.x = val[0] + 0.5
                 player.y = val[1] + 0.5
+
+        # push bombs
+        for bomb in self.bombs:
+            if bomb.x == px and bomb.y == py:
+                target_x, target_y, _, _ = self.get_entity_movement_vector(player)
+                tile = self.get_tile(target_x, target_y)
+                if tile is not None and not tile.solid:
+                    blocked = False
+                    for b in self.bombs:
+                        if b.x == target_x and b.y == target_y:
+                            blocked = True
+                            break
+                    if not blocked:
+                        bomb.x = target_x
+                        bomb.y = target_y
+                        cx, cy = self.clamp_to_map_size(bomb.x, bomb.y)
+                        bomb.x, bomb.y = int(cx), int(cy)
+                    else:
+                        break
 
     def use_switch(self) -> None:
         if self.switch_state == SwitchState.OFF:
@@ -1433,7 +1476,9 @@ class GameEngine:
             player.y += dy
         self.prev_time = Clock.now()
 
-    def _interpolate_entity_position(self, entity: DynamicEntity, render_entity: DynamicEntity, now: float) -> None:
+    def _interpolate_entity_position(
+        self, entity: DynamicEntity, render_entity: DynamicEntity, now: float
+    ) -> None:
         """Update render_entity position based on pending move event progress.
 
         Uses progress fraction (elapsed / total_duration) to interpolate exactly
@@ -1449,7 +1494,9 @@ class GameEngine:
         if not move_events:
             return
 
-        assert len(move_events) <= 1, f"Expected at most 1 move event, got {len(move_events)}"
+        assert (
+            len(move_events) <= 1
+        ), f"Expected at most 1 move event, got {len(move_events)}"
         event: MoveEvent = move_events[0]  # type: ignore[assignment]
         total_duration = event.trigger_at - event.created_at
         if total_duration <= 0:
@@ -1527,3 +1574,26 @@ class GameEngine:
 
     def clamp_y(self, y: Union[int, float]):
         return clamp(y, 0, self.height)
+
+    def get_entity_movement_vector(
+        self, target: DynamicEntity
+    ) -> Tuple[int, int, int, int]:
+        player_x, player_y = xy_to_tile(target.x, target.y)
+        target_x, target_y = player_x, player_y
+        new_x, new_y = target_x, target_y
+        if target.direction == Direction.RIGHT:
+            target_x = player_x + 1
+            new_x = target_x + 1
+        elif target.direction == Direction.LEFT:
+            target_x = player_x - 1
+            new_x = target_x - 1
+        elif target.direction == Direction.UP:
+            target_y = player_y - 1
+            new_y = target_y - 1
+        elif target.direction == Direction.DOWN:
+            target_y = player_y + 1
+            new_y = target_y + 1
+        else:
+            raise ValueError("Invalid move direction")
+
+        return target_x, target_y, new_x, new_y
