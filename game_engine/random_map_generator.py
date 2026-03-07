@@ -1,5 +1,6 @@
 """Creates random maps"""
 
+import os
 import array
 import random
 from typing import List, Tuple
@@ -10,6 +11,7 @@ from game_engine.entities.treasure import TreasureType, Treasure
 from game_engine.entities.tool import Tool, ToolType
 from game_engine.entities import DynamicEntity
 from game_engine.perlin import generate_and_threshold
+from game_engine.map_loader import parse_map
 from cfg.tile_dictionary import (
     BEDROCK_INSIDE_TILES,
     BEDROCK_NW_ID,
@@ -43,6 +45,8 @@ class RandomMapGenerator:
         max_treasure: int = 40,
         min_tools: int = 5,
         max_tools: int = 20,
+        max_rooms: int = 5,
+        room_chance: float = 0.1
     ) -> MapData:
         """Generate a random map.
 
@@ -143,6 +147,36 @@ class RandomMapGenerator:
                             tiles[y].append(Tile.create_by_id(tile_id=rid))
                 tilemap.append(tiles[y][x].to_byte())
 
+        for _ in range(random.randint(0, max_rooms)):
+            p = random.uniform(0, 1)
+            if p < room_chance:
+                room_w, room_h, room_map, room_data = self.get_room()
+                left = random.randint(0, x-room_w)
+                top = random.randint(0, y-room_h)
+                init_offset = top * width + left
+
+                for row in range(room_h):
+                    for col in range(room_w):
+                        idx = row * room_w + col
+                        offset = row * height + col
+                        tilemap[init_offset + offset] = room_map[idx]
+
+                        tiles[top+row][left+col] = Tile.create_by_id(room_map[idx])
+
+                for t in room_data.treasures:
+                    t.x += left
+                    t.y += top
+                for t in room_data.tools:
+                    t.x += left
+                    t.y += top
+                for m in room_data.monsters:
+                    m.x += left
+                    m.y += top
+
+                treasures += room_data.treasures
+                tools += room_data.tools
+                monsters += room_data.monsters
+
         return MapData(
             width=width,
             height=height,
@@ -152,3 +186,26 @@ class RandomMapGenerator:
             treasures=treasures,
             tools=tools,
         )
+
+    def get_room(self) -> Tuple[int, int, List, MapData]:
+        rooms = os.listdir("common/room_templates")
+        room = random.choice(rooms)
+        path = f"common/room_templates/{room}"
+
+        tiles: List[int] = []
+        with open(path, "rb") as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if i == 0:
+                    width = int(line)
+                elif i == 1:
+                    height = int(line)
+                else:
+                    line = line.rstrip(b"\r\n")
+                    for char in line:
+                        tiles.append(char)
+
+        tilemap = array.array("B", tiles)
+
+        data = parse_map(tilemap, width, height)
+        return width, height, tiles, data

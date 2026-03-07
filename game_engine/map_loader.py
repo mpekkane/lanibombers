@@ -71,7 +71,10 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
             line = line.rstrip(b"\r\n")
             for char in line:
                 tilemap.append(char)
+    return parse_map(tilemap, width, height)
 
+
+def parse_map(tilemap: array.array, width: int, height: int) -> MapData:
     # Create tile grid and entity lists
     tiles = []
     monsters = []
