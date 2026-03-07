@@ -1408,7 +1408,14 @@ class GameEngine:
 
         # push bombs
         for bomb in self.bombs:
-            if bomb.x == px and bomb.y == py:
+            if (
+                bomb.x == px
+                and bomb.y == py
+                and not (
+                    bomb.bomb_type == BombType.LANDMINE
+                    or bomb.bomb_type == BombType.CRACKER_BARREL
+                )
+            ):
                 target_x, target_y, _, _ = self.get_entity_movement_vector(player)
                 tile = self.get_tile(target_x, target_y)
                 if tile is not None and not tile.solid:
