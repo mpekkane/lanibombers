@@ -340,12 +340,13 @@ class GameEngine:
         # print(player.x, player.y)
 
         # collision check
-        next_tile = self.get_neighbor_tile(player)
-        if next_tile.solid:
-            self.collision_check(player, next_tile, now)
-        else:
-            # Create new movement
-            self.move_entity(player, now=now)
+        in_bounds, next_tile = self.get_neighbor_tile(player)
+        if in_bounds:
+            if next_tile.solid:
+                self.collision_check(player, next_tile, now)
+            else:
+                # Create new movement
+                self.move_entity(player, now=now)
 
         # send renderstate
         if self.state_callback:
@@ -362,8 +363,8 @@ class GameEngine:
                 self.use_switch()
             elif next_tile.is_boulder():
                 # TODO: can you push boulders on top of items?
-                tile_behind_push = self.get_neighbor_tile(entity, range=2)
-                if not tile_behind_push.solid:
+                in_bounds, tile_behind_push = self.get_neighbor_tile(entity, range=2)
+                if in_bounds and not tile_behind_push.solid:
                     self.move_entity(entity, push=True, now=now)
         # if nothing can be done: stop
         else:
@@ -1224,6 +1225,19 @@ class GameEngine:
             moved = target.y
         else:
             raise ValueError("Invalid move direction")
+
+        # check map bounds
+        min_allowed = 0.5
+        if target.y < min_allowed:
+            target.y = min_allowed
+        if target.x < min_allowed:
+            target.x = min_allowed
+        if target.y > self.height - min_allowed:
+            target.y = self.height - min_allowed
+        if target.x > self.width - min_allowed:
+            target.x = self.width - min_allowed
+
+
         # print(f"to  : {target.x}, {target.y}")
         # self.round_position(target)
         # print(f"cntr: {target.x}, {target.y}")
@@ -1250,12 +1264,16 @@ class GameEngine:
             # check the neighboring tiles
             # wall
             # interact
-            next_tile = self.get_neighbor_tile(target)
+            in_bounds, next_tile = self.get_neighbor_tile(target)
             # print(next_tile)
-            if next_tile.solid:
+            if not in_bounds:
                 blocked = True
-                px, py = xy_to_tile(target.x, target.y)
-                self.collision_check(target, next_tile, current_time)
+                target.state = "idle"
+            else:
+                if next_tile.solid:
+                    blocked = True
+                    px, py = xy_to_tile(target.x, target.y)
+                    self.collision_check(target, next_tile, current_time)
 
         if flags.spawn and not blocked:
             self.move_entity(target, now=current_time)
@@ -1273,7 +1291,9 @@ class GameEngine:
         if target.state == "dead":
             return
 
-        target_tile = self.get_neighbor_tile(target)
+        in_bounds, target_tile = self.get_neighbor_tile(target)
+        if not in_bounds:
+            return
         dig_power = target.get_dig_power()
         target_tile.take_damage(dig_power)
         self.pending_sounds.append(SoundType.DIG)
@@ -1286,7 +1306,7 @@ class GameEngine:
             target.state = "walk"
             self.move_entity(target, now=event.trigger_at)
 
-    def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tile:
+    def get_neighbor_tile(self, entity: DynamicEntity, range: int = 1) -> Tuple[bool, Tile]:
         px, py = xy_to_tile(entity.x, entity.y)
         nx, ny = px, py
         dir = Direction(entity.direction)
@@ -1302,16 +1322,19 @@ class GameEngine:
             print(entity)
             raise ValueError("Invalid move direction")
 
-        nx, ny = self.clamp_to_map_size(nx, ny)
-        next_tile: Tile = self.tiles[ny][nx]
+        #nx, ny = self.clamp_to_map_size(nx, ny)
+        if nx >= 0 and nx <= self.width and ny >= 0 and ny < self.height:
+            next_tile: Tile = self.tiles[ny][nx]
 
-        # print("-" * 20)
-        # print("pp:", entity.x, entity.y)
-        # print("px:", px, py)
-        # print("nx:", nx, ny)
-        # print(next_tile)
+            # print("-" * 20)
+            # print("pp:", entity.x, entity.y)
+            # print("px:", px, py)
+            # print("nx:", nx, ny)
+            # print(next_tile)
 
-        return next_tile
+            return True, next_tile
+        else:
+            return False, Tile()
 
     # TODO: tile entering logic
     def entity_enter_tile(self, target: DynamicEntity, now: float = 0.0) -> None:

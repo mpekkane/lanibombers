@@ -6,7 +6,7 @@ down: down
 left: left
 right: motion_right
 stop: backspace
-fire: mod_windows
+fire: rctrl
 choose: tab
 remote: enter
 items:

@@ -1,9 +1,0 @@
----
-  up: up
-  down: down
-  left: left
-  right: right
-  fire: space
-  stop: ctrl_r
-  choose: shift_r
-  remote: enter
