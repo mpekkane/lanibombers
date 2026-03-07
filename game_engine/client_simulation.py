@@ -161,5 +161,18 @@ class ClientSimulation:
         new_x = entity.x + dx * entity.speed * delta_time
         new_y = entity.y + dy * entity.speed * delta_time
 
+        width = self._server_state.width
+        height = self._server_state.height
+
+        min_allowed = 0.5
+        if new_y < min_allowed:
+            new_y = min_allowed
+        if new_x < min_allowed:
+            new_x = min_allowed
+        if new_y > height - min_allowed:
+            new_y = height - min_allowed
+        if new_x > width - min_allowed:
+            new_x = width - min_allowed
+
         # Return new entity with extrapolated position
         return replace(entity, x=new_x, y=new_y)
