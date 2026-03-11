@@ -144,6 +144,16 @@ class ShopRenderer(arcade.Window):
         if client_player is None:
             return
 
+        # Find which shop item index the client player's cursor is on
+        selected_index = -1
+        for cursor_id, cursor_bomb in self.cursor_positions:
+            if cursor_id == client_player.id:
+                for idx, (item_type, _) in enumerate(self.shop_items):
+                    if item_type == cursor_bomb:
+                        selected_index = idx
+                        break
+                break
+
         # Text base position (design coords: 34, 16 at 1x)
         base_x = 34 * self.zoom
         base_y = self.height - 16 * self.zoom
@@ -170,12 +180,14 @@ class ShopRenderer(arcade.Window):
                 str(client_player.money), base_x, base_y - 2 * row_spacing
             )
 
-        # Row 3: Item quantity (total items across all inventory)
-        total_items = sum(count for _, count in client_player.inventory)
-        if total_items != self._cached_item_qty:
-            self._cached_item_qty = total_items
+        # Row 3: Count of item under cursor
+        cursor_item = self.shop_items[selected_index][0] if 0 <= selected_index < len(self.shop_items) else None
+        cursor_count = sum(c for bt, c in client_player.inventory if bt == cursor_item) if cursor_item else 0
+        item_qty_key = (selected_index, cursor_count)
+        if item_qty_key != self._cached_item_qty:
+            self._cached_item_qty = item_qty_key
             self.item_qty_sprites = self.bitmap_text.create_text_sprites(
-                str(total_items), base_x, base_y - 3 * row_spacing
+                str(cursor_count), base_x, base_y - 3 * row_spacing
             )
 
         # Quantity bars (rebuild if inventory or health changed)
@@ -185,15 +197,6 @@ class ShopRenderer(arcade.Window):
             self._build_quantity_bars(client_player)
 
         # Card backgrounds + inventory overview (rebuild if any cursor or inventory changed)
-        # Find which shop item index the client player's cursor is on
-        selected_index = -1
-        for cursor_id, cursor_bomb in self.cursor_positions:
-            if cursor_id == client_player.id:
-                for idx, (item_type, _) in enumerate(self.shop_items):
-                    if item_type == cursor_bomb:
-                        selected_index = idx
-                        break
-                break
         overview_key = (
             selected_index,
             tuple(
