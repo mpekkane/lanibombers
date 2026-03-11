@@ -539,6 +539,9 @@ SPRITE_DEFS = [
     (0 , 0, 10, 3, 205, 128, 'transition_vertical_empty_bedrock_burnt'),
     (0 , 0, 10, 3, 205, 132, 'transition_vertical_bedrock_empty_burnt'),
 
+    # Shop item card backgrounds (64x48)
+    (0, 0, 64, 48, 64, 92, 'shop_card_normal'),
+    (0, 0, 64, 48, 128, 92, 'shop_card_selected'),
 ]
 
 

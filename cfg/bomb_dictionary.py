@@ -4,7 +4,18 @@ Central location for bomb types, names, and icon mappings.
 """
 
 from enum import Enum
-from game_engine.entities.explosion import ExplosionType
+
+
+class ExplosionType(Enum):
+    NONE = 'none'
+    SMALL = 'small'
+    MEDIUM = 'medium'
+    LARGE = 'large'
+    NUKE = 'nuke'
+    FLAME = 'flame'
+    DIRECTED_FLAME = 'directed_flame'
+    SMALL_CROSS = 'small_cross'
+    BIG_CROSS = 'big_cross'
 
 
 class BombType(Enum):

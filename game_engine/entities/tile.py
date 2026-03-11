@@ -2,7 +2,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, TYPE_CHECKING, Optional
+from typing import Optional
 
 from cfg.tile_dictionary import (
     EMPTY_TILE_ID,
@@ -13,10 +13,7 @@ from cfg.tile_dictionary import (
 )
 from game_engine.entities.game_object import GameObject
 
-if TYPE_CHECKING:
-    from game_engine.entities.explosion import ExplosionType
-else:
-    from game_engine.entities.explosion import ExplosionType
+from cfg.bomb_dictionary import ExplosionType
 
 from cfg.tile_dictionary import (
     EMPTY_TILE_ID,

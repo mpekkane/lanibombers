@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 import numpy as np
 
+from cfg.bomb_dictionary import ExplosionType as ExplosionType
 from game_engine.entities.dynamic_entity import Direction
 
 
@@ -42,18 +42,6 @@ DAMAGE_FLAME = 35
 DAMAGE_DIRECTED_FLAME = 35
 DAMAGE_SMALL_CROSS = 50
 DAMAGE_BIG_CROSS = 50
-
-
-class ExplosionType(Enum):
-    NONE = 'none'  # No explosion (used for bombs that don't explode)
-    SMALL = 'small'
-    MEDIUM = 'medium'
-    LARGE = 'large'
-    NUKE = 'nuke'
-    FLAME = 'flame'
-    DIRECTED_FLAME = 'directed_flame'
-    SMALL_CROSS = 'small_cross'
-    BIG_CROSS = 'big_cross'
 
 
 class Explosion(ABC):

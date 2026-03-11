@@ -3,8 +3,7 @@ from uuid import UUID
 from typing import Optional, TYPE_CHECKING
 from game_engine.clock import Clock
 from game_engine.entities.game_object import GameObject
-from game_engine.entities.explosion import ExplosionType
-from cfg.bomb_dictionary import BombType, BOMB_PROPERTIES
+from cfg.bomb_dictionary import BombType, BOMB_PROPERTIES, ExplosionType
 
 if TYPE_CHECKING:
     from game_engine.entities.dynamic_entity import Direction
