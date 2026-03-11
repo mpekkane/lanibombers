@@ -39,8 +39,35 @@ def make_mock_tilemap(width: int = 64, height: int = 45) -> np.ndarray:
     return tiles
 
 
+ENEMY_COLORS = [
+    (0xDB, 0x00, 0x00),
+    (0x00, 0xA3, 0x00),
+    (0xCC, 0xCC, 0x00),
+    (0x80, 0x00, 0xCC),
+    (0x00, 0x8B, 0x8B),
+    (0xCC, 0x66, 0x00),
+    (0xFF, 0x69, 0xB4),
+    (0x55, 0x55, 0xDD),
+    (0xAA, 0x55, 0x00),
+    (0x00, 0xDD, 0xDD),
+    (0xDD, 0x55, 0x55),
+    (0x55, 0xAA, 0x55),
+    (0xBB, 0xBB, 0x55),
+    (0xAA, 0x00, 0x88),
+    (0x88, 0x88, 0x88),
+]
+
+STARTER_INVENTORIES = [
+    [(BombType.SMALL_BOMB, 20), (BombType.DYNAMITE, 5), (BombType.NUKE, 1)],
+    [(BombType.SMALL_BOMB, 10), (BombType.BIG_BOMB, 25), (BombType.C4, 3)],
+    [(BombType.SMALL_BOMB, 15), (BombType.BIG_BOMB, 5), (BombType.GRENADE, 3)],
+    [(BombType.SMALL_BOMB, 40), (BombType.LANDMINE, 10)],
+    [(BombType.SMALL_BOMB, 5), (BombType.URETHANE, 8), (BombType.FLAMETHROWER, 2)],
+]
+
+
 def make_mock_players() -> list[Player]:
-    """Create mock players for testing."""
+    """Create mock players for testing (1 client + 15 enemies = 16 total)."""
     p1 = Player(
         name="TestPlayer",
         sprite_id=1,
@@ -61,67 +88,21 @@ def make_mock_players() -> list[Player]:
         (BombType.GRENADE, 10),
     ]
 
-    p2 = Player(
-        name="Enemy1",
-        sprite_id=2,
-        color=(0xDB, 0x00, 0x00),
-        money=800,
-        x=10.0,
-        y=10.0,
-    )
-    p2.dig_power = 15
-    p2.inventory = [
-        (BombType.SMALL_BOMB, 20),
-        (BombType.DYNAMITE, 5),
-        (BombType.NUKE, 1),
-    ]
+    players = [p1]
+    for i in range(15):
+        enemy = Player(
+            name=f"Enemy{i + 1}",
+            sprite_id=(i % 4) + 1,
+            color=ENEMY_COLORS[i],
+            money=random.randint(400, 2000),
+            x=float(5 + i * 4),
+            y=float(5 + (i % 5) * 8),
+        )
+        enemy.dig_power = random.randint(5, 30)
+        enemy.inventory = list(STARTER_INVENTORIES[i % len(STARTER_INVENTORIES)])
+        players.append(enemy)
 
-    p3 = Player(
-        name="Enemy2",
-        sprite_id=3,
-        color=(0x00, 0xA3, 0x00),
-        money=2000,
-        x=20.0,
-        y=20.0,
-    )
-    p3.dig_power = 30
-    p3.inventory = [
-        (BombType.SMALL_BOMB, 10),
-        (BombType.BIG_BOMB, 25),
-        (BombType.C4, 3),
-        (BombType.LANDMINE, 8),
-    ]
-
-    p4 = Player(
-        name="Enemy3",
-        sprite_id=4,
-        color=(0xCC, 0xCC, 0x00),
-        money=1200,
-        x=30.0,
-        y=10.0,
-    )
-    p4.dig_power = 20
-    p4.inventory = [
-        (BombType.SMALL_BOMB, 15),
-        (BombType.BIG_BOMB, 5),
-        (BombType.GRENADE, 3),
-    ]
-
-    p5 = Player(
-        name="Enemy4",
-        sprite_id=2,
-        color=(0x80, 0x00, 0xCC),
-        money=600,
-        x=40.0,
-        y=20.0,
-    )
-    p5.dig_power = 10
-    p5.inventory = [
-        (BombType.SMALL_BOMB, 40),
-        (BombType.LANDMINE, 10),
-    ]
-
-    return [p1, p2, p3, p4, p5]
+    return players
 
 
 def make_mock_pickups() -> list[Pickup]:

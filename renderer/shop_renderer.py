@@ -131,6 +131,63 @@ class ShopRenderer(arcade.Window):
         self.other_player_info_sprites = arcade.SpriteList()
         self._cached_other_players = None
 
+        # Extract panel border pieces from SHOPPIC.png (3x3 corners, 1px edge strips)
+        shoppic = Image.open(os.path.join(GRAPHICS_PATH, "SHOPPIC.png")).convert("RGBA")
+        self._panel_corners = {
+            'tl': shoppic.crop((0, 0, 3, 3)),
+            'tr': shoppic.crop((637, 0, 640, 3)),
+            'bl': shoppic.crop((0, 477, 3, 480)),
+            'br': shoppic.crop((637, 477, 640, 480)),
+        }
+        self._panel_edges = {
+            'top': shoppic.crop((320, 0, 321, 3)),     # 1x3
+            'bottom': shoppic.crop((320, 477, 321, 480)),  # 1x3
+            'left': shoppic.crop((0, 240, 3, 241)),     # 3x1
+            'right': shoppic.crop((637, 240, 640, 241)),  # 3x1
+        }
+
+        # Build empty player card slots (up to 16 total, fill unused with panels)
+        self.empty_card_sprites = arcade.SpriteList()
+        card_x = 640
+        card_w = 110
+        card_h = 30
+        icon_size = 30
+        max_players = 16
+        card_panel_texture = self.create_panel_texture(card_w, card_h)
+        icon_panel_texture = self.create_panel_texture(icon_size, icon_size)
+        # Slot 0: card panel + icon panel (above first enemy card)
+        panel_0 = arcade.Sprite()
+        panel_0.texture = card_panel_texture
+        panel_0.scale = self.zoom
+        panel_0.center_x = (card_x + card_w / 2) * self.zoom
+        panel_0.center_y = self.height - (card_h / 2) * self.zoom
+        self.empty_card_sprites.append(panel_0)
+
+        icon_panel_0 = arcade.Sprite()
+        icon_panel_0.texture = icon_panel_texture
+        icon_panel_0.scale = self.zoom
+        icon_panel_0.center_x = (card_x + card_w + icon_size / 2) * self.zoom
+        icon_panel_0.center_y = self.height - (icon_size / 2) * self.zoom
+        self.empty_card_sprites.append(icon_panel_0)
+
+        # Slots 1..15: card panel + icon panel for other players
+        for slot in range(1, max_players):
+            slot_y = slot * card_h
+
+            panel_sprite = arcade.Sprite()
+            panel_sprite.texture = card_panel_texture
+            panel_sprite.scale = self.zoom
+            panel_sprite.center_x = (card_x + card_w / 2) * self.zoom
+            panel_sprite.center_y = self.height - (slot_y + card_h / 2) * self.zoom
+            self.empty_card_sprites.append(panel_sprite)
+
+            icon_panel_sprite = arcade.Sprite()
+            icon_panel_sprite.texture = icon_panel_texture
+            icon_panel_sprite.scale = self.zoom
+            icon_panel_sprite.center_x = (card_x + card_w + icon_size / 2) * self.zoom
+            icon_panel_sprite.center_y = self.height - (slot_y + icon_size / 2) * self.zoom
+            self.empty_card_sprites.append(icon_panel_sprite)
+
     def on_update(self, delta_time: float):  # noqa: ARG002
         state = self.get_state()
 
@@ -238,9 +295,43 @@ class ShopRenderer(arcade.Window):
         self.card_price_sprites.draw(pixelated=True)
         self.quantity_bar_sprites.draw(pixelated=True)
         self.overview_bar_sprites.draw(pixelated=True)
+        self.empty_card_sprites.draw(pixelated=True)
         self.other_player_sprites.draw(pixelated=True)
         self.other_player_name_sprites.draw(pixelated=True)
         self.other_player_info_sprites.draw(pixelated=True)
+
+    def create_panel_texture(self, width: int, height: int) -> arcade.Texture:
+        """Create a grey beveled panel texture of the given size (min 6x6).
+
+        Uses 3x3 corner pieces and 1px edge strips sampled from SHOPPIC.png,
+        with #676767 fill for the interior.
+        """
+        w = max(width, 6)
+        h = max(height, 6)
+
+        panel = Image.new("RGBA", (w, h), (0x67, 0x67, 0x67, 0xFF))
+
+        # Paste corners
+        panel.paste(self._panel_corners['tl'], (0, 0))
+        panel.paste(self._panel_corners['tr'], (w - 3, 0))
+        panel.paste(self._panel_corners['bl'], (0, h - 3))
+        panel.paste(self._panel_corners['br'], (w - 3, h - 3))
+
+        # Tile edges
+        top_strip = self._panel_edges['top']      # 1x3
+        bottom_strip = self._panel_edges['bottom']  # 1x3
+        left_strip = self._panel_edges['left']      # 3x1
+        right_strip = self._panel_edges['right']    # 3x1
+
+        for x in range(3, w - 3):
+            panel.paste(top_strip, (x, 0))
+            panel.paste(bottom_strip, (x, h - 3))
+
+        for y in range(3, h - 3):
+            panel.paste(left_strip, (0, y))
+            panel.paste(right_strip, (w - 3, y))
+
+        return arcade.Texture(panel)
 
     def _build_map_preview(self, state: RenderState) -> None:
         """Build the map preview sprite from next_map_tiles and treasure positions."""
@@ -410,14 +501,12 @@ class ShopRenderer(arcade.Window):
                 inner_h = card_h - margin_top - margin_bottom
                 seg_h = inner_h / num_others
                 for oi, color in other_cursor_indices[i]:
-                    # Bottom-up: player 0 at bottom, matching inventory bars
-                    flipped_oi = num_others - 1 - oi
-                    strip_texture = self._get_selected_strip_texture(color, num_others, flipped_oi)
+                    strip_texture = self._get_selected_strip_texture(color, num_others, oi)
                     strip_sprite = arcade.Sprite()
                     strip_sprite.texture = strip_texture
                     strip_sprite.scale = self.zoom
                     strip_sprite.center_x = (card_left + card_w / 2) * self.zoom
-                    strip_top = card_top + margin_top + flipped_oi * seg_h
+                    strip_top = card_top + margin_top + oi * seg_h
                     strip_sprite.center_y = self.height - (strip_top + seg_h / 2) * self.zoom
                     self.card_bg_sprites.append(strip_sprite)
 
@@ -557,24 +646,22 @@ class ShopRenderer(arcade.Window):
             card_left = grid_x + col * card_w
             card_top = grid_y + row * card_h
             card_right = card_left + card_w
-            card_bottom = card_top + card_h
 
             # Same x-position as left-side quantity bars: right edge of card
             bar_x_center = card_right - 8 + 2.5
-            # Stack segments bottom-up from bar_bottom
-            bar_bottom = card_bottom - 4
+            # Stack segments top-down from bar_top (player 0 at top, matching card list)
+            bar_top = card_top + 3
 
             for pi, player in enumerate(others):
-                # Segment for this player, stacked bottom-up (player 0 at bottom)
-                seg_bottom = bar_bottom - pi * segment_height
+                seg_top = bar_top + pi * segment_height
 
                 count = player_inventories[pi].get(shop_item, 0)
                 if count <= 0:
                     continue
 
-                # Fill grows upward from segment bottom, min 1px if count > 0
+                # Fill grows downward from segment top, min 1px if count > 0
                 fill = max(1.0, min(count, segment_height))
-                fill_center_y = seg_bottom - fill / 2
+                fill_center_y = seg_top + fill / 2
 
                 bar = arcade.Sprite()
                 bar.texture = self.white_texture
