@@ -27,6 +27,13 @@ MONSTER_DAMAGE = {
     EntityType.GRENADEMONSTER: 10,
 }
 
+MONSTER_SPEEDS = {
+    EntityType.FURRYMAN: 2.0,
+    EntityType.SLIME: 1.0,
+    EntityType.ALIEN: 3.0,
+    EntityType.GRENADEMONSTER: 2.5,
+}
+
 
 @dataclass
 class DynamicEntity(GameObject):
@@ -66,6 +73,7 @@ class DynamicEntity(GameObject):
             direction=direction,
             entity_type=monster_type,
             state="walk",
+            speed=MONSTER_SPEEDS[monster_type],
             fight_power=MONSTER_DAMAGE[monster_type],
         )
 

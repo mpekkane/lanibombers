@@ -22,6 +22,7 @@ from game_engine.clock import Clock
 from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
+from game_engine.input_queue import InputCommand
 from cfg.bomb_dictionary import BombType
 from game_engine.map_loader import load_map
 from game_engine import GameEngine
@@ -153,7 +154,7 @@ class BomberServer:
     ##################
 
     def on_control(self, msg: ClientControl, ctx: ClientContext):
-        """test contolling"""
+        """Handle player control input via the input queue."""
         if not self.state.running():
             return
 
@@ -170,6 +171,8 @@ class BomberServer:
 
         cmd: Action = msg.command  # type: ignore
         assert isinstance(cmd, Action)
+        now = Clock.now()
+
         if cmd.is_move():
             if cmd == Action.RIGHT:
                 if player.direction == Direction.RIGHT and player.state == "walk":
@@ -194,17 +197,22 @@ class BomberServer:
             elif cmd == Action.STOP:
                 player.state = "idle"
 
-            self.engine.change_entity_direction(player)
+            self.engine.input_queue.submit(
+                InputCommand(entity=player, action=cmd, timestamp=now)
+            )
         else:
             if cmd == Action.FIRE:
                 bomb = player.plant_bomb()
                 if bomb is not None:
-                    self.engine.plant_bomb(bomb)
+                    self.engine.input_queue.submit(
+                        InputCommand(entity=player, action=cmd, timestamp=now, bomb=bomb)
+                    )
             elif cmd == Action.CHOOSE:
-                bomb = player.choose()
+                player.choose()
             elif cmd == Action.REMOTE:
-                # TODO: trigger remote bomb
-                self.engine.detonate_remotes(player)
+                self.engine.input_queue.submit(
+                    InputCommand(entity=player, action=cmd, timestamp=now)
+                )
 
     def on_select(self, msg: ClientSelect, ctx: ClientContext):
         """Handle weapon selection by bomb type."""

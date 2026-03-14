@@ -6,6 +6,7 @@ from itertools import chain
 import random
 from enum import Enum
 from copy import deepcopy
+from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
@@ -49,6 +50,8 @@ EXPLOSION_MAP = {
     ExplosionType.BIG_CROSS: BigCrossExplosion(),
 }
 from game_engine.events.event_resolver import EventResolver
+from game_engine.input_queue import InputCommand, InputQueue
+from game_engine.monster_controller import MonsterController
 from game_engine.render_state import ExplosionVisual, RenderState, SoundType
 from game_engine.entities import Tool, Treasure
 from game_engine.utils import xy_to_tile, clamp
@@ -95,6 +98,7 @@ class GameEngine:
             {}
         )  # (x, y) -> (start_time, type)
         self.event_resolver = EventResolver(resolve=self.resolve)
+        self.input_queue = InputQueue()
         # FIXME this has to be set by the map so you don't start in illegal position
         offset = 0
         self.starting_poses = [
@@ -109,11 +113,20 @@ class GameEngine:
         self.switch_state = SwitchState.OFF
         self.security_doors: List[Tuple[int, int, Tile]] = []
         self.state_callback: Optional[Callable[[RenderState], None]] = None
+        self._external_state_callback: Optional[Callable[[RenderState], None]] = None
+        self.monster_controllers: List[MonsterController] = []
         self._bioslime_tick_active = False
         self._bioslime_sentinel = _BioslimeTick()
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
-        self.state_callback = callback
+        self._external_state_callback = callback
+        self.state_callback = self._dispatch_render_state
+
+    def _dispatch_render_state(self, state: RenderState) -> None:
+        if self._external_state_callback:
+            self._external_state_callback(state)
+        for controller in self.monster_controllers:
+            controller.push_state(state)
 
     def load_map(self, map_data: MapData) -> None:
         """Load map data into the engine."""
@@ -140,10 +153,41 @@ class GameEngine:
 
     def start(self) -> None:
         """Start the game engine and event processing."""
+        self.input_queue.set_notify(self.event_resolver.notify)
+        self.event_resolver.pre_process = self.process_inputs
         self.event_resolver.start()
+        self._start_monster_controllers()
+
+    def process_inputs(self) -> None:
+        """Drain the input queue and apply commands. Called from the resolver thread."""
+        for cmd in self.input_queue.drain():
+            if cmd.entity.state == "dead":
+                continue
+            if cmd.action.is_move():
+                self.change_entity_direction(cmd.entity)
+            elif cmd.action == Action.FIRE:
+                if cmd.bomb is not None:
+                    self.plant_bomb(cmd.bomb)
+            elif cmd.action == Action.REMOTE:
+                if isinstance(cmd.entity, Player):
+                    self.detonate_remotes(cmd.entity)
+
+    def _start_monster_controllers(self) -> None:
+        for monster in self.monsters:
+            if monster.entity_type == EntityType.GRENADE:
+                continue  # projectiles, not AI
+            controller = MonsterController(monster, self)
+            self.monster_controllers.append(controller)
+            controller.start()
+        # Ensure dispatch is wired up even if no external callback was set
+        if self.monster_controllers and self.state_callback is None:
+            self.state_callback = self._dispatch_render_state
 
     def stop(self) -> None:
         """Stop the game engine and event processing."""
+        for controller in self.monster_controllers:
+            controller.stop()
+        self.monster_controllers.clear()
         self.event_resolver.stop()
 
     def create_player(self, name: str) -> None:
@@ -302,9 +346,10 @@ class GameEngine:
             if monster.state == "dead":
                 continue
             mx, my = xy_to_tile(monster.x, monster.y)
-            dmg = damage_array[my, mx]
-            if dmg > 0:
-                monster.take_damage(int(dmg))
+            if 0 <= mx < self.width and 0 <= my < self.height:
+                dmg = damage_array[my, mx]
+                if dmg > 0:
+                    monster.take_damage(int(dmg))
 
         for y in range(len(self.pickups)):
             for x in range(len(self.pickups[y])):
@@ -515,18 +560,15 @@ class GameEngine:
         # Handle bomb explosion
         if isinstance(target, Bomb) and event.event_type == "explode":
             self.resolve_bomb(target, event, flags)
-        elif isinstance(target, Player) and event.event_type == "move":
-            self.resolve_movement(target, event, flags)
-        elif isinstance(target, Player) and event.event_type == "push":
+        elif isinstance(target, DynamicEntity) and event.event_type == "move":
+            if target.entity_type == EntityType.GRENADE:
+                self.resolve_grenade_movement(target, event, flags)
+            else:
+                self.resolve_movement(target, event, flags)
+        elif isinstance(target, DynamicEntity) and event.event_type == "push":
             self.resolve_push(target, event, flags)
-        elif isinstance(target, Player) and event.event_type == "dig":
+        elif isinstance(target, DynamicEntity) and event.event_type == "dig":
             self.resolve_dig(target, event, flags)
-        elif (
-            isinstance(target, DynamicEntity)
-            and target.entity_type == EntityType.GRENADE
-            and event.event_type == "move"
-        ):
-            self.resolve_grenade_movement(target, event, flags)
         elif isinstance(target, _BioslimeTick) and event.event_type == "bioslime_tick":
             self._bioslime_tick(event.trigger_at)
 
@@ -999,10 +1041,12 @@ class GameEngine:
                 self._explode_grenade(grenade, nx, ny, now=current_time)
                 return
 
-        # Check if next tile is solid
+        # Check if next tile is solid or out of bounds
         next_tile = self.get_tile(nx, ny)
-        if next_tile and next_tile.solid:
-            # Explode in current (non-solid) tile
+        if next_tile is None or next_tile.solid:
+            # Explode in current tile (clamped to map)
+            gx = max(0, min(self.width - 1, gx))
+            gy = max(0, min(self.height - 1, gy))
             self._explode_grenade(grenade, gx, gy, now=current_time)
             return
 
@@ -1364,14 +1408,14 @@ class GameEngine:
         if entity.direction in (Direction.RIGHT, Direction.LEFT):
             entity.y = round(entity.y - 0.5) + 0.5
 
-    def resolve_dig(self, target: Player, event: Event, flags: ResolveFlags) -> None:
+    def resolve_dig(self, target: DynamicEntity, event: Event, flags: ResolveFlags) -> None:
         if target.state == "dead":
             return
 
         in_bounds, target_tile = self.get_neighbor_tile(target)
         if not in_bounds:
             return
-        dig_power = target.get_dig_power()
+        dig_power = target.get_dig_power() if isinstance(target, Player) else 1
         target_tile.take_damage(dig_power)
         self.pending_sounds.append(SoundType.DIG)
         # print("DIG!")
@@ -1423,23 +1467,25 @@ class GameEngine:
                     self.event_resolver.schedule_event(explosion_event)
 
     # TODO: tile center reached logic
-    def entity_reach_tile_center(self, player: Player) -> None:
+    def entity_reach_tile_center(self, entity: DynamicEntity) -> None:
         """Events that happen when entity enters a tile center"""
-        # pickup items
-        px, py = xy_to_tile(player.x, player.y)
-        pickup = self.pickups[py][px]
-        if pickup:
-            if pickup.pickup_type == PickupType.TOOL:
-                assert isinstance(pickup, Tool)
-                player.pickup_tool(pickup)
-            else:
-                assert isinstance(pickup, Treasure)
-                player.pickup_treasure(pickup)
-                # TODO:
-                self.pending_sounds.append(SoundType.TREASURE)
-            self.pickups[py][px] = None
+        px, py = xy_to_tile(entity.x, entity.y)
 
-        # teleport
+        # pickup items (only players pick up items)
+        if isinstance(entity, Player):
+            pickup = self.pickups[py][px]
+            if pickup:
+                if pickup.pickup_type == PickupType.TOOL:
+                    assert isinstance(pickup, Tool)
+                    entity.pickup_tool(pickup)
+                else:
+                    assert isinstance(pickup, Treasure)
+                    entity.pickup_treasure(pickup)
+                    # TODO:
+                    self.pending_sounds.append(SoundType.TREASURE)
+                self.pickups[py][px] = None
+
+        # teleport (applies to all entities)
         tile = self.tiles[py][px]
         if tile.is_teleport():
             available: List[Tuple[int, int]] = []
@@ -1450,8 +1496,8 @@ class GameEngine:
                     available.append(teleport)
             if available:
                 val = random.choice(available)
-                player.x = val[0] + 0.5
-                player.y = val[1] + 0.5
+                entity.x = val[0] + 0.5
+                entity.y = val[1] + 0.5
 
 
     def use_switch(self) -> None:
