@@ -37,12 +37,14 @@ WINDOW_TITLE = "Session Setup"
 DEFAULT_RANDOM_PARAMS = {
     "width": 64,
     "height": 45,
-    "feature_size": 20,
+    "feature_sizes": [20, 5],
     "threshold": 0.1,
     "min_treasure": 10,
     "max_treasure": 40,
     "min_tools": 5,
     "max_tools": 20,
+    "max_rooms": 5,
+    "room_chance": 0.1,
 }
 
 
@@ -152,14 +154,15 @@ class SessionSetup(arcade.Window):
     def _ensure_random_params(self, entry):
         """Ensure a map_list entry has random_params and expanded keys."""
         if "random_params" not in entry:
-            entry["random_params"] = dict(DEFAULT_RANDOM_PARAMS)
+            entry["random_params"] = copy.deepcopy(DEFAULT_RANDOM_PARAMS)
         if "expanded" not in entry:
             entry["expanded"] = False
 
     def _make_random_map_fields(self, entry_index):
         """Create random map sub-fields for a specific map_list entry."""
         params = self.map_list[entry_index]["random_params"]
-        return [
+        feature_sizes = params["feature_sizes"]
+        fields = [
             MenuField(
                 name="Width", field_type=FieldType.NUMERIC,
                 value=params["width"],
@@ -173,9 +176,15 @@ class SessionSetup(arcade.Window):
                 map_entry_index=entry_index,
             ),
             MenuField(
-                name="Feature Size", field_type=FieldType.NUMERIC,
-                value=params["feature_size"],
+                name="Feature Size 1", field_type=FieldType.NUMERIC,
+                value=feature_sizes[0] if len(feature_sizes) > 0 else 20,
                 step=1, min_value=1, max_value=100, indent=True,
+                map_entry_index=entry_index,
+            ),
+            MenuField(
+                name="Feature Size 2", field_type=FieldType.NUMERIC,
+                value=feature_sizes[1] if len(feature_sizes) > 1 else 0,
+                step=1, min_value=0, max_value=100, indent=True,
                 map_entry_index=entry_index,
             ),
             MenuField(
@@ -208,7 +217,20 @@ class SessionSetup(arcade.Window):
                 step=1, min_value=0, max_value=200, indent=True,
                 map_entry_index=entry_index,
             ),
+            MenuField(
+                name="Max Rooms", field_type=FieldType.NUMERIC,
+                value=params["max_rooms"],
+                step=1, min_value=0, max_value=20, indent=True,
+                map_entry_index=entry_index,
+            ),
+            MenuField(
+                name="Room Chance", field_type=FieldType.NUMERIC,
+                value=params["room_chance"],
+                step=0.05, min_value=0.0, max_value=1.0, indent=True,
+                map_entry_index=entry_index,
+            ),
         ]
+        return fields
 
     def _rebuild_fields(self):
         """Assemble self.fields from fixed fields + map entries + conditional sub-fields + Save."""
@@ -281,16 +303,7 @@ class SessionSetup(arcade.Window):
             self.current_field_index = len(self.fields) - 1
 
     def _init_sprite_lists(self):
-        """Initialize sprite lists for highlight, text, and instructions."""
-        # Menu highlight sprite
-        self.highlight_sprite_list = arcade.SpriteList()
-        self.highlight_sprite = arcade.Sprite()
-        highlight_image = Image.new("RGBA", (600, 20 * self.zoom), (60, 60, 80, 255))
-        self.highlight_texture = arcade.Texture(highlight_image, name="session_highlight")
-        self.highlight_sprite.texture = self.highlight_texture
-        self.highlight_sprite.scale = 1
-        self.highlight_sprite_list.append(self.highlight_sprite)
-
+        """Initialize sprite lists for text and instructions."""
         # Text sprite lists
         self.menu_text_sprites = arcade.SpriteList()
         self.instructions_sprites = arcade.SpriteList()
@@ -312,7 +325,7 @@ class SessionSetup(arcade.Window):
             # Multiplier fields: display as percentage
             if menu_field.name in ("Damage Multiplier", "Speed Multiplier"):
                 text = f"{int(round(val * 100))}%"
-            elif menu_field.name == "Threshold":
+            elif menu_field.name in ("Threshold", "Room Chance"):
                 text = f"{val:.2f}"
             else:
                 text = str(int(val))
@@ -447,10 +460,12 @@ class SessionSetup(arcade.Window):
             params = entry["random_params"]
             map_data = self.random_map_generator.generate(
                 x=params["width"], y=params["height"],
-                feature_size=params["feature_size"],
+                feature_sizes=params["feature_sizes"],
                 threshold=params["threshold"],
                 min_treasure=0, max_treasure=0,
                 min_tools=0, max_tools=0,
+                max_rooms=params["max_rooms"],
+                room_chance=params["room_chance"],
             )
         else:
             map_data = load_map(os.path.join(MAPS_PATH, file))
@@ -490,14 +505,7 @@ class SessionSetup(arcade.Window):
         self.map_preview_random_params = copy.deepcopy(random_params) if random_params else None
 
     def on_update(self, delta_time: float):
-        """Update highlight position and menu text."""
-        # Update highlight position
-        start_y = self.height - 38 * self.zoom
-        line_height = 20 * self.zoom
-        highlight_y = start_y - self.current_field_index * line_height - line_height / 2 + 4
-        self.highlight_sprite.center_x = self.width / 2
-        self.highlight_sprite.center_y = highlight_y
-
+        """Update menu text and map preview."""
         # Update menu text
         self._update_menu_text()
 
@@ -518,9 +526,6 @@ class SessionSetup(arcade.Window):
     def on_draw(self):
         """Render the setup screen."""
         self.clear()
-
-        # Draw highlight bar
-        self.highlight_sprite_list.draw(pixelated=True)
 
         # Draw menu text
         self.menu_text_sprites.draw(pixelated=True)
@@ -717,14 +722,30 @@ class SessionSetup(arcade.Window):
             if idx >= 0 and idx < len(self.map_list):
                 params = self.map_list[idx].get("random_params")
                 if params is not None:
+                    # Feature sizes are stored as a list
+                    if name == "Feature Size 1":
+                        params["feature_sizes"][0] = int(changed_field.value)
+                        return
+                    elif name == "Feature Size 2":
+                        val = int(changed_field.value)
+                        if len(params["feature_sizes"]) > 1:
+                            if val == 0:
+                                params["feature_sizes"] = params["feature_sizes"][:1]
+                            else:
+                                params["feature_sizes"][1] = val
+                        elif val > 0:
+                            params["feature_sizes"].append(val)
+                        return
+
                     key = {
                         "Width": "width", "Height": "height",
-                        "Feature Size": "feature_size", "Threshold": "threshold",
+                        "Threshold": "threshold",
                         "Min Treasure": "min_treasure", "Max Treasure": "max_treasure",
                         "Min Tools": "min_tools", "Max Tools": "max_tools",
+                        "Max Rooms": "max_rooms", "Room Chance": "room_chance",
                     }.get(name)
                     if key:
-                        if key == "threshold":
+                        if key in ("threshold", "room_chance"):
                             params[key] = changed_field.value
                         else:
                             params[key] = int(changed_field.value)
@@ -769,10 +790,13 @@ class SessionSetup(arcade.Window):
                         idx = self.map_files.index(fname)
                         entry = {"file": fname, "index": idx}
                         if fname == "RANDOM":
-                            params = dict(DEFAULT_RANDOM_PARAMS)
+                            params = copy.deepcopy(DEFAULT_RANDOM_PARAMS)
                             for k in params:
                                 if k in map_val:
                                     params[k] = map_val[k]
+                            # Migrate old feature_size (single int) to feature_sizes list
+                            if "feature_size" in map_val and "feature_sizes" not in map_val:
+                                params["feature_sizes"] = [map_val["feature_size"]]
                             entry["random_params"] = params
                         self.map_list.append(entry)
                 elif isinstance(map_val, str):
@@ -786,11 +810,14 @@ class SessionSetup(arcade.Window):
                 idx = self.map_files.index(map_val)
                 entry = {"file": map_val, "index": idx}
                 if map_val == "RANDOM" and "random_map" in config:
-                    params = dict(DEFAULT_RANDOM_PARAMS)
+                    params = copy.deepcopy(DEFAULT_RANDOM_PARAMS)
                     rm = config["random_map"]
                     for k in params:
                         if k in rm:
                             params[k] = rm[k]
+                    # Migrate old feature_size to feature_sizes list
+                    if "feature_size" in rm and "feature_sizes" not in rm:
+                        params["feature_sizes"] = [rm["feature_size"]]
                     entry["random_params"] = params
                 self.map_list = [entry]
 

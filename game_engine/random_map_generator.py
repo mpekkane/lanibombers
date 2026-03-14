@@ -158,7 +158,7 @@ class RandomMapGenerator:
                 for row in range(room_h):
                     for col in range(room_w):
                         idx = row * room_w + col
-                        offset = row * height + col
+                        offset = row * width + col
                         tilemap[init_offset + offset] = room_map[idx]
 
                         tiles[top+row][left+col] = Tile.create_by_id(room_map[idx])
