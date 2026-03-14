@@ -363,8 +363,8 @@ class GameEngine:
         if in_bounds:
             if next_tile.solid:
                 self.collision_check(player, next_tile, now)
-            else:
-                # Create new movement
+            elif not self.try_push_bomb(player):
+                # Create new movement (no bomb blocked us)
                 self.move_entity(player, now=now)
 
         # send renderstate
@@ -384,10 +384,50 @@ class GameEngine:
                 # TODO: can you push boulders on top of items?
                 in_bounds, tile_behind_push = self.get_neighbor_tile(entity, range=2)
                 if in_bounds and not tile_behind_push.solid:
-                    self.move_entity(entity, push=True, now=now)
+                    # Check no bomb blocking the destination
+                    _, _, nx, ny = self.get_entity_movement_vector(entity)
+                    bomb_blocked = any(b.x == nx and b.y == ny for b in self.bombs)
+                    if not bomb_blocked:
+                        self.move_entity(entity, push=True, now=now)
+                    else:
+                        entity.state = "idle"
+                else:
+                    entity.state = "idle"
         # if nothing can be done: stop
         else:
             entity.state = "idle"
+
+    def try_push_bomb(self, entity: DynamicEntity) -> bool:
+        """Try to push a bomb in the next tile ahead of entity.
+        Returns True if movement is blocked (bomb couldn't be pushed)."""
+        target_x, target_y, _, _ = self.get_entity_movement_vector(entity)
+        for bomb in self.bombs:
+            if (
+                bomb.x == target_x
+                and bomb.y == target_y
+                and not (
+                    bomb.bomb_type == BombType.LANDMINE
+                    or bomb.bomb_type == BombType.CRACKER_BARREL
+                )
+            ):
+                # Check destination tile for the bomb
+                _, _, new_x, new_y = self.get_entity_movement_vector(entity)
+                dest_tile = self.get_tile(new_x, new_y)
+                if dest_tile is not None and not dest_tile.solid:
+                    # Check no other bomb at destination
+                    bomb_blocked = any(
+                        b.x == new_x and b.y == new_y for b in self.bombs
+                    )
+                    if not bomb_blocked:
+                        bomb.x = new_x
+                        bomb.y = new_y
+                        cx, cy = self.clamp_to_map_size(bomb.x, bomb.y)
+                        bomb.x, bomb.y = int(cx), int(cy)
+                        return False  # pushed successfully, entity can continue
+                # Can't push — block movement
+                entity.state = "idle"
+                return True
+        return False  # no bomb ahead, entity can continue
 
     def move_entity(self, entity: DynamicEntity, push: bool = False, now: float = 0.0):
         """Main movement generator function from dynamic entities"""
@@ -1306,11 +1346,11 @@ class GameEngine:
             if not in_bounds:
                 blocked = True
                 target.state = "idle"
-            else:
-                if next_tile.solid:
-                    blocked = True
-                    px, py = xy_to_tile(target.x, target.y)
-                    self.collision_check(target, next_tile, current_time)
+            elif next_tile.solid:
+                blocked = True
+                self.collision_check(target, next_tile, current_time)
+            elif self.try_push_bomb(target):
+                blocked = True
 
         if flags.spawn and not blocked:
             self.move_entity(target, now=current_time)
@@ -1413,31 +1453,6 @@ class GameEngine:
                 player.x = val[0] + 0.5
                 player.y = val[1] + 0.5
 
-        # push bombs
-        for bomb in self.bombs:
-            if (
-                bomb.x == px
-                and bomb.y == py
-                and not (
-                    bomb.bomb_type == BombType.LANDMINE
-                    or bomb.bomb_type == BombType.CRACKER_BARREL
-                )
-            ):
-                target_x, target_y, _, _ = self.get_entity_movement_vector(player)
-                tile = self.get_tile(target_x, target_y)
-                if tile is not None and not tile.solid:
-                    blocked = False
-                    for b in self.bombs:
-                        if b.x == target_x and b.y == target_y:
-                            blocked = True
-                            break
-                    if not blocked:
-                        bomb.x = target_x
-                        bomb.y = target_y
-                        cx, cy = self.clamp_to_map_size(bomb.x, bomb.y)
-                        bomb.x, bomb.y = int(cx), int(cy)
-                    else:
-                        break
 
     def use_switch(self) -> None:
         if self.switch_state == SwitchState.OFF:
