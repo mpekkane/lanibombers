@@ -35,21 +35,23 @@ class MonsterController:
         self.engine = engine
         self.ai: MonsterAI = MONSTER_AI_MAP[monster.entity_type]()
         self._state: Optional[RenderState] = None
+        self._updated = False
         self._lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
     def push_state(self, state: RenderState) -> None:
-        """Store the latest render state (drops old states)."""
+        """Store the latest render state and mark as updated."""
         with self._lock:
             self._state = state
+            self._updated = True
 
-    def _pop_state(self) -> Optional[RenderState]:
-        """Retrieve and clear the latest render state."""
+    def _get_state(self) -> tuple[Optional[RenderState], bool]:
+        """Get the latest state and whether it was updated since last call."""
         with self._lock:
-            state = self._state
-            self._state = None
-            return state
+            updated = self._updated
+            self._updated = False
+            return self._state, updated
 
     def start(self) -> None:
         self._running = True
@@ -74,11 +76,11 @@ class MonsterController:
             if self.monster.state == "dead":
                 continue
 
-            state = self._pop_state()
+            state, updated = self._get_state()
             if state is None:
                 continue
 
-            action = self.ai.think(state)
+            action = self.ai.think(state, updated)
             if action is not None:
                 self._execute_action(action)
 
