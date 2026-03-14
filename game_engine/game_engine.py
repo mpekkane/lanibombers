@@ -49,7 +49,7 @@ EXPLOSION_MAP = {
     ExplosionType.BIG_CROSS: BigCrossExplosion(),
 }
 from game_engine.events.event_resolver import EventResolver
-from game_engine.render_state import RenderState, SoundType
+from game_engine.render_state import ExplosionVisual, RenderState, SoundType
 from game_engine.entities import Tool, Treasure
 from game_engine.utils import xy_to_tile, clamp
 
@@ -567,6 +567,13 @@ class GameEngine:
         solids = np.zeros((self.height, self.width), dtype=bool)
         damage_array = explosion.calculate_damage(target.x, target.y, solids)
 
+        # Choose visual code for the explosion array
+        visual = (
+            ExplosionVisual.NUKE
+            if target.explosion_type == ExplosionType.NUKE
+            else ExplosionVisual.EXPLOSION
+        )
+
         # Track C4 tiles that will be hit for chain reaction
         c4_tiles_hit = []
 
@@ -582,7 +589,7 @@ class GameEngine:
                             c4_tiles_hit.append((x, y))
                         tile.take_damage(dmg, target.explosion_type)
                         if not tile.solid:
-                            self.explosions[y, x] = 1
+                            self.explosions[y, x] = visual
 
         # Schedule chain explosions for C4 tiles that were hit (1/60s delay)
         chain_delay = 1.0 / 60.0

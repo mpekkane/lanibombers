@@ -44,6 +44,16 @@ class ExplosionSprite(arcade.Sprite):
                 self.texture = self.explosion_textures[2]
             else:
                 self.texture = self.explosion_textures[0]
+        elif self.explosion_type == 5:
+            # Nuke explosion: explosion -> smoke1 -> smoke2 -> transparent
+            if frame_index == 0:
+                self.texture = self.explosion_textures[1]
+            elif frame_index == 1:
+                self.texture = self.explosion_textures[2]
+            elif frame_index == 2:
+                self.texture = self.explosion_textures[3]
+            else:
+                self.texture = self.explosion_textures[0]
         else:
             # Normal explosion: explosion -> smoke1 -> smoke2 -> transparent
             if frame_index == 0:

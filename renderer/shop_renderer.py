@@ -16,6 +16,7 @@ from cfg.item_dictionary import ItemType, get_item_icon
 from game_engine.render_state import RenderState
 from game_engine.entities.player import Player
 from renderer.bitmap_text import BitmapText
+from renderer.panel_builder import PanelBuilder
 from renderer.player_colorizer import PlayerColorizer
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
@@ -131,20 +132,8 @@ class ShopRenderer(arcade.Window):
         self.other_player_info_sprites = arcade.SpriteList()
         self._cached_other_players = None
 
-        # Extract panel border pieces from SHOPPIC.png (3x3 corners, 1px edge strips)
-        shoppic = Image.open(os.path.join(GRAPHICS_PATH, "SHOPPIC.png")).convert("RGBA")
-        self._panel_corners = {
-            'tl': shoppic.crop((0, 0, 3, 3)),
-            'tr': shoppic.crop((637, 0, 640, 3)),
-            'bl': shoppic.crop((0, 477, 3, 480)),
-            'br': shoppic.crop((637, 477, 640, 480)),
-        }
-        self._panel_edges = {
-            'top': shoppic.crop((320, 0, 321, 3)),     # 1x3
-            'bottom': shoppic.crop((320, 477, 321, 480)),  # 1x3
-            'left': shoppic.crop((0, 240, 3, 241)),     # 3x1
-            'right': shoppic.crop((637, 240, 640, 241)),  # 3x1
-        }
+        # Panel builder for grey beveled panels
+        self.panel_builder = PanelBuilder()
 
         # Build empty player card slots (up to 16 total, fill unused with panels)
         self.empty_card_sprites = arcade.SpriteList()
@@ -153,8 +142,8 @@ class ShopRenderer(arcade.Window):
         card_h = 30
         icon_size = 30
         max_players = 16
-        card_panel_texture = self.create_panel_texture(card_w, card_h)
-        icon_panel_texture = self.create_panel_texture(icon_size, icon_size)
+        card_panel_texture = self.panel_builder.create_panel_texture(card_w, card_h)
+        icon_panel_texture = self.panel_builder.create_panel_texture(icon_size, icon_size)
         # Slot 0: card panel + icon panel (above first enemy card)
         panel_0 = arcade.Sprite()
         panel_0.texture = card_panel_texture
@@ -299,39 +288,6 @@ class ShopRenderer(arcade.Window):
         self.other_player_sprites.draw(pixelated=True)
         self.other_player_name_sprites.draw(pixelated=True)
         self.other_player_info_sprites.draw(pixelated=True)
-
-    def create_panel_texture(self, width: int, height: int) -> arcade.Texture:
-        """Create a grey beveled panel texture of the given size (min 6x6).
-
-        Uses 3x3 corner pieces and 1px edge strips sampled from SHOPPIC.png,
-        with #676767 fill for the interior.
-        """
-        w = max(width, 6)
-        h = max(height, 6)
-
-        panel = Image.new("RGBA", (w, h), (0x67, 0x67, 0x67, 0xFF))
-
-        # Paste corners
-        panel.paste(self._panel_corners['tl'], (0, 0))
-        panel.paste(self._panel_corners['tr'], (w - 3, 0))
-        panel.paste(self._panel_corners['bl'], (0, h - 3))
-        panel.paste(self._panel_corners['br'], (w - 3, h - 3))
-
-        # Tile edges
-        top_strip = self._panel_edges['top']      # 1x3
-        bottom_strip = self._panel_edges['bottom']  # 1x3
-        left_strip = self._panel_edges['left']      # 3x1
-        right_strip = self._panel_edges['right']    # 3x1
-
-        for x in range(3, w - 3):
-            panel.paste(top_strip, (x, 0))
-            panel.paste(bottom_strip, (x, h - 3))
-
-        for y in range(3, h - 3):
-            panel.paste(left_strip, (0, y))
-            panel.paste(right_strip, (w - 3, y))
-
-        return arcade.Texture(panel)
 
     def _build_map_preview(self, state: RenderState) -> None:
         """Build the map preview sprite from next_map_tiles and treasure positions."""

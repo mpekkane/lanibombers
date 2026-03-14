@@ -4,14 +4,17 @@ Main graphics processing and display loop.
 """
 
 import os
+import random
 import time
 import arcade
+import numpy as np
 from typing import Callable, Dict, Optional, Tuple, List
 from PIL import Image
 from renderer.tile_renderer import TileRenderer
 from renderer.entity_renderer import EntityRenderer
 from renderer.header_renderer import HeaderRenderer
-from game_engine.render_state import RenderState
+from renderer.margin_renderer import MarginRenderer
+from game_engine.render_state import RenderState, ExplosionVisual
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
 from cfg.bomb_dictionary import BombType
@@ -115,6 +118,9 @@ class GameRenderer(arcade.Window):
             self.show_stats,
             self.item_hotkeys,
         )
+        self.margin_renderer = MarginRenderer(
+            self.zoom, self.height, self.client_player_name
+        )
 
         # Calculate y offset for UI space at top
         self.ui_offset = UI_TOP_MARGIN * self.zoom
@@ -138,6 +144,32 @@ class GameRenderer(arcade.Window):
             self.viewport_pixels_y / 2,
         )
 
+        # UI camera (Camera2D so we can offset its position for shake)
+        self.ui_camera = arcade.Camera2D(
+            viewport=arcade.LBWH(0, 0, self.width, self.height),
+            position=(self.width / 2, self.height / 2),
+        )
+
+        # Nuke screen shake & white flash state
+        self.NUKE_SHAKE_DURATION = 2.0  # seconds
+        self.NUKE_FLASH_DURATION = 1.0  # seconds
+        self.NUKE_SHAKE_MAX_AMP = 50 * self.zoom  # screen pixels (5 tiles)
+        self._nuke_start_time = 0.0
+        self._cam_position = (0.0, 0.0)
+
+        # White flash overlay sprite (1x1 white pixel scaled to cover viewport + shake margin)
+        white_image = Image.new("RGBA", (1, 1), (255, 255, 255, 255))
+        white_texture = arcade.Texture(white_image, name="nuke_flash_white")
+        self._flash_sprite = arcade.Sprite()
+        self._flash_sprite.texture = white_texture
+        # Scale to cover viewport plus shake margin on each side
+        flash_margin = self.NUKE_SHAKE_MAX_AMP * 2
+        self._flash_sprite.width = self.viewport_pixels_x + flash_margin
+        self._flash_sprite.height = self.viewport_pixels_y + flash_margin
+        self._flash_sprite.visible = False
+        self._flash_sprite_list = arcade.SpriteList()
+        self._flash_sprite_list.append(self._flash_sprite)
+
     def on_update(self, delta_time: float):
         """Poll server and update tilemap"""
         state = self.render_state_function()
@@ -151,6 +183,13 @@ class GameRenderer(arcade.Window):
             state.width,
             state.height,
         )
+        # Store base camera position before shake is applied
+        self._cam_position = (cam_x, cam_y)
+
+        # Detect nuke explosions and latch start time
+        if np.any(state.explosions == ExplosionVisual.NUKE):
+            self._nuke_start_time = current_time
+
         # Set camera to show 64x45 tile viewport centered on player
         self.game_camera.position = (cam_x, cam_y)
 
@@ -194,6 +233,7 @@ class GameRenderer(arcade.Window):
             view_end_y,
         )
         self.header_renderer.on_update(state.players, self.client_player_name)
+        self.margin_renderer.on_update(state.players)
 
     # ██╗  ██╗███████╗██╗     ██████╗ ███████╗██████╗ ███████╗
     # ██║  ██║██╔════╝██║     ██╔══██╗██╔════╝██╔══██╗██╔════╝
@@ -272,7 +312,20 @@ class GameRenderer(arcade.Window):
         """Render the game"""
         self.clear()
 
-        # Draw game world with camera transformation
+        # Compute nuke shake offset
+        elapsed = time.perf_counter() - self._nuke_start_time
+        shaking = elapsed < self.NUKE_SHAKE_DURATION
+        if shaking:
+            amp = self.NUKE_SHAKE_MAX_AMP * (1.0 - elapsed / self.NUKE_SHAKE_DURATION)
+            shake_x = random.uniform(-amp, amp)
+            shake_y = random.uniform(-amp, amp)
+        else:
+            shake_x = 0.0
+            shake_y = 0.0
+
+        # Draw game world with camera transformation (+ shake)
+        cam_x, cam_y = self._cam_position
+        self.game_camera.position = (cam_x + shake_x, cam_y + shake_y)
         self.game_camera.use()
         self.tile_renderer.background_tile_sprite_list.draw(pixelated=True)  # type: ignore
         self.tile_renderer.vertical_transition_sprite_list.draw(pixelated=True)  # type: ignore
@@ -284,9 +337,29 @@ class GameRenderer(arcade.Window):
         self.entity_renderer.player_sprite_list.draw(pixelated=True)  # type: ignore
         self.entity_renderer.explosion_sprite_list.draw(pixelated=True)  # type: ignore
 
-        # Draw UI without camera (use default projection)
-        self.default_camera.use()
-        self.header_renderer.on_draw(self.show_stats)
+        # Draw white flash overlay (in game camera space, fades over 1 second)
+        if elapsed < self.NUKE_FLASH_DURATION:
+            alpha = int(255 * (1.0 - elapsed / self.NUKE_FLASH_DURATION))
+            self._flash_sprite.alpha = alpha
+            self._flash_sprite.position = (cam_x + shake_x, cam_y + shake_y)
+            self._flash_sprite.visible = True
+            self._flash_sprite_list.draw()
+        else:
+            self._flash_sprite.visible = False
+
+        # Draw UI with shake (header without perf graphs, margin)
+        center_x = self.width / 2
+        center_y = self.height / 2
+        self.ui_camera.position = (center_x + shake_x, center_y + shake_y)
+        self.ui_camera.use()
+        self.header_renderer.on_draw(show_stats=not shaking and self.show_stats)
+        self.margin_renderer.on_draw()
+
+        # Draw perf graphs without shake (stationary)
+        if shaking and self.show_stats:
+            self.ui_camera.position = (center_x, center_y)
+            self.ui_camera.use()
+            self.header_renderer.draw_perf_graphs()
 
     # ██╗███╗   ██╗██████╗ ██╗   ██╗████████╗
     # ██║████╗  ██║██╔══██╗██║   ██║╚══██╔══╝

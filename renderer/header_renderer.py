@@ -304,3 +304,8 @@ class HeaderRenderer:
         self.hotkey_text_sprites.draw(pixelated=True)
         if show_stats:
             self.perf_graph_list.draw()
+
+    def draw_perf_graphs(self):
+        """Draw only the performance graphs. Used by game_renderer to draw
+        graphs after resetting camera shake so they remain stationary."""
+        self.perf_graph_list.draw()
