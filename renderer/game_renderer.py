@@ -41,8 +41,8 @@ VIEWPORT_HEIGHT = 45  # Visible tiles vertically
 # ============================================================================
 
 
-class GameRenderer(arcade.Window):
-    """Main game window and renderer"""
+class GameView(arcade.View):
+    """Main game view and renderer"""
 
     # ██╗███╗   ██╗██╗████████╗
     # ██║████╗  ██║██║╚══██╔══╝
@@ -54,25 +54,23 @@ class GameRenderer(arcade.Window):
     def __init__(
         self,
         render_state_function: Callable[[], RenderState],
-        width: int = 1708,
-        height: int = 960,
         client_player_name: str = "",
         show_stats: bool = True,
         show_grid: bool = True,
-        window_name: str = "lanibombers",
         item_hotkeys: Optional[Dict[BombType, str]] = None,
     ):
-        super().__init__(width, height, window_name, vsync=VSYNC)
+        super().__init__()
         self.client_player_name = client_player_name
         self.item_hotkeys = item_hotkeys or {}
         self.show_stats = show_stats
         self.render_state_function = render_state_function
         self.show_stats = show_stats
-        self.init_width = width
-        self.init_height = height
         self.show_grid = show_grid
-        self.input_callback = Optional[Callable[[int, int], None]]
+        self.input_callback: Optional[Callable[[int, int], None]] = None
         self.input_callback_bound = False
+
+    def on_show_view(self):
+        self.initialize()
 
     def initialize(self):
         """
@@ -85,10 +83,10 @@ class GameRenderer(arcade.Window):
         if self.show_stats:
             arcade.enable_timings()
 
-        self.set_update_rate(1 / TARGET_FPS)
-        self.set_draw_rate(1 / TARGET_FPS)
+        self.window.set_update_rate(1 / TARGET_FPS)
+        self.window.set_draw_rate(1 / TARGET_FPS)
 
-        self.zoom = min(self.init_width // 640, self.init_height // 480)
+        self.zoom = min(self.window.width // 640, self.window.height // 480)
 
         # Create transparent texture for empty transitions
         transparent_image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
@@ -107,19 +105,19 @@ class GameRenderer(arcade.Window):
             state,
             self.transparent_texture,
             self.zoom,
-            self.height,
+            self.window.height,
             self.map_height,
             SPRITES_PATH,
         )
         self.header_renderer = HeaderRenderer(
             self.transparent_texture,
             self.zoom,
-            self.height,
+            self.window.height,
             self.show_stats,
             self.item_hotkeys,
         )
         self.margin_renderer = MarginRenderer(
-            self.zoom, self.height, self.client_player_name
+            self.zoom, self.window.height, self.client_player_name
         )
 
         # Calculate y offset for UI space at top
@@ -146,8 +144,8 @@ class GameRenderer(arcade.Window):
 
         # UI camera (Camera2D so we can offset its position for shake)
         self.ui_camera = arcade.Camera2D(
-            viewport=arcade.LBWH(0, 0, self.width, self.height),
-            position=(self.width / 2, self.height / 2),
+            viewport=arcade.LBWH(0, 0, self.window.width, self.window.height),
+            position=(self.window.width / 2, self.window.height / 2),
         )
 
         # Nuke screen shake & white flash state
@@ -348,8 +346,8 @@ class GameRenderer(arcade.Window):
             self._flash_sprite.visible = False
 
         # Draw UI with shake (header without perf graphs, margin)
-        center_x = self.width / 2
-        center_y = self.height / 2
+        center_x = self.window.width / 2
+        center_y = self.window.height / 2
         self.ui_camera.position = (center_x + shake_x, center_y + shake_y)
         self.ui_camera.use()
         self.header_renderer.on_draw(show_stats=not shaking and self.show_stats)
@@ -373,18 +371,10 @@ class GameRenderer(arcade.Window):
         self.input_callback_bound = True
 
     def on_key_press(self, symbol: int, modifiers: int):
-        if self.input_callback_bound:
+        if self.input_callback is not None:
             self.input_callback(symbol, modifiers)
 
     def on_key_release(self, symbol: int, modifiers: int):
         pass
 
-    # ███╗   ███╗ █████╗ ██╗███╗   ██╗
-    # ████╗ ████║██╔══██╗██║████╗  ██║
-    # ██╔████╔██║███████║██║██╔██╗ ██║
-    # ██║╚██╔╝██║██╔══██║██║██║╚██╗██║
-    # ██║ ╚═╝ ██║██║  ██║██║██║ ╚████║
-    # ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
 
-    def run(self):
-        arcade.run()

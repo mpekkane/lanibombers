@@ -29,7 +29,9 @@ from game_engine import GameEngine
 from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.sound_engine import SoundEngine
 from game_engine.render_state import SoundType
-from renderer.game_renderer import GameRenderer
+import arcade
+from renderer.game_renderer import GameView
+from renderer.lanibombers_window import LanibombersWindow
 
 
 class ServerState(IntEnum):
@@ -343,11 +345,10 @@ def main() -> None:
                 print(state.players[0].x, state.players[0].y)
             time.sleep(1)
     else:
-        renderer = GameRenderer(
-            server.get_render_state_unsafe, window_name="lanibombers server"
-        )
-        renderer.initialize()
-        renderer.run()
+        window = LanibombersWindow()
+        view = GameView(server.get_render_state_unsafe)
+        window.show_view(view)
+        arcade.run()
 
 
 if __name__ == "__main__":

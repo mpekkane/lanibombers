@@ -23,7 +23,7 @@ SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites"
 GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "graphics")
 
 
-class ShopRenderer(arcade.Window):
+class ShopView(arcade.View):
     """Shop screen where players buy weapons/items between rounds."""
 
     def __init__(
@@ -33,21 +33,25 @@ class ShopRenderer(arcade.Window):
         shop_items: List[Tuple[ItemType | str, int]],
         cursor_positions: List[Tuple[UUID, ItemType | str]],
         next_map_tiles: np.ndarray,
-        width: int = 1708,
-        height: int = 960,
+        rounds_left: int = 0,
     ):
-        super().__init__(width, height, "lanibombers - Shop", vsync=True)
+        super().__init__()
         self.get_state = get_state
         self.client_player_name = client_player_name
         self.shop_items = shop_items
         self.cursor_positions = cursor_positions
         self.next_map_tiles = next_map_tiles
-        self.init_width = width
-        self.init_height = height
+        self._initial_rounds_left = rounds_left
+
+    def on_show_view(self):
+        """Called by arcade when this view becomes active."""
+        self.initialize()
+        if self._initial_rounds_left:
+            self.set_rounds_left(self._initial_rounds_left)
 
     def initialize(self):
         """Set up rendering resources after window is ready."""
-        self.zoom = min(self.init_width // 640, self.init_height // 480)
+        self.zoom = min(self.window.width // 640, self.window.height // 480)
 
         # Load SHOPPIC.png background (640x480)
         bg_path = os.path.join(GRAPHICS_PATH, "SHOPPIC.png")
@@ -56,7 +60,7 @@ class ShopRenderer(arcade.Window):
         self.bg_sprite.texture = bg_texture
         self.bg_sprite.scale = self.zoom
         self.bg_sprite.center_x = (640 / 2) * self.zoom
-        self.bg_sprite.center_y = self.height - (480 / 2) * self.zoom
+        self.bg_sprite.center_y = self.window.height - (480 / 2) * self.zoom
         self.bg_sprite_list = arcade.SpriteList()
         self.bg_sprite_list.append(self.bg_sprite)
 
@@ -149,14 +153,14 @@ class ShopRenderer(arcade.Window):
         panel_0.texture = card_panel_texture
         panel_0.scale = self.zoom
         panel_0.center_x = (card_x + card_w / 2) * self.zoom
-        panel_0.center_y = self.height - (card_h / 2) * self.zoom
+        panel_0.center_y = self.window.height - (card_h / 2) * self.zoom
         self.empty_card_sprites.append(panel_0)
 
         icon_panel_0 = arcade.Sprite()
         icon_panel_0.texture = icon_panel_texture
         icon_panel_0.scale = self.zoom
         icon_panel_0.center_x = (card_x + card_w + icon_size / 2) * self.zoom
-        icon_panel_0.center_y = self.height - (icon_size / 2) * self.zoom
+        icon_panel_0.center_y = self.window.height - (icon_size / 2) * self.zoom
         self.empty_card_sprites.append(icon_panel_0)
 
         # Slots 1..15: card panel + icon panel for other players
@@ -167,14 +171,14 @@ class ShopRenderer(arcade.Window):
             panel_sprite.texture = card_panel_texture
             panel_sprite.scale = self.zoom
             panel_sprite.center_x = (card_x + card_w / 2) * self.zoom
-            panel_sprite.center_y = self.height - (slot_y + card_h / 2) * self.zoom
+            panel_sprite.center_y = self.window.height - (slot_y + card_h / 2) * self.zoom
             self.empty_card_sprites.append(panel_sprite)
 
             icon_panel_sprite = arcade.Sprite()
             icon_panel_sprite.texture = icon_panel_texture
             icon_panel_sprite.scale = self.zoom
             icon_panel_sprite.center_x = (card_x + card_w + icon_size / 2) * self.zoom
-            icon_panel_sprite.center_y = self.height - (slot_y + icon_size / 2) * self.zoom
+            icon_panel_sprite.center_y = self.window.height - (slot_y + icon_size / 2) * self.zoom
             self.empty_card_sprites.append(icon_panel_sprite)
 
     def on_update(self, delta_time: float):  # noqa: ARG002
@@ -202,7 +206,7 @@ class ShopRenderer(arcade.Window):
 
         # Text base position (design coords: 34, 16 at 1x)
         base_x = 34 * self.zoom
-        base_y = self.height - 16 * self.zoom
+        base_y = self.window.height - 16 * self.zoom
         row_spacing = 14 * self.zoom
 
         # Row 0: Player name
@@ -334,7 +338,7 @@ class ShopRenderer(arcade.Window):
         sprite.texture = texture
         sprite.scale = self.zoom
         sprite.center_x = (288 + w / 2) * self.zoom
-        sprite.center_y = self.height - (51 + h / 2) * self.zoom
+        sprite.center_y = self.window.height - (51 + h / 2) * self.zoom
 
         self.map_preview_sprite_list = arcade.SpriteList()
         self.map_preview_sprite_list.append(sprite)
@@ -344,7 +348,7 @@ class ShopRenderer(arcade.Window):
         text = str(rounds)
         text_width = self.bitmap_text.get_text_width(text)
         center_x = 320 * self.zoom
-        screen_y = self.height - 120 * self.zoom
+        screen_y = self.window.height - 120 * self.zoom
         self.rounds_left_sprites = self.bitmap_text.create_text_sprites(
             text, center_x - text_width / 2, screen_y
         )
@@ -431,7 +435,7 @@ class ShopRenderer(arcade.Window):
                 bg_sprite.texture = self.card_normal_texture
             bg_sprite.scale = self.zoom
             bg_sprite.center_x = (card_left + card_w / 2) * self.zoom
-            bg_sprite.center_y = self.height - (card_top + card_h / 2) * self.zoom
+            bg_sprite.center_y = self.window.height - (card_top + card_h / 2) * self.zoom
             self.card_bg_sprites.append(bg_sprite)
 
         # Right grid
@@ -446,7 +450,7 @@ class ShopRenderer(arcade.Window):
             bg_sprite.texture = self.card_normal_texture
             bg_sprite.scale = self.zoom
             bg_sprite.center_x = (card_left + card_w / 2) * self.zoom
-            bg_sprite.center_y = self.height - (card_top + card_h / 2) * self.zoom
+            bg_sprite.center_y = self.window.height - (card_top + card_h / 2) * self.zoom
             self.card_bg_sprites.append(bg_sprite)
 
             # Proportional selected strips for other players' cursors
@@ -463,7 +467,7 @@ class ShopRenderer(arcade.Window):
                     strip_sprite.scale = self.zoom
                     strip_sprite.center_x = (card_left + card_w / 2) * self.zoom
                     strip_top = card_top + margin_top + oi * seg_h
-                    strip_sprite.center_y = self.height - (strip_top + seg_h / 2) * self.zoom
+                    strip_sprite.center_y = self.window.height - (strip_top + seg_h / 2) * self.zoom
                     self.card_bg_sprites.append(strip_sprite)
 
     def _build_item_cards(self) -> None:
@@ -490,7 +494,7 @@ class ShopRenderer(arcade.Window):
                     icon_sprite.texture = icon_texture
                     icon_sprite.scale = self.zoom
                     icon_sprite.center_x = (card_left + 17 + 15) * self.zoom
-                    icon_sprite.center_y = self.height - (card_top + 3 + 15) * self.zoom
+                    icon_sprite.center_y = self.window.height - (card_top + 3 + 15) * self.zoom
                     self.card_icon_sprites.append(icon_sprite)
 
                 # Price text: centered in box (12,36)-(52,44) relative to card
@@ -499,7 +503,7 @@ class ShopRenderer(arcade.Window):
                 box_left = card_left + 12
                 box_width = 40  # 52 - 12
                 text_x = (box_left + box_width / 2) * self.zoom - text_width / 2
-                text_y = self.height - (card_top + 36) * self.zoom
+                text_y = self.window.height - (card_top + 36) * self.zoom
                 price_sprites = self.bitmap_text.create_text_sprites(
                     price_text, text_x, text_y, color=(255, 255, 0, 255)
                 )
@@ -561,7 +565,7 @@ class ShopRenderer(arcade.Window):
             bar_sprite.width = 5 * self.zoom
             bar_sprite.height = bar_height * self.zoom
             bar_sprite.center_x = bar_x_center * self.zoom
-            bar_sprite.center_y = self.height - bar_y_center * self.zoom
+            bar_sprite.center_y = self.window.height - bar_y_center * self.zoom
             bar_sprite.color = player_color
             self.quantity_bar_sprites.append(bar_sprite)
 
@@ -624,7 +628,7 @@ class ShopRenderer(arcade.Window):
                 bar.width = bar_width * self.zoom
                 bar.height = fill * self.zoom
                 bar.center_x = bar_x_center * self.zoom
-                bar.center_y = self.height - fill_center_y * self.zoom
+                bar.center_y = self.window.height - fill_center_y * self.zoom
                 bar.color = player.color
                 self.overview_bar_sprites.append(bar)
 
@@ -656,12 +660,12 @@ class ShopRenderer(arcade.Window):
                 card_sprite.texture = card_texture
                 card_sprite.scale = self.zoom
                 card_sprite.center_x = (card_x + card_w / 2) * self.zoom
-                card_sprite.center_y = self.height - (card_top + card_h / 2) * self.zoom
+                card_sprite.center_y = self.window.height - (card_top + card_h / 2) * self.zoom
                 self.other_player_sprites.append(card_sprite)
 
             # Player name at card-relative (8, 1)
             name_x = (card_x + 8) * self.zoom
-            name_y = self.height - (card_top + 1) * self.zoom
+            name_y = self.window.height - (card_top + 1) * self.zoom
             name_sprites = self.bitmap_text.create_text_sprites(
                 player.name, name_x, name_y
             )
@@ -670,7 +674,7 @@ class ShopRenderer(arcade.Window):
 
             # Dig power at card-relative (26, 11) in red
             dp_x = (card_x + 26) * self.zoom
-            dp_y = self.height - (card_top + 11) * self.zoom
+            dp_y = self.window.height - (card_top + 11) * self.zoom
             dp_sprites = self.bitmap_text.create_text_sprites(
                 str(player.get_dig_power()), dp_x, dp_y, color=(255, 0, 0, 255)
             )
@@ -679,7 +683,7 @@ class ShopRenderer(arcade.Window):
 
             # Money at card-relative (26, 21) in yellow
             money_x = (card_x + 26) * self.zoom
-            money_y = self.height - (card_top + 21) * self.zoom
+            money_y = self.window.height - (card_top + 21) * self.zoom
             money_sprites = self.bitmap_text.create_text_sprites(
                 str(player.money), money_x, money_y, color=(255, 255, 0, 255)
             )
@@ -697,7 +701,7 @@ class ShopRenderer(arcade.Window):
                 bar.width = 5 * self.zoom
                 bar.height = bar_h * self.zoom
                 bar.center_x = bar_x
-                bar.center_y = self.height - (bar_bottom_y - bar_h / 2) * self.zoom
+                bar.center_y = self.window.height - (bar_bottom_y - bar_h / 2) * self.zoom
                 bar.color = player.color
                 self.other_player_info_sprites.append(bar)
 
@@ -712,7 +716,7 @@ class ShopRenderer(arcade.Window):
                     icon_sprite.texture = icon_texture
                     icon_sprite.scale = self.zoom
                     icon_sprite.center_x = (icon_left + 15) * self.zoom
-                    icon_sprite.center_y = self.height - (icon_top + 15) * self.zoom
+                    icon_sprite.center_y = self.window.height - (icon_top + 15) * self.zoom
                     self.other_player_info_sprites.append(icon_sprite)
 
                     # Item count at top-left of icon (1px inset) — bombs only
@@ -721,10 +725,8 @@ class ShopRenderer(arcade.Window):
                         count_sprites = self.bitmap_text.create_text_sprites(
                             str(count),
                             (icon_left + 1) * self.zoom,
-                            self.height - (icon_top + 1) * self.zoom,
+                            self.window.height - (icon_top + 1) * self.zoom,
                         )
                         for sprite in count_sprites:
                             self.other_player_info_sprites.append(sprite)
 
-    def start(self):
-        arcade.run()

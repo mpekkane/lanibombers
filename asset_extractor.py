@@ -542,6 +542,9 @@ SPRITE_DEFS = [
     # Shop item card backgrounds (64x48)
     (0, 0, 64, 48, 64, 92, 'shop_card_normal'),
     (0, 0, 64, 48, 128, 92, 'shop_card_selected'),
+
+    # Menu selection sprite (64x11)
+    (0, 0, 64, 11, 151, 144, 'menu_spade'),
 ]
 
 

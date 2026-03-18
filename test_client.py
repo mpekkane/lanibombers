@@ -18,7 +18,9 @@ from network_stack.bomber_network_client import BomberNetworkClient
 from pynput import keyboard
 from common.config_reader import ConfigReader
 from common.keymapper import map_keys, parse_arcade_key, pynput_to_arcade_key
-from renderer.game_renderer import GameRenderer
+import arcade
+from renderer.lanibombers_window import LanibombersWindow
+from renderer.game_renderer import GameView
 from game_engine.render_state import RenderState
 from game_engine.client_simulation import ClientSimulation
 from game_engine.sound_engine import SoundEngine
@@ -105,22 +107,21 @@ class BomberClient:
         self.client.set_name(name, self.color, self.appearance_id)
 
         if not self.headless:
-            renderer = GameRenderer(
-                self.get_render_state_unsafe,
-                client_player_name=name,
-                window_name="lanibombers client",
-                item_hotkeys=self.item_hotkeys,
-            )
-            renderer.bind_input_callback(self.on_press)
-
             while not self.has_state():
                 Clock.sleep(1)
 
             if self.sound_engine:
                 self.sound_engine.game()
 
-            renderer.initialize()
-            renderer.run()
+            window = LanibombersWindow()
+            view = GameView(
+                self.get_render_state_unsafe,
+                client_player_name=name,
+                item_hotkeys=self.item_hotkeys,
+            )
+            view.bind_input_callback(self.on_press)
+            window.show_view(view)
+            arcade.run()
         else:
             # Create and start the listener
             with keyboard.Listener(on_press=self.on_press_local) as listener:

@@ -14,7 +14,9 @@ from common.keymapper import map_keys
 from game_engine.render_state import RenderState
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
-from renderer.shop_renderer import ShopRenderer
+import arcade
+from renderer.lanibombers_window import LanibombersWindow
+from renderer.shop_renderer import ShopView
 
 
 def make_mock_tilemap(width: int = 64, height: int = 45) -> np.ndarray:
@@ -357,15 +359,16 @@ def main():
     for i, p in enumerate(players[1:], start=1):
         enemy_ais.append(EnemyAI(p, i, shop_items, cursor_positions, cols))
 
-    shop = ShopRenderer(
+    window = LanibombersWindow()
+    shop = ShopView(
         get_state=get_state,
         client_player_name="TestPlayer",
         shop_items=shop_items,
         cursor_positions=cursor_positions,
         next_map_tiles=tilemap,
+        rounds_left=5,
     )
-    shop.initialize()
-    shop.set_rounds_left(5)
+    window.show_view(shop)
 
     # Hook into on_update for enemy AI ticks
     original_on_update = shop.on_update
@@ -410,7 +413,7 @@ def main():
         cursor_positions[0] = (client_player.id, shop_items[cursor[0]][0])
 
     shop.on_key_press = on_key_press  # type: ignore[assignment]
-    shop.start()
+    arcade.run()
 
 
 if __name__ == "__main__":

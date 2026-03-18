@@ -1,0 +1,7 @@
+{
+  "venvPath": "/home/pokauppi/venvs",
+  "venv": "lanibombers",
+  "pythonVersion": "3.14",
+  "include": ["."],
+  "extraPaths": ["."]
+}
