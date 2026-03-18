@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import arcade
 
@@ -9,7 +9,7 @@ from network_stack.shared.factory import get_scanner
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
-_DEFAULT_SUBNET: Optional[int] = 1
+_DEFAULT_SUBNET: int | None = 1
 _DEFAULT_PORT = 9999
 _DEFAULT_TIMEOUT = 1.5
 
@@ -35,7 +35,6 @@ class ServerFinderView(arcade.View):
         self._scan_elapsed: float = 0.0
         self._scan_done: bool = False
         self._connecting: bool = False
-        self._pending_player_cfg: Optional[dict] = None
         self._connect_elapsed: float = 0.0
         self._connect_timeout: float = 5.0
         self._name_sent: bool = False
@@ -73,8 +72,6 @@ class ServerFinderView(arcade.View):
             print(f"[ServerFinderView] scan error: {exc}")
             results = []
 
-        # These writes happen from a non-main thread but are single assignments,
-        # which is atomic enough for our display purposes.
         self._servers = results
         self._scanning = False
         self._scan_done = True
@@ -92,23 +89,22 @@ class ServerFinderView(arcade.View):
             client = self.window.network_client
             # Send Name as soon as the TCP handshake completes.
             if not self._name_sent and client is not None and client.connected:
-                cfg = self._pending_player_cfg or {}
-                name = cfg.get("player_name") or "Player"
-                color_hex = cfg.get("color", "#FFFFFF")
-                color_str = color_hex.lstrip("#")
-                color = (int(color_str[0:2], 16), int(color_str[2:4], 16), int(color_str[4:6], 16))
-                appearance_id = int(cfg.get("appearance_id") or 1)
-                client.set_name(name, color, appearance_id)
+                client.set_name(
+                    self.window.name or "Player",
+                    self.window.color,
+                    self.window.appearance_id,
+                )
                 self._name_sent = True
 
             simulation = self.window.client_simulation
             if simulation is not None and simulation.has_state():
                 from renderer.game_renderer import GameView
-                player_cfg = self._pending_player_cfg or {}
                 view = GameView(
-                    simulation.get_render_state,
-                    client_player_name=player_cfg.get("player_name", ""),
+                    self.window.get_render_state,
+                    client_player_name=self.window.name,
+                    item_hotkeys=self.window.item_hotkeys,
                 )
+                view.bind_input_callback(self.window.on_press)
                 self._connecting = False
                 self.window.show_view(view)
             elif self._connect_elapsed >= self._connect_timeout:
@@ -124,7 +120,6 @@ class ServerFinderView(arcade.View):
         cx = self.window.width / 2
         cy = self.window.height
 
-        # Title
         arcade.draw_text(
             "SERVER FINDER",
             cx,
@@ -180,7 +175,6 @@ class ServerFinderView(arcade.View):
                     anchor_y="center",
                 )
 
-        # Hint bar
         arcade.draw_text(
             HINT,
             cx,
@@ -223,7 +217,6 @@ class ServerFinderView(arcade.View):
         player_cfg = ConfigReader("cfg/player.yaml").config
         self.window.connect(server[0], server[1], player_cfg)
 
-        self._pending_player_cfg = player_cfg
         self._connect_elapsed = 0.0
         self._name_sent = False
         self._connecting = True

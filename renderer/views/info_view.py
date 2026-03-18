@@ -1,59 +1,31 @@
+import os
 import arcade
 
-SLIDES = [
-    ("How to Play", "Move with arrow keys.\nPlant bombs with fire.\nSurvive!"),
-    ("Bomb Types", "Choose your bomb before the round.\nBuy upgrades in the shop."),
-    ("Shop", "Between rounds you buy weapons.\nSelect 'Ready' when done."),
-    ("Credits", "lanibombers\n\nPress ESC to return."),
-]
+_GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "graphics")
+_SLIDE_FILES = ["INFO1.png", "INFO3.png", "INFO2.png"]
 
 
 class InfoView(arcade.View):
-    """Info/help slideshow — placeholder text slides, Esc exits."""
+    """Info slideshow — INFO1/3/2 images, any key advances, exits after third."""
 
     def on_show_view(self):
-        self.window.background_color = arcade.color.DARK_BLUE
+        self.window.background_color = arcade.color.BLACK
         self._slide = 0
+        zoom = min(self.window.width // 640, self.window.height // 480)
+        rect = arcade.XYWH(self.window.width / 2, self.window.height / 2, 640 * zoom, 480 * zoom)
+        self._textures = [
+            arcade.load_texture(os.path.join(_GRAPHICS_PATH, f))
+            for f in _SLIDE_FILES
+        ]
+        self._rect = rect
 
     def on_draw(self):
         self.clear()
-        title, body = SLIDES[self._slide]
-        arcade.draw_text(
-            title,
-            self.window.width / 2,
-            self.window.height * 0.7,
-            arcade.color.YELLOW,
-            font_size=40,
-            anchor_x="center",
-            anchor_y="center",
-            bold=True,
-        )
-        arcade.draw_text(
-            body,
-            self.window.width / 2,
-            self.window.height / 2,
-            arcade.color.WHITE,
-            font_size=24,
-            anchor_x="center",
-            anchor_y="center",
-            multiline=True,
-            width=800,
-        )
-        arcade.draw_text(
-            f"Slide {self._slide + 1}/{len(SLIDES)}  |  LEFT/RIGHT: navigate  |  ESC: back",
-            self.window.width / 2,
-            60,
-            arcade.color.LIGHT_GRAY,
-            font_size=18,
-            anchor_x="center",
-            anchor_y="center",
-        )
+        arcade.draw_texture_rect(self._textures[self._slide], self._rect, pixelated=True)
 
-    def on_key_press(self, key, _modifiers):
-        if key == arcade.key.ESCAPE:
+    def on_key_press(self, _key, _modifiers):
+        if self._slide < len(_SLIDE_FILES) - 1:
+            self._slide += 1
+        else:
             from renderer.views.main_menu_view import MainMenuView
             self.window.show_view(MainMenuView())
-        elif key == arcade.key.RIGHT:
-            self._slide = min(self._slide + 1, len(SLIDES) - 1)
-        elif key == arcade.key.LEFT:
-            self._slide = max(self._slide - 1, 0)
