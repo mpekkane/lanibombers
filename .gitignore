@@ -10,3 +10,4 @@ dist/
 *Zone.Identifier*
 *.orig.worktrees/
 .worktrees/
+*.orig
