@@ -191,6 +191,7 @@ class GameEngine:
         self.event_resolver.stop()
 
     def create_player(self, name: str) -> None:
+        assert name not in self.players, "Name already in use"
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(

@@ -5,7 +5,7 @@ Test code for server-side
 import uuid
 import time
 from enum import IntEnum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from argparse import ArgumentParser
 from pathlib import Path
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
@@ -24,14 +24,16 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
 from cfg.bomb_dictionary import BombType
-from game_engine.map_loader import load_map
 from game_engine import GameEngine
-from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.sound_engine import SoundEngine
 from game_engine.render_state import SoundType
 import arcade
 from renderer.game_renderer import GameView
 from renderer.lanibombers_window import LanibombersWindow
+from game_engine.entities import Player
+from game_engine.session_parser import Session, SessionMap, SessionMapType
+from game_engine.map_loader import load_map
+from game_engine.random_map_generator import RandomMapGenerator
 
 
 class ServerState(IntEnum):
@@ -45,24 +47,39 @@ class ServerState(IntEnum):
         return int(self) > 2
 
 
+class SessionPlayer:
+
+    def __init__(
+        self,
+        name: str,
+        data: Optional[Player],
+        color: Tuple[int, int, int],
+        appearance: int,
+    ) -> None:
+        self.name = name
+        self.player = data
+        self.color = color
+        self.appearance = appearance
+        self.created = False
+
+    def set_player(self, player: Player) -> None:
+        self.player = player
+
+    def get_player(self) -> Optional[Player]:
+        return self.player
+
+
 class BomberServer:
-    def __init__(self, cfg: str, map_path: str, headless: bool) -> None:
+    def __init__(
+        self, cfg: str, session_setup: str, headless: bool, map_path: Optional[str]
+    ) -> None:
         self.state = ServerState.STARTING
+        self.headless = headless
+        self.session = Session.parse_session(session_setup)
+        if not self.session.valid:
+            self.session = Session.get_single_map_session(map_path)
 
-        if map_path:
-            map_data = load_map(map_path)
-        else:
-            random_map_generator = RandomMapGenerator()
-            map_data = random_map_generator.generate()
-
-        # game engine
-        self.engine = GameEngine(map_data.width, map_data.height)
-        self.engine.set_render_callback(self.render_callback)
-        self.engine.load_map(map_data)
-
-        # local sound engine for server-side rendering
-        self.sound_engine = SoundEngine(music_volume=0.5, fx_volume=1.0) if not headless else None
-
+        assert self.session.valid
         # networking
         self.server = BomberNetworkServer(cfg)
 
@@ -78,7 +95,10 @@ class BomberServer:
         self.ping_count = 0
         self.pong_count = 0
         self.MAX_PING_BUFFER = 1
-        self.players: List[str] = []
+        self.players: List[SessionPlayer] = []
+
+    def get_state(self) -> ServerState:
+        return self.state
 
     def render_callback(self, state: RenderState) -> None:
         self.server.broadcast(GameState.from_render(state), None)  # type: ignore
@@ -91,7 +111,7 @@ class BomberServer:
             if len(self.players) > 0:
                 print("Players in the lobby")
                 for i, player in enumerate(self.players):
-                    print(f"{i+1}: {player}")
+                    print(f"{i+1}: {player.name}")
                 inp = input("start game? y/n")
                 if inp == "y":
                     self.state = ServerState.GAME
@@ -101,6 +121,39 @@ class BomberServer:
         return self.state == ServerState.GAME
 
     def start_game(self) -> None:
+        next_map = self.session.get_next_map()
+        if next_map.type == SessionMapType.LOAD:
+            map_data = load_map(next_map.map_path)
+        else:
+            random_map_generator = RandomMapGenerator()
+            map_data = random_map_generator.generate(
+                next_map.width,
+                next_map.height,
+                next_map.feature_sizes,
+                next_map.threshold,
+                next_map.min_treasure,
+                next_map.max_treasure,
+                next_map.min_tools,
+                next_map.max_tools,
+                next_map.max_rooms,
+                next_map.room_chance,
+            )
+        # game engine
+        self.engine = GameEngine(map_data.width, map_data.height)
+        self.engine.set_render_callback(self.render_callback)
+        self.engine.load_map(map_data)
+
+        # local sound engine for server-side rendering
+        self.sound_engine = (
+            SoundEngine(music_volume=0.5, fx_volume=1.0) if not self.headless else None
+        )
+
+        # create players
+        for player in self.players:
+            if not player.created:
+                self.create_player(player)
+                player.created = True
+
         # FIXME: temp to check logic
         self.state = ServerState.GAME
         self.engine.start()
@@ -207,7 +260,9 @@ class BomberServer:
                 bomb = player.plant_bomb()
                 if bomb is not None:
                     self.engine.input_queue.submit(
-                        InputCommand(entity=player, action=cmd, timestamp=now, bomb=bomb)
+                        InputCommand(
+                            entity=player, action=cmd, timestamp=now, bomb=bomb
+                        )
                     )
             elif cmd == Action.CHOOSE:
                 player.choose()
@@ -263,13 +318,18 @@ class BomberServer:
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
         ctx.name = msg.name  # type: ignore
-        self.players.append(msg.name)  # type: ignore
-        self.engine.create_player(msg.name)  # type: ignore
-        player = self.engine.get_player_by_name(msg.name)  # type: ignore
+        player_name = msg.name
+        player_color = msg.color
+        player_appearance = msg.appearance_id
+        self.players.append(SessionPlayer(player_name, None, player_color, player_appearance))  # type: ignore
+
+    def create_player(self, session_player: SessionPlayer) -> None:
+        self.engine.create_player(session_player.name)  # type: ignore
+        player = self.engine.get_player_by_name(session_player.name)  # type: ignore
         if player is not None:
-            player.color = msg.color  # type: ignore
-            player.sprite_id = msg.appearance_id  # type: ignore
-            player.test_inventory()
+            player.color = session_player.color  # type: ignore
+            player.sprite_id = session_player.appearance  # type: ignore
+            player.initialize_player(self.session.starting_money)
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:
         sender = ctx.name or "?"
@@ -320,35 +380,43 @@ def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
     parser.add_argument("--map", "-m", type=str, default="")
+    parser.add_argument("--session", "-s", type=str, default="cfg/session.yaml")
     # FIXME: might wanna flip this in final version
-    parser.add_argument("--headless", "-hl", action="store_true", default=False)
+    parser.add_argument("--display", "-d", action="store_true", default=False)
     args = parser.parse_args()
     cfg = args.cfg
     map_path = args.map
-    headless = args.headless
-    server = BomberServer(cfg, map_path, headless)
+    headless = not args.display
+    session = args.session
+    server = BomberServer(cfg, session, headless, map_path)
     ready = server.run_lobby()
     if not ready:
         exit(0)
-    # ping_thread = threading.Thread(
-    #     target=ping, daemon=True, kwargs={"server": server}
-    # )
-    # ping_thread.start()
 
-    # state = server.get_render_state()
-    server.start_game()
-    if headless:
-        while True:
-            # FIXME: debug
-            state = server.get_render_state()
-            if state is not None:
-                print(state.players[0].x, state.players[0].y)
-            time.sleep(1)
+    state = server.get_state()
+    if state == ServerState.GAME:
+        server.start_game()
+        if headless:
+            while True:
+                _ = server.get_render_state()
+                time.sleep(1)
+        else:
+            window = LanibombersWindow()
+            view = GameView(server.get_render_state_unsafe)
+            window.show_view(view)
+            arcade.run()
+    elif state == ServerState.SHOP:
+        # TODO: shop logic
+        pass
+    elif state == ServerState.END:
+        # TODO: end logic
+        pass
+    elif state == ServerState.LOBBY:
+        raise ValueError("Invalid session state")
+    elif state == ServerState.STARTING:
+        raise ValueError("Invalid session state")
     else:
-        window = LanibombersWindow()
-        view = GameView(server.get_render_state_unsafe)
-        window.show_view(view)
-        arcade.run()
+        raise ValueError("Invalid session state")
 
 
 if __name__ == "__main__":

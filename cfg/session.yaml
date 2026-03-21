@@ -1,0 +1,18 @@
+starting_money: 500
+floating_market: false
+damage_multiplier: 1.0
+speed_multiplier: 1.0
+maps:
+- file: RANDOM
+  width: 65
+  height: 45
+  feature_sizes:
+  - 20
+  - 5
+  threshold: 0.1
+  min_treasure: 10
+  max_treasure: 40
+  min_tools: 5
+  max_tools: 20
+  max_rooms: 5
+  room_chance: 0.1

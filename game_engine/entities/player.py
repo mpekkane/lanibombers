@@ -39,6 +39,10 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.TELEPORT, 10))
         self.inventory.append((BombType.GRENADE, 15))
 
+    def initialize_player(self, money: int) -> None:
+        self.inventory = []
+        self.money = money
+
     def choose(self) -> None:
         if not self.inventory:
             return
