@@ -275,7 +275,6 @@ class ShopView(arcade.View):
 
     def on_draw(self):
         self.clear()
-        # self.default_camera.use()
         self.bg_sprite_list.draw(pixelated=True)
         self.name_sprites.draw(pixelated=True)
         self.dig_power_sprites.draw(pixelated=True)

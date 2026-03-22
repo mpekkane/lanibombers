@@ -368,9 +368,9 @@ def main():
         next_map_tiles=tilemap,
         rounds_left=5,
     )
-    window.show_view(shop)
 
     # Hook into on_update for enemy AI ticks
+    # Must patch BEFORE show_view so pyglet captures the patched methods
     original_on_update = shop.on_update
 
     def on_update(delta_time: float):
@@ -413,6 +413,8 @@ def main():
         cursor_positions[0] = (client_player.id, shop_items[cursor[0]][0])
 
     shop.on_key_press = on_key_press  # type: ignore[assignment]
+
+    window.show_view(shop)
     arcade.run()
 
 
