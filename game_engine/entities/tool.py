@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from cfg.item_dictionary import PowerupType
 from game_engine.entities.pickup import Pickup, PickupType
 from cfg.tile_dictionary import (
     MEDPACK_ID,
@@ -18,6 +19,21 @@ class ToolType(Enum):
     DRILL = 'drill'
     MEDPACK = 'medpack'
     CRATE = 'crate'
+    SUPER_DRILL = 'super_drill'
+    KEVLAR_VEST = 'kevlar_vest'
+
+    @staticmethod
+    def from_powerup(pt: PowerupType) -> ToolType:
+        if pt == PowerupType.BIG_PICK:
+            return ToolType.BIG_PICK
+        elif pt == PowerupType.SMALL_PICK:
+            return ToolType.SMALL_PICK
+        elif pt == PowerupType.DRILL:
+            return ToolType.DRILL
+        elif pt == PowerupType.SUPER_DRILL:
+            return ToolType.SUPER_DRILL
+        elif pt == PowerupType.KEVLAR_VEST:
+            return ToolType.KEVLAR_VEST
 
 
 # Dig power bonus for each tool type
@@ -25,8 +41,10 @@ TOOL_DIG_POWER = {
     ToolType.SMALL_PICK: 1,
     ToolType.BIG_PICK: 3,
     ToolType.DRILL: 5,
+    ToolType.SUPER_DRILL: 10,
     ToolType.MEDPACK: 0,
     ToolType.CRATE: 0,
+    ToolType.KEVLAR_VEST: 0
 }
 
 
