@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import threading
 from typing import List, Tuple
 
 import arcade
 
 from network_stack.shared.factory import get_scanner
+from renderer.bitmap_text import BitmapText
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
@@ -13,9 +15,13 @@ _DEFAULT_SUBNET: int | None = 1
 _DEFAULT_PORT = 9999
 _DEFAULT_TIMEOUT = 1.5
 
-SELECTED_COLOR = arcade.color.YELLOW
-NORMAL_COLOR = arcade.color.WHITE
-HINT = "UP/DOWN: navigate  |  ENTER: connect  |  R: rescan  |  ESC: back"
+SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites")
+GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "graphics")
+
+# Design coordinates (top-left origin, 640x480 base resolution)
+SERVER_LIST_X = 217
+SERVER_LIST_Y = 102
+LINE_HEIGHT = 10  # 8px char + 2px gap
 
 
 class ServerFinderView(arcade.View):
@@ -28,7 +34,6 @@ class ServerFinderView(arcade.View):
     def on_show_view(self) -> None:
         self.window.background_color = arcade.color.BLACK
 
-        # Reset all state — safe to call again on R/rescan.
         self._servers: List[Tuple[str, int]] = []
         self._selected: int = 0
         self._scanning: bool = False
@@ -38,6 +43,27 @@ class ServerFinderView(arcade.View):
         self._connect_elapsed: float = 0.0
         self._connect_timeout: float = 5.0
         self._name_sent: bool = False
+
+        # Rendering resources
+        self.zoom = min(self.window.width // 640, self.window.height // 480)
+
+        # Background image
+        bg_path = os.path.join(GRAPHICS_PATH, "SERVERFINDER.png")
+        bg_texture = arcade.load_texture(bg_path)
+        bg_sprite = arcade.Sprite()
+        bg_sprite.texture = bg_texture
+        bg_sprite.scale = self.zoom
+        bg_sprite.center_x = (640 / 2) * self.zoom
+        bg_sprite.center_y = self.window.height - (480 / 2) * self.zoom
+        self.bg_sprite_list = arcade.SpriteList()
+        self.bg_sprite_list.append(bg_sprite)
+
+        # Bitmap text
+        font_path = os.path.join(SPRITES_PATH, "font.png")
+        self.bitmap_text = BitmapText(font_path, zoom=self.zoom)
+
+        self.server_list_sprites = arcade.SpriteList()
+        self._cached_server_key = None
 
         self._start_scan()
 
@@ -51,6 +77,7 @@ class ServerFinderView(arcade.View):
         self._scanning = True
         self._scan_elapsed = 0.0
         self._scan_done = False
+        self._cached_server_key = None
 
         t = threading.Thread(target=self._run_scan, daemon=True)
         t.start()
@@ -87,7 +114,6 @@ class ServerFinderView(arcade.View):
         if self._connecting:
             self._connect_elapsed += delta_time
             client = self.window.network_client
-            # Send Name as soon as the TCP handshake completes.
             if not self._name_sent and client is not None and client.connected:
                 client.set_name(
                     self.window.name or "Player",
@@ -103,79 +129,62 @@ class ServerFinderView(arcade.View):
                 print("[ServerFinderView] timed out waiting for first game state")
                 self._connecting = False
 
+        self._rebuild_server_list()
+
+    def _rebuild_server_list(self) -> None:
+        """Rebuild server list sprites only when state changes."""
+        if self._connecting:
+            key = ("connecting",)
+        elif self._scanning:
+            key = ("scanning", round(self._scan_elapsed, 1))
+        elif self._scan_done and not self._servers:
+            key = ("no_servers",)
+        else:
+            key = ("servers", tuple(self._servers), self._selected)
+
+        if key == self._cached_server_key:
+            return
+        self._cached_server_key = key
+
+        base_x = SERVER_LIST_X * self.zoom
+        base_y = self.window.height - SERVER_LIST_Y * self.zoom
+        line_h = LINE_HEIGHT * self.zoom
+
+        if self._connecting:
+            self.server_list_sprites = self.bitmap_text.create_text_sprites(
+                "Connecting...", base_x, base_y
+            )
+        elif self._scanning:
+            self.server_list_sprites = self.bitmap_text.create_text_sprites(
+                f"Scanning... {self._scan_elapsed:.1f}s", base_x, base_y
+            )
+        elif self._scan_done and not self._servers:
+            self.server_list_sprites = self.bitmap_text.create_text_sprites(
+                "No servers found", base_x, base_y, color=(0x67, 0x67, 0x67)
+            )
+        else:
+            sprites = arcade.SpriteList()
+            for i, (ip, port) in enumerate(self._servers):
+                prefix = "> " if i == self._selected else "  "
+                color = (0x8B, 0x8B, 0x8B) if i == self._selected else (0x67, 0x67, 0x67)
+                line = self.bitmap_text.create_text_sprites(
+                    f"{prefix}{ip}:{port}",
+                    base_x, base_y - i * line_h,
+                    color=color,
+                )
+                for s in line:
+                    sprites.append(s)
+            self.server_list_sprites = sprites
+
     # ------------------------------------------------------------------
     # Draw
     # ------------------------------------------------------------------
 
     def on_draw(self) -> None:
         self.clear()
-        cx = self.window.width / 2
-        cy = self.window.height
-
-        arcade.draw_text(
-            "SERVER FINDER",
-            cx,
-            cy * 0.85,
-            arcade.color.WHITE,
-            font_size=36,
-            anchor_x="center",
-            anchor_y="center",
-            bold=True,
-        )
-
-        if self._connecting:
-            arcade.draw_text(
-                "Connecting to server...",
-                cx,
-                cy * 0.55,
-                arcade.color.LIGHT_GRAY,
-                font_size=24,
-                anchor_x="center",
-                anchor_y="center",
-            )
-        elif self._scanning:
-            arcade.draw_text(
-                f"Scanning... {self._scan_elapsed:.1f}s",
-                cx,
-                cy * 0.55,
-                arcade.color.LIGHT_GRAY,
-                font_size=24,
-                anchor_x="center",
-                anchor_y="center",
-            )
-        elif self._scan_done and not self._servers:
-            arcade.draw_text(
-                "No servers found.  Press R to rescan or ESC to go back.",
-                cx,
-                cy * 0.55,
-                arcade.color.LIGHT_GRAY,
-                font_size=22,
-                anchor_x="center",
-                anchor_y="center",
-            )
-        else:
-            for i, (ip, port) in enumerate(self._servers):
-                color = SELECTED_COLOR if i == self._selected else NORMAL_COLOR
-                prefix = "> " if i == self._selected else "  "
-                arcade.draw_text(
-                    f"{prefix}{ip}:{port}",
-                    cx,
-                    cy * 0.6 - i * 48,
-                    color,
-                    font_size=26,
-                    anchor_x="center",
-                    anchor_y="center",
-                )
-
-        arcade.draw_text(
-            HINT,
-            cx,
-            40,
-            arcade.color.LIGHT_GRAY,
-            font_size=16,
-            anchor_x="center",
-            anchor_y="center",
-        )
+        self.window.default_camera.use()
+        self.bg_sprite_list.draw(pixelated=True)
+        self.server_list_sprites.draw(pixelated=True)
 
     # ------------------------------------------------------------------
     # Input
