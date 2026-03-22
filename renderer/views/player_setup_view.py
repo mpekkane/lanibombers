@@ -1096,12 +1096,10 @@ class PlayerSetupView(arcade.View):
 
             elif current_field.field_type == FieldType.SAVE:
                 self._save_config()
-                from renderer.views.main_menu_view import MainMenuView
-                self.window.show_view(MainMenuView())
+                self.window.view_complete()
 
         elif key == arcade.key.ESCAPE:
-            from renderer.views.main_menu_view import MainMenuView
-            self.window.show_view(MainMenuView())
+            self.window.view_complete()
 
     def _key_to_char(
         self, key: int, modifiers: int, is_text: bool = False

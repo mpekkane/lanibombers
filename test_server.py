@@ -34,17 +34,7 @@ from game_engine.entities import Player
 from game_engine.session_parser import Session, SessionMap, SessionMapType
 from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
-
-
-class ServerState(IntEnum):
-    STARTING = 1
-    LOBBY = 2
-    SHOP = 3
-    GAME = 4
-    END = 5
-
-    def running(self) -> bool:
-        return int(self) > 2
+from game_engine.state_machine import ServerState
 
 
 class SessionPlayer:
@@ -381,7 +371,6 @@ def main() -> None:
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
     parser.add_argument("--map", "-m", type=str, default="")
     parser.add_argument("--session", "-s", type=str, default="cfg/session.yaml")
-    # FIXME: might wanna flip this in final version
     parser.add_argument("--display", "-d", action="store_true", default=False)
     args = parser.parse_args()
     cfg = args.cfg
@@ -393,6 +382,7 @@ def main() -> None:
     if not ready:
         exit(0)
 
+    # TODO: implement server states
     state = server.get_state()
     if state == ServerState.GAME:
         server.start_game()

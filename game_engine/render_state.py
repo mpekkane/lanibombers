@@ -38,3 +38,4 @@ class RenderState:
     bombs: List[Bomb] = field(default_factory=list)
     server_time: float = 0.0  # Server clock at interpolation time
     sounds: List[int] = field(default_factory=list)
+    running: bool = True

@@ -1,5 +1,6 @@
 import os
 import arcade
+from game_engine.state_machine import ClientStateAction
 
 _GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "graphics")
 _SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites")
@@ -57,14 +58,14 @@ class MainMenuView(arcade.View):
 
     def _confirm(self):
         label = MENU_ITEMS[self._selected]
+        action = ClientStateAction.NONE
         if label == "Find Server":
-            from renderer.views.server_finder_view import ServerFinderView
-            self.window.show_view(ServerFinderView())
+            action = ClientStateAction.CONNECT
         elif label == "Player Setup":
-            from renderer.views.player_setup_view import PlayerSetupView
-            self.window.show_view(PlayerSetupView())
+            action = ClientStateAction.SETUP
         elif label == "Info":
-            from renderer.views.info_view import InfoView
-            self.window.show_view(InfoView())
+            action = ClientStateAction.INFO
         elif label == "Exit":
-            self.window.close()
+            action = ClientStateAction.QUIT
+        self.window.view_complete(action)
+

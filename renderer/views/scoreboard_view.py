@@ -73,5 +73,4 @@ class ScoreboardView(arcade.View):
 
     def _disconnect_and_return(self):
         self.window.disconnect()
-        from renderer.views.main_menu_view import MainMenuView
-        self.window.show_view(MainMenuView())
+        self.window.view_complete()

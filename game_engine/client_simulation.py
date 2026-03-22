@@ -126,6 +126,7 @@ class ClientSimulation:
             pickups=self._server_state.pickups,
             bombs=self._server_state.bombs,
             explosions=explosions,
+            running=self._server_state.running
         )
 
     def get_render_state_unsafe(self) -> RenderState:

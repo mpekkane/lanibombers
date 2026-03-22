@@ -27,5 +27,4 @@ class InfoView(arcade.View):
         if self._slide < len(_SLIDE_FILES) - 1:
             self._slide += 1
         else:
-            from renderer.views.main_menu_view import MainMenuView
-            self.window.show_view(MainMenuView())
+            self.window.view_complete()

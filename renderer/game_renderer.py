@@ -69,6 +69,10 @@ class GameView(arcade.View):
         self.input_callback: Optional[Callable[[int, int], None]] = None
         self.input_callback_bound = False
 
+        self.closing = False
+        self.elapsed_since_closing = 0.0
+        self.CLOSE_TIMEOUT = 5.0
+
     def on_show_view(self):
         self.initialize()
 
@@ -171,6 +175,14 @@ class GameView(arcade.View):
     def on_update(self, delta_time: float):
         """Poll server and update tilemap"""
         state = self.render_state_function()
+        if not state.running:
+            if not self.closing:
+                self.closing = True
+            else:
+                self.elapsed_since_closing += delta_time
+                if self.elapsed_since_closing > self.CLOSE_TIMEOUT:
+                    self.window.view_complete()
+
         current_time = time.perf_counter()  # Single timestamp for all updates
 
         # Calculate camera position based on client player

@@ -81,6 +81,7 @@ class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
     def __init__(self, width: int = 64, height: int = 45):
+        self.running = True
         self.width = width
         self.height = height
         self.tiles: list[list[Tile]] = [
@@ -356,6 +357,14 @@ class GameEngine:
             for x in range(len(self.pickups[y])):
                 if self.pickups[y][x] is not None and damage_array[y, x] > 0:
                     self.pickups[y][x] = None
+
+        # ending condition: all dead
+        all_dead = True
+        for player in self.players:
+            if player.state != "dead":
+                all_dead = False
+                break
+        self.running = not all_dead
 
     def clear_entity_move_events(
         self, player: DynamicEntity, resolve_time: float = 0.0
@@ -1630,6 +1639,7 @@ class GameEngine:
             bombs=self.bombs,
             server_time=now,
             sounds=sounds,
+            running=self.running
         )
 
     def cleanup_render_state(self):

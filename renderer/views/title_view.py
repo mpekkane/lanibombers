@@ -38,7 +38,6 @@ class TitleView(arcade.View):
         if overlay_alpha > 0:
             arcade.draw_rect_filled(self._rect, (0, 0, 0, overlay_alpha))
 
-    def on_key_press(self, _key, _modifiers):
+    def on_key_press(self, symbol, modifiers):
         if self._ready:
-            from renderer.views.main_menu_view import MainMenuView
-            self.window.show_view(MainMenuView())
+            self.window.view_complete()

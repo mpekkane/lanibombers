@@ -98,15 +98,7 @@ class ServerFinderView(arcade.View):
 
             simulation = self.window.client_simulation
             if simulation is not None and simulation.has_state():
-                from renderer.game_renderer import GameView
-                view = GameView(
-                    self.window.get_render_state,
-                    client_player_name=self.window.name,
-                    item_hotkeys=self.window.item_hotkeys,
-                )
-                view.bind_input_callback(self.window.on_press)
-                self._connecting = False
-                self.window.show_view(view)
+                self.window.view_complete()
             elif self._connect_elapsed >= self._connect_timeout:
                 print("[ServerFinderView] timed out waiting for first game state")
                 self._connecting = False
