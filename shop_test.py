@@ -7,7 +7,7 @@ import random
 
 
 from cfg.bomb_dictionary import BombType
-from cfg.item_dictionary import PowerupType, READY_ITEM
+from cfg.item_dictionary import READY_ITEM
 
 from common.config_reader import ConfigReader
 from common.keymapper import map_keys
