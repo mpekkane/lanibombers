@@ -53,6 +53,20 @@ SPRITE_BASE_COLORS = {
     4: (0xFF, 0x9F, 0x00),  # #FF9F00 - Orange for appearance 4 sprites
 }
 
+# Extra hues for appearance 4 (yellow) — light highlight and dark shadow
+KEL_LIGHT = (0xFF, 0xFF, 0x00)  # Bright yellow highlight
+KEL_DARK = (0xFF, 0x9F, 0x00)   # Orangey shadow
+
+
+def brighten(color: Tuple[int, int, int], factor: float = 0.5) -> Tuple[int, int, int]:
+    """Brighten a color toward white."""
+    return tuple(min(255, int(c + (255 - c) * factor)) for c in color)  # type: ignore
+
+
+def darken(color: Tuple[int, int, int], factor: float = 0.35) -> Tuple[int, int, int]:
+    """Darken/mute a color toward black."""
+    return tuple(max(0, int(c * (1 - factor))) for c in color)  # type: ignore
+
 
 class PlayerColorizer:
     """Handles color swapping for player sprites and cards.
@@ -114,16 +128,12 @@ class PlayerColorizer:
 
     def _swap_color(self, image: Image.Image, old_color: Tuple[int, int, int],
                     new_color: Tuple[int, int, int]) -> Image.Image:
-        """Swap a specific color in an image with a new color.
+        """Swap a specific color in an image with a new color."""
+        return self._swap_colors(image, {old_color: new_color})
 
-        Args:
-            image: The source PIL image
-            old_color: RGB tuple of the color to replace
-            new_color: RGB tuple of the replacement color
-
-        Returns:
-            A new PIL image with the color swapped
-        """
+    def _swap_colors(self, image: Image.Image,
+                     swap_map: Dict[Tuple[int, int, int], Tuple[int, int, int]]) -> Image.Image:
+        """Swap multiple colors in an image."""
         img = image.copy()
         data = img.load()
         assert data is not None
@@ -131,10 +141,20 @@ class PlayerColorizer:
         for y in range(img.height):
             for x in range(img.width):
                 r, g, b, a = data[x, y]
-                if (r, g, b) == old_color:
-                    data[x, y] = (new_color[0], new_color[1], new_color[2], a)
+                new = swap_map.get((r, g, b))
+                if new is not None:
+                    data[x, y] = (new[0], new[1], new[2], a)
 
         return img
+
+    def _build_swap_map(self, sprite_id: int, base_color: Tuple[int, int, int],
+                        new_color: Tuple[int, int, int]) -> Dict[Tuple[int, int, int], Tuple[int, int, int]]:
+        """Build color swap map, including light/dark variants for appearance 4."""
+        swap = {base_color: new_color}
+        if sprite_id == 4:
+            swap[KEL_LIGHT] = brighten(new_color)
+            swap[KEL_DARK] = darken(new_color)
+        return swap
 
     def update_textures(self, sprite_id: int, color_index: int):
         """Regenerate player textures with the selected color.
@@ -148,14 +168,16 @@ class PlayerColorizer:
         new_color = PLAYER_COLORS[color_index]
 
         # Regenerate player sprite textures (using sprite base color)
+        sprite_swap = self._build_swap_map(sprite_id, sprite_base_color, new_color)
         for key, img in self.player_images.items():
-            if key[0] == sprite_id:  # Only recolor current appearance
-                recolored = self._swap_color(img, sprite_base_color, new_color)
+            if key[0] == sprite_id:
+                recolored = self._swap_colors(img, sprite_swap)
                 self.player_textures[key] = arcade.Texture(recolored)
 
         # Regenerate player card texture (using card base color)
         if sprite_id in self.player_card_images:
-            recolored_card = self._swap_color(self.player_card_images[sprite_id], card_base_color, new_color)
+            card_swap = self._build_swap_map(sprite_id, card_base_color, new_color)
+            recolored_card = self._swap_colors(self.player_card_images[sprite_id], card_swap)
             self.player_card_textures[sprite_id] = arcade.Texture(recolored_card)
 
     def get_player_texture(self, sprite_id: int, state: str, direction: Direction,
@@ -196,10 +218,11 @@ class PlayerColorizer:
             Dict mapping (sprite_id, state, direction, frame) -> recolored arcade.Texture
         """
         base_color = SPRITE_BASE_COLORS[sprite_id]
+        swap = self._build_swap_map(sprite_id, base_color, color)
         textures = {}
         for key, img in self.player_images.items():
             if key[0] == sprite_id:
-                recolored = self._swap_color(img, base_color, color)
+                recolored = self._swap_colors(img, swap)
                 textures[key] = arcade.Texture(recolored)
         return textures
 
@@ -215,6 +238,7 @@ class PlayerColorizer:
         """
         base_color = CARD_BASE_COLORS[sprite_id]
         if sprite_id in self.player_card_images:
-            recolored = self._swap_color(self.player_card_images[sprite_id], base_color, color)
+            swap = self._build_swap_map(sprite_id, base_color, color)
+            recolored = self._swap_colors(self.player_card_images[sprite_id], swap)
             return arcade.Texture(recolored)
         return None
