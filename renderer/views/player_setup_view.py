@@ -338,6 +338,28 @@ class PlayerSetupView(arcade.View):
         self.player_bg_sprite_list = arcade.SpriteList()
         self.player_bg_sprite_list.append(bg_sprite)
 
+        # --- Controls tab background ---
+        controls_bg_path = os.path.join(GRAPHICS_PATH, "PLAYERSETUP2.png")
+        controls_bg_texture = arcade.load_texture(controls_bg_path)
+        controls_bg_sprite = arcade.Sprite()
+        controls_bg_sprite.texture = controls_bg_texture
+        controls_bg_sprite.scale = z
+        controls_bg_sprite.center_x = (640 / 2) * z
+        controls_bg_sprite.center_y = self.window.height - (480 / 2) * z
+        self.controls_bg_sprite_list = arcade.SpriteList()
+        self.controls_bg_sprite_list.append(controls_bg_sprite)
+
+        # --- Weapons tab background ---
+        weapons_bg_path = os.path.join(GRAPHICS_PATH, "PLAYERSETUP3.png")
+        weapons_bg_texture = arcade.load_texture(weapons_bg_path)
+        weapons_bg_sprite = arcade.Sprite()
+        weapons_bg_sprite.texture = weapons_bg_texture
+        weapons_bg_sprite.scale = z
+        weapons_bg_sprite.center_x = self.window.width / 2
+        weapons_bg_sprite.center_y = self.window.height / 2
+        self.weapons_bg_sprite_list = arcade.SpriteList()
+        self.weapons_bg_sprite_list.append(weapons_bg_sprite)
+
         # --- Player tab: card at 2x normal zoom ---
         # Design coord top-left: (129, 75) in 640x480 space
         card_zoom = z * 2
@@ -433,6 +455,8 @@ class PlayerSetupView(arcade.View):
             sprite.center_x = icons_start_x + (i + 1) * icon_spacing
             sprite.center_y = self.window.height - 15 * self.zoom
             self.separator_sprite_list.append(sprite)
+
+        self.hotkey_text_sprites = arcade.SpriteList()
 
         # --- Shared ---
         # Menu highlight sprite
@@ -673,13 +697,33 @@ class PlayerSetupView(arcade.View):
         )
 
     def _update_weapons_tab(self):
-        """Update weapon icon sprites based on weapon_order."""
+        """Update weapon icon sprites and hotkey labels based on weapon_order."""
+        z = self.zoom
+        icon_size = ICON_SIZE
+        icons_start_x = 110 * z
+        icon_spacing = icon_size * z
+        self.hotkey_text_sprites = arcade.SpriteList()
+
         for i, bomb_type in enumerate(self.weapon_order):
             if i < len(self.weapon_icon_sprites):
                 if bomb_type in self.icon_textures:
                     self.weapon_icon_sprites[i].texture = self.icon_textures[bomb_type]
                 else:
                     self.weapon_icon_sprites[i].texture = self.transparent_texture
+
+            # Draw hotkey label at bottom-right of icon
+            hotkey_label = self.hotkeys.get(bomb_type, "")
+            if hotkey_label:
+                char_width = self.bitmap_text.char_width
+                text_width = char_width * len(hotkey_label)
+                icon_left_x = icons_start_x + i * icon_spacing
+                hotkey_x = icon_left_x + icon_size * z - text_width - 1 * z
+                hotkey_y = self.window.height - (icon_size - self.bitmap_text.char_height / z - 1) * z
+                hotkey_sprites = self.bitmap_text.create_text_sprites(
+                    hotkey_label, hotkey_x, hotkey_y
+                )
+                for s in hotkey_sprites:
+                    self.hotkey_text_sprites.append(s)
 
     def _update_save_prompt(self):
         """Rebuild save prompt sprites when selection changes."""
@@ -732,19 +776,16 @@ class PlayerSetupView(arcade.View):
             self._update_player_tab_text()
             return
 
+        if self._tab == TAB_CONTROLS:
+            self._update_controls_tab_text()
+            return
+
         fields = self._current_fields()
         if not fields:
             return
 
-        start_y = self.window.height - 38 * self.zoom
+        start_y = self.window.height - 98 * self.zoom
         line_height = 12 * self.zoom
-
-        # Update highlight position
-        highlight_y = (
-            start_y - self.current_field_index * line_height - line_height / 2 + 4
-        )
-        self.highlight_sprite.center_x = self.window.width / 2
-        self.highlight_sprite.center_y = highlight_y
 
         for i, menu_field in enumerate(fields):
             y = start_y - i * line_height
@@ -753,13 +794,13 @@ class PlayerSetupView(arcade.View):
             # Field name
             name_color = (255, 255, 255, 255) if is_selected else (0x8B, 0x8B, 0x8B, 255)
             name_sprites = self.bitmap_text.create_text_sprites(
-                menu_field.name + ":", 30, y, color=name_color
+                menu_field.name.replace(" Hotkey", "") + ":", 588, y, color=name_color
             )
             for s in name_sprites:
                 self.menu_text_sprites.append(s)
 
             # Field value
-            value_x = 500
+            value_x = 1058
             value_color = (255, 255, 255, 255) if is_selected else (0x8B, 0x8B, 0x8B, 255)
 
             if menu_field.field_type == FieldType.HOTKEY:
@@ -774,6 +815,32 @@ class PlayerSetupView(arcade.View):
                     )
                 for s in value_sprites:
                     self.menu_text_sprites.append(s)
+
+    def _update_controls_tab_text(self):
+        """Update text sprites for the controls tab — values only, centered."""
+        z = self.zoom
+        cw = self.bitmap_text.char_width
+        center_x = 350 * z
+        start_y_design = 74  # design-space Y for first field
+        line_height = 17  # design-space line spacing
+
+        for i, menu_field in enumerate(self.control_fields):
+            is_selected = i == self.current_field_index
+            y = self.window.height - (start_y_design + i * line_height - 4) * z
+            color = (255, 255, 255, 255) if is_selected else (0x8B, 0x8B, 0x8B, 255)
+
+            if is_selected and self.editing_hotkey:
+                value_str = "Press a key..."
+                color = (255, 200, 100, 255)
+            else:
+                value_str = menu_field.value if menu_field.value else "(none)"
+
+            x = center_x - len(value_str) * cw / 2
+            sprites = self.bitmap_text.create_text_sprites(
+                value_str, x, y, color=color
+            )
+            for s in sprites:
+                self.menu_text_sprites.append(s)
 
     def _update_player_tab_text(self):
         """Update text sprites for the player tab — values only, centered."""
@@ -840,16 +907,15 @@ class PlayerSetupView(arcade.View):
             self.menu_text_sprites.draw(pixelated=True)
 
         elif self._tab == TAB_WEAPONS:
+            self.weapons_bg_sprite_list.draw(pixelated=True)
             # Weapon icon header
             self.weapon_icon_sprite_list.draw(pixelated=True)
             self.separator_sprite_list.draw(pixelated=True)
-            # Menu highlight and text
-            self.highlight_sprite_list.draw(pixelated=True)
+            self.hotkey_text_sprites.draw(pixelated=True)
             self.menu_text_sprites.draw(pixelated=True)
 
         elif self._tab == TAB_CONTROLS:
-            # Menu highlight and text only
-            self.highlight_sprite_list.draw(pixelated=True)
+            self.controls_bg_sprite_list.draw(pixelated=True)
             self.menu_text_sprites.draw(pixelated=True)
 
     # ------------------------------------------------------------------
