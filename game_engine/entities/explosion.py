@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
-from cfg.bomb_dictionary import ExplosionType as ExplosionType
+from common.bomb_dictionary import ExplosionType as ExplosionType
 from game_engine.entities.dynamic_entity import Direction
 
 

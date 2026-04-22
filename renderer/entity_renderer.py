@@ -8,7 +8,7 @@ import os
 import arcade
 
 from game_engine.entities import Direction, EntityType
-from cfg.bomb_dictionary import BombType
+from common.bomb_dictionary import BombType
 from game_engine.render_state import RenderState
 
 from renderer.sprites import (
@@ -19,7 +19,7 @@ from renderer.sprites import (
     ExplosionSprite,
 )
 from renderer.player_colorizer import PlayerColorizer
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     TILE_DICTIONARY,
     PLAYER_DEATH_SPRITE,
     MONSTER_DEATH_SPRITE,

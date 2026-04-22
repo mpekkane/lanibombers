@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     EMPTY_TILE_ID,
     ROCK1_TILE_ID,
     ROCK2_TILE_ID,
@@ -13,9 +13,9 @@ from cfg.tile_dictionary import (
 )
 from game_engine.entities.game_object import GameObject
 
-from cfg.bomb_dictionary import ExplosionType
+from common.bomb_dictionary import ExplosionType
 
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     EMPTY_TILE_ID,
     ROCK1_TILE_ID,
     ROCK2_TILE_ID,

@@ -24,7 +24,7 @@ from renderer.player_colorizer import (
     PLAYER_COLORS,
     PLAYER_COLOR_NAMES,
 )
-from cfg.bomb_dictionary import (
+from common.bomb_dictionary import (
     BOMB_TYPES,
     BOMB_TYPE_NAMES,
     BOMB_TYPE_TO_ICON,

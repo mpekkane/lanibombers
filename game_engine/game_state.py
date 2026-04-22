@@ -1,7 +1,7 @@
 import array
 from game_engine.clock import Clock
 from typing import List, Tuple, Dict
-from cfg.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
+from common.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
 from game_engine.entities import Direction, EntityType, DynamicEntity
 import random
 from copy import deepcopy

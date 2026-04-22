@@ -17,7 +17,7 @@ from renderer.margin_renderer import MarginRenderer
 from game_engine.render_state import RenderState, ExplosionVisual
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
-from cfg.bomb_dictionary import BombType
+from common.bomb_dictionary import BombType
 
 # ============================================================================
 # Configuration

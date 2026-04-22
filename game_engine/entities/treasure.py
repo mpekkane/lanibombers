@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from game_engine.entities.pickup import Pickup, PickupType
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     GOLD_SHIELD_ID,
     GOLD_EGG_ID,
     GOLD_COINS_ID,

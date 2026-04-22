@@ -11,8 +11,8 @@ import arcade
 import numpy as np
 from PIL import Image
 
-from cfg.bomb_dictionary import BombType
-from cfg.item_dictionary import ItemType, get_item_icon
+from common.bomb_dictionary import BombType
+from common.item_dictionary import ItemType, get_item_icon
 from game_engine.render_state import RenderState
 from game_engine.entities.player import Player
 from renderer.bitmap_text import BitmapText
@@ -294,7 +294,7 @@ class ShopView(arcade.View):
 
     def _build_map_preview(self, state: RenderState) -> None:
         """Build the map preview sprite from next_map_tiles and treasure positions."""
-        from cfg.tile_dictionary import (
+        from common.tile_dictionary import (
             EMPTY_TILE_ID,
             DIRT_TILES,
             BEDROCK_TILES,
@@ -515,7 +515,7 @@ class ShopView(arcade.View):
         For bombs: bar height = item count (1px per item).
         For kevlar vest: bar height = extra HP over 100 (1px per 50 HP).
         """
-        from cfg.item_dictionary import PowerupType
+        from common.item_dictionary import PowerupType
 
         self.quantity_bar_sprites = arcade.SpriteList()
 

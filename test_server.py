@@ -23,7 +23,7 @@ from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
-from cfg.bomb_dictionary import BombType
+from common.bomb_dictionary import BombType
 from game_engine import GameEngine
 from game_engine.sound_engine import SoundEngine
 from game_engine.render_state import SoundType

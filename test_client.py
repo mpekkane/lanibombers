@@ -24,7 +24,7 @@ from renderer.game_renderer import GameView
 from game_engine.render_state import RenderState
 from game_engine.client_simulation import ClientSimulation
 from game_engine.sound_engine import SoundEngine
-from cfg.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
+from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 
 
 class BomberClient:

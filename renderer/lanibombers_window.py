@@ -9,7 +9,7 @@ from game_engine.render_state import RenderState
 from game_engine.sound_engine import SoundEngine
 from network_stack.bomber_network_client import BomberNetworkClient
 from network_stack.messages.messages import GameState, ClientControl, ClientSelect
-from cfg.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
+from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
 from common.config_reader import ConfigReader
 from game_engine.state_machine import ClientStateMachine, ClientState, ClientStateAction

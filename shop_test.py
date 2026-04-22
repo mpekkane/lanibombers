@@ -6,8 +6,8 @@ Populates mock data and opens the shop window for visual testing.
 import random
 
 
-from cfg.bomb_dictionary import BombType
-from cfg.item_dictionary import READY_ITEM
+from common.bomb_dictionary import BombType
+from common.item_dictionary import READY_ITEM
 
 from common.config_reader import ConfigReader
 from common.keymapper import map_keys

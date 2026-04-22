@@ -8,7 +8,7 @@ import os
 import arcade
 from PIL import Image
 from typing import Dict, List, Optional
-from cfg.bomb_dictionary import BombType, BOMB_TYPE_TO_ICON
+from common.bomb_dictionary import BombType, BOMB_TYPE_TO_ICON
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import PlayerColorizer
 from game_engine.entities.player import Player

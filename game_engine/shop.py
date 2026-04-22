@@ -1,9 +1,9 @@
 from typing import List, Optional, Dict, Any, Union, Tuple
-from cfg.bomb_dictionary import BombType
-from cfg.item_dictionary import PowerupType, READY_ITEM, ItemType
+from common.bomb_dictionary import BombType
+from common.item_dictionary import PowerupType, READY_ITEM, ItemType
 from game_engine.entities import Player
 from game_engine.render_state import RenderState
-from cfg.tile_dictionary import EMPTY_TILE_ID, DIRT_TILE_ID, ROCK1_TILE_ID
+from common.tile_dictionary import EMPTY_TILE_ID, DIRT_TILE_ID, ROCK1_TILE_ID
 import random
 from game_engine.entities.pickup import Pickup, PickupType
 import numpy as np

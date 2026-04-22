@@ -2,9 +2,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from cfg.item_dictionary import PowerupType
+from common.item_dictionary import PowerupType
 from game_engine.entities.pickup import Pickup, PickupType
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     MEDPACK_ID,
     CRATE_ID,
     SMALLPICK_ID,

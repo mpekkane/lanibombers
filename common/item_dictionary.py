@@ -6,7 +6,7 @@ Unified abstraction over BombType and PowerupType for the shop system.
 from enum import Enum
 from typing import Union
 
-from cfg.bomb_dictionary import BombType
+from common.bomb_dictionary import BombType
 
 
 class PowerupType(Enum):
@@ -47,7 +47,7 @@ READY_ICON = "ready"
 
 def get_item_icon(item: ItemType | str) -> str | None:
     """Get icon sprite name for any shop item (BombType, PowerupType, or READY_ITEM)."""
-    from cfg.bomb_dictionary import BOMB_TYPE_TO_ICON
+    from common.bomb_dictionary import BOMB_TYPE_TO_ICON
     if isinstance(item, BombType):
         return BOMB_TYPE_TO_ICON.get(item)
     elif isinstance(item, PowerupType):
@@ -59,7 +59,7 @@ def get_item_icon(item: ItemType | str) -> str | None:
 
 def get_item_name(item: ItemType | str) -> str | None:
     """Get display name for any shop item."""
-    from cfg.bomb_dictionary import BOMB_TYPE_NAMES
+    from common.bomb_dictionary import BOMB_TYPE_NAMES
     if isinstance(item, BombType):
         return BOMB_TYPE_NAMES.get(item)
     elif isinstance(item, PowerupType):

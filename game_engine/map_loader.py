@@ -6,7 +6,7 @@ import array
 from dataclasses import dataclass, field
 from typing import List
 
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     EMPTY_TILE_ID,
     ROCK1_TILE_ID,
     ROCK2_TILE_ID,

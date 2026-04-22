@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 from game_engine.render_state import RenderState
 
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     TILE_DICTIONARY,
     EMPTY_TILE_NAMES,
     BEDROCK_TILE_NAMES,

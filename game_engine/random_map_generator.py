@@ -12,7 +12,7 @@ from game_engine.entities.tool import Tool, ToolType
 from game_engine.entities import DynamicEntity
 from game_engine.perlin import generate_and_threshold
 from game_engine.map_loader import parse_map
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     BEDROCK_INSIDE_TILES,
     BEDROCK_NW_ID,
     BEDROCK_NE_ID,

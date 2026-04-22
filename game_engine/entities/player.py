@@ -4,7 +4,7 @@ from game_engine.clock import Clock
 from game_engine.entities import DynamicEntity
 from game_engine.entities import Bomb, BombType
 from game_engine.entities import Tool, ToolType, Treasure
-from cfg.bomb_dictionary import BOMB_TYPES
+from common.bomb_dictionary import BOMB_TYPES
 from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
 

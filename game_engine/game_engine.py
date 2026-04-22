@@ -11,7 +11,7 @@ from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
 from game_engine.engine_utils import flood_fill, get_solid_map, get_bioslime_map
-from cfg.tile_dictionary import (
+from common.tile_dictionary import (
     C4_TILE_ID,
     URETHANE_TILE_ID,
     EMPTY_TILE_ID,
@@ -20,7 +20,7 @@ from cfg.tile_dictionary import (
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
 from game_engine.entities.bomb import Bomb, BombType
-from cfg.bomb_dictionary import (
+from common.bomb_dictionary import (
     GRASSHOPPER_CONFIG,
     FLAME_BARREL_CONFIG,
     CRACKER_BARREL_CONFIG,
