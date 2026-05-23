@@ -10,11 +10,15 @@ from dataclasses import dataclass
 import pickle
 import numpy as np
 from game_engine.clock import Clock
-from typing import ClassVar, Dict, Type, Iterable, List
+from typing import ClassVar, Dict, Type, Iterable, List, Tuple, Union
 from game_engine.agent_state import Action
-from game_engine.entities import Pickup, Bomb, DynamicEntity, Player
+from game_engine.entities import Pickup, Bomb, DynamicEntity, Player, BombType
 from game_engine.render_state import RenderState
-
+from common.item_dictionary import PowerupType
+from game_engine.shop import Shop
+from game_engine.session_parser import SessionPlayer
+from common.item_dictionary import ItemType
+from uuid import UUID
 
 class Message:
     """Abstract class for message objects"""
@@ -268,23 +272,6 @@ class ClientControl(Message):
     def from_bytes(cls, payload: bytes) -> ClientControl:
         return cls(Action(int.from_bytes(payload, "big")))
 
-
-@register_message
-@dataclass(frozen=True)
-class ClientSelect(Message):
-    """Client sends specific weapon selection by BombType enum value."""
-
-    TYPE: ClassVar[int] = 10
-    bomb_type: int
-
-    def to_bytes(self) -> bytes:
-        return self.bomb_type.to_bytes(1, "big")
-
-    @classmethod
-    def from_bytes(cls, payload: bytes) -> ClientSelect:
-        return cls(bomb_type=int.from_bytes(payload, "big"))
-
-
 @register_message
 @dataclass(frozen=True)
 class GameState(Message):
@@ -315,7 +302,7 @@ class GameState(Message):
             bombs=state.bombs,
             server_time=state.server_time,
             sounds=tuple(state.sounds),
-            running=state.running
+            running=state.running,
         )
 
     def to_render(self) -> RenderState:
@@ -330,7 +317,7 @@ class GameState(Message):
             bombs=self.bombs,
             server_time=self.server_time,
             sounds=list(self.sounds),
-            running=self.running
+            running=self.running,
         )
 
     def to_bytes(self) -> bytes:
@@ -449,3 +436,105 @@ class GameState(Message):
             sounds=sounds,
             running=running,
         )
+
+
+@register_message
+@dataclass(frozen=True)
+class ClientSelect(Message):
+    """Client sends specific weapon selection by BombType enum value."""
+
+    TYPE: ClassVar[int] = 10
+    bomb_type: int
+
+    def to_bytes(self) -> bytes:
+        return self.bomb_type.to_bytes(1, "big")
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ClientSelect:
+        return cls(bomb_type=int.from_bytes(payload, "big"))
+
+
+@register_message
+@dataclass(frozen=True)
+class ShopState(Message):
+
+    TYPE: ClassVar[int] = 11
+    players: List[SessionPlayer]
+    state: List[Tuple[str, bool]]
+    dynamic_pricing: bool
+    items: List[Tuple[Union[BombType, PowerupType], int]]
+    cursor_positions: List[Tuple[UUID, ItemType | str]]
+
+    def to_bytes(self) -> bytes:
+        dynamic_pricing = int(self.dynamic_pricing).to_bytes(1, "big")
+        b_players = pickle.dumps(self.players)
+        b_state = pickle.dumps(self.state)
+        b_items = pickle.dumps(self.items)
+        b_cursor_positions = pickle.dumps(self.cursor_positions)
+
+        # auxiliary data
+        b_players_size = len(b_players).to_bytes(2, "big")
+        b_state_size = len(b_state).to_bytes(2, "big")
+        b_items_size = len(b_items).to_bytes(2, "big")
+        b_cursor_positions_size = len(b_cursor_positions).to_bytes(2, "big")
+
+        return (
+            dynamic_pricing
+            + b_players_size
+            + b_state_size
+            + b_items_size
+            + b_cursor_positions_size
+            + b_players
+            + b_state
+            + b_items
+            + b_cursor_positions
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ShopState:
+        dynamic_pricing = bool(int(payload[0]))
+        players_size = int.from_bytes(payload[1:3], "big")
+        state_size = int.from_bytes(payload[3:5], "big")
+        items_size = int.from_bytes(payload[5:7], "big")
+        cursor_positions_size = int.from_bytes(payload[7:9], "big")
+        start = 9
+        stop = start + players_size
+        players = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + state_size
+        state = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + items_size
+        items = pickle.loads(payload[start:stop])
+        start = stop
+        stop = start + cursor_positions_size
+        cursor_positions = pickle.loads(payload[start:stop])
+
+        return cls(
+            dynamic_pricing=dynamic_pricing,
+            players=players,
+            state=state,
+            items=items,
+            cursor_positions=cursor_positions,
+        )
+
+    @staticmethod
+    def from_shop(shop: Shop) -> ShopState:
+        return ShopState(
+            dynamic_pricing=shop.dynamic_pricing,
+            players=shop.players,
+            state=shop.state,
+            items=shop.items,
+            cursor_positions=shop.cursor_positions,
+        )
+
+    @staticmethod
+    def to_shop(state: ShopState) -> Shop:
+        shop = Shop(
+            dynamic_pricing=state.dynamic_pricing,
+            players=state.players,
+        )
+        shop.update_state(
+            state=state.state, items=state.items, cursor_positions=state.cursor_positions
+        )
+        return shop

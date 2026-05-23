@@ -8,6 +8,7 @@ from common.bomb_dictionary import BOMB_TYPES
 from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
 
+
 @dataclass
 class Player(DynamicEntity):
     inventory: List[Tuple[BombType, int]] = field(default_factory=lambda: [])

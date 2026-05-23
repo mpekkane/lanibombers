@@ -1,18 +1,21 @@
-from typing import List, Optional, Dict, Any, Union, Tuple
+from typing import List, Optional, Union, Tuple
 from common.bomb_dictionary import BombType
 from common.item_dictionary import PowerupType, READY_ITEM, ItemType
-from game_engine.entities import Player
-from game_engine.render_state import RenderState
+from game_engine.session_parser import (
+    SessionPlayer,
+)
+from game_engine.render_state import RenderState, ShopRenderState
 from common.tile_dictionary import EMPTY_TILE_ID, DIRT_TILE_ID, ROCK1_TILE_ID
 import random
 from game_engine.entities.pickup import Pickup, PickupType
 import numpy as np
 from game_engine.entities.tool import TOOL_DIG_POWER, ToolType
 from uuid import UUID
+from game_engine.agent_state import Action
 
 
 class Shop:
-    def __init__(self, players: List[Player], dynamic_pricing: bool) -> None:
+    def __init__(self, players: List[SessionPlayer], dynamic_pricing: bool) -> None:
         self.players = players
         self.state = []
         for p in self.players:
@@ -49,35 +52,114 @@ class Shop:
             (READY_ITEM, 0),
         ]
 
+        self.COLS = 4
+
         self.tilemap = self.make_mock_tilemap()
         self.pickups = self.make_mock_pickups()
 
         self.cursor_positions: List[Tuple[UUID, ItemType | str]] = []
+        self.cursor_visual_positions: List[Tuple[UUID, int]] = []
         for p in players:
             self.cursor_positions.append((p.id, self.items[0][0]))
+            self.cursor_visual_positions.append((p.id, 0))
 
-    def get_state(self) -> RenderState:
+    def update_state(self, items, state, cursor_positions):
+        self.items = items
+        self.state = state
+        self.cursor_positions = cursor_positions
+
+    def get_state(self) -> ShopRenderState:
         width, height = 64, 45
-        return RenderState(
+
+        gps = [p.to_player() for p in self.players]
+        renderState = RenderState(
             width=width,
             height=height,
             tilemap=self.tilemap,
             explosions=np.zeros((height, width), dtype=np.uint8),
-            players=self.players,
+            players=gps,
             pickups=self.pickups,
         )
 
-    def get_player(self, player_name: str) -> Optional[Player]:
+        return ShopRenderState(
+            renderState=renderState, cursor_positions=self.cursor_positions
+        )
+
+    def get_player(self, player_name: str) -> Optional[SessionPlayer]:
         for p in self.players:
             if p.name == player_name:
                 return p
         else:
             return None
 
+    def get_player_by_id(self, id: UUID) -> Optional[SessionPlayer]:
+        for p in self.players:
+            if p.id == id:
+                return p
+        else:
+            return None
+
+    def move_player(self, id: UUID, action: Action):
+        old = None
+        for pid, vp in self.cursor_visual_positions:
+            if pid == id:
+                old = vp
+        assert old is not None, "Player id not found in shop"
+        num_items = len(self.items)
+
+        row = old // self.COLS
+        col = old % self.COLS
+        max_row = (num_items - 1) // self.COLS
+
+        new_pos = old
+        if action == Action.UP:
+            if row > 0:
+                new_pos = (row - 1) * self.COLS + col
+        elif action == Action.DOWN:
+            new = (row + 1) * self.COLS + col
+            if row < max_row and new < num_items:
+                new_pos = new
+        elif action == Action.LEFT:
+            if col > 0:
+                new_pos = row * self.COLS + (col - 1)
+        elif action == Action.RIGHT:
+            new = row * self.COLS + (col + 1)
+            if col < self.COLS - 1 and new < num_items:
+                new_pos = new
+
+        print(f"Shop: move from {old} to {new_pos}")
+
+        new_item = self.items[new_pos]
+        self.move(id, new_item)
+        for idx, (p_id, p_pos) in enumerate(self.cursor_visual_positions):
+            if p_id == id:
+                self.cursor_visual_positions[idx] = (p_id, new_pos)
+
     def move(self, id: UUID, pos: Union[ItemType, str]):
         for idx, (p_id, p_pos) in enumerate(self.cursor_positions):
             if p_id == id:
                 self.cursor_positions[idx] = (p_id, pos)
+
+    def get_player_cursor(self, id: UUID) -> Tuple[UUID, ItemType | str]:
+        for idx, (p_id, p_pos) in enumerate(self.cursor_positions):
+            if p_id == id:
+                return self.cursor_positions[idx]
+
+        raise ValueError("Unknown player")
+
+    def get_player_cursor_index(self, id: UUID) -> Tuple[UUID, int]:
+        for idx, (p_id, p_pos) in enumerate(self.cursor_visual_positions):
+            if p_id == id:
+                return self.cursor_visual_positions[idx]
+
+        raise ValueError("Unknown player")
+
+    def purchase_current(self, id: UUID) -> None:
+        uid, idx = self.get_player_cursor_index(id)
+        player = self.get_player_by_id(id)
+        if player is None:
+            return
+        return self.purchase(idx, player.name)
 
     def purchase(self, item_index: int, player_name: str) -> None:
         """Stub: deduct money and add item to inventory."""
@@ -120,10 +202,12 @@ class Shop:
                 return
         client_player.inventory.append((item, 1))
 
-    def apply_powerup(self, player: Player, item: PowerupType) -> None:
+        print(f"Shop: purchase {item_index}")
+
+    def apply_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
         """Apply a powerup to a player."""
         if item == PowerupType.KEVLAR_VEST:
-            player.health += 50
+            player.max_health += 50
             return
         dp = TOOL_DIG_POWER.get(ToolType.from_powerup(item))
         if dp is not None:

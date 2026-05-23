@@ -17,6 +17,7 @@ from network_stack.messages.messages import (
     ClientControl,
     ClientSelect,
     GameState,
+    ShopState,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -31,39 +32,23 @@ import arcade
 from renderer.game_renderer import GameView
 from renderer.lanibombers_window import LanibombersWindow
 from game_engine.entities import Player
-from game_engine.session_parser import Session, SessionMap, SessionMapType
+from game_engine.session_parser import (
+    Session,
+    SessionMap,
+    SessionMapType,
+    SessionPlayer,
+)
 from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
-from game_engine.state_machine import ServerState
-
-
-class SessionPlayer:
-
-    def __init__(
-        self,
-        name: str,
-        data: Optional[Player],
-        color: Tuple[int, int, int],
-        appearance: int,
-    ) -> None:
-        self.name = name
-        self.player = data
-        self.color = color
-        self.appearance = appearance
-        self.created = False
-
-    def set_player(self, player: Player) -> None:
-        self.player = player
-
-    def get_player(self) -> Optional[Player]:
-        return self.player
+from game_engine.state_machine import ServerState, ServerStateMachine
+from game_engine.shop import Shop
 
 
 class BomberServer:
     def __init__(
         self, cfg: str, session_setup: str, headless: bool, map_path: Optional[str]
     ) -> None:
-        self.state = ServerState.STARTING
+        self.state_machine = ServerStateMachine()
         self.headless = headless
         self.session = Session.parse_session(session_setup)
         if not self.session.valid:
@@ -87,15 +72,39 @@ class BomberServer:
         self.MAX_PING_BUFFER = 1
         self.players: List[SessionPlayer] = []
 
+        self.shop: Optional[Shop] = None
+        self.shop_complete = False
+
+    def run_state(self) -> None:
+        state = self.state_machine.get_state()
+
+        print(f"Run state {state}")
+
+        if state == ServerState.STARTING:
+            return
+        elif state == ServerState.LOBBY:
+            self.run_lobby()
+        elif state == ServerState.SHOP:
+            self.run_shop()
+        elif state == ServerState.GAME:
+            self.start_game()
+        elif state == ServerState.END:
+            self.end_game()
+        else:
+            raise ValueError("Invalid server state")
+
+    def next_state(self) -> None:
+        self.state_machine.update()
+
     def get_state(self) -> ServerState:
-        return self.state
+        return self.state_machine.get_state()
 
     def render_callback(self, state: RenderState) -> None:
         self.server.broadcast(GameState.from_render(state), None)  # type: ignore
 
-    def run_lobby(self) -> bool:
-        self.state = ServerState.LOBBY
-        while self.state == ServerState.LOBBY:
+    def run_lobby(self) -> None:
+        ready = False
+        while not ready:
             print("")
             print("Hosting a LAN server")
             if len(self.players) > 0:
@@ -104,11 +113,17 @@ class BomberServer:
                     print(f"{i+1}: {player.name}")
                 inp = input("start game? y/n")
                 if inp == "y":
-                    self.state = ServerState.GAME
+                    ready = True
             else:
                 print("No players in the lobby")
                 Clock.sleep(1)
-        return self.state == ServerState.GAME
+
+    def run_shop(self) -> None:
+        self.shop_complete = False
+        self._update_shop()
+        self._send_shop()
+        while not self.shop_complete:
+            Clock.sleep(1)
 
     def start_game(self) -> None:
         next_map = self.session.get_next_map()
@@ -141,11 +156,11 @@ class BomberServer:
         # create players
         for player in self.players:
             if not player.created:
-                self.create_player(player)
+                self.create_game_player(player)
                 player.created = True
 
         # FIXME: temp to check logic
-        self.state = ServerState.GAME
+        # self.state = ServerState.GAME
         self.engine.start()
         if self.sound_engine:
             self.sound_engine.game()
@@ -153,13 +168,16 @@ class BomberServer:
         # update_thread = threading.Thread(target=self.update_state, daemon=True)
         # update_thread.start()
 
+    def end_game(self) -> None:
+        pass
+
     ##################
     # game engine
     ##################
 
     def get_render_state(self) -> Optional[RenderState]:
         """Returns RenderState with dimensions and sprite indices"""
-        if not self.state.running():
+        if not self.state_machine.get_state().running():
             return
         return self.engine.get_render_state()
 
@@ -195,10 +213,63 @@ class BomberServer:
             Clock.sleep(0.1)
 
     ##################
+    # shop
+    ##################
+
+    def _update_shop(self) -> None:
+        if self.shop is None:
+            self.shop = Shop(
+                players=self.players, dynamic_pricing=self.session.floating_market
+            )
+        else:
+            self.shop.players = self.players
+
+    def _send_shop(self) -> None:
+        if self.shop is None:
+            return
+
+        self.server.broadcast(ShopState.from_shop(self.shop), None)
+
+    ##################
     # networking
     ##################
 
     def on_control(self, msg: ClientControl, ctx: ClientContext):
+        if self.state_machine.get_state() == ServerState.GAME:
+            self._on_control_game(msg, ctx)
+        elif self.state_machine.get_state() == ServerState.SHOP:
+            self._on_control_shop(msg, ctx)
+        else:
+            pass
+
+    def _on_control_shop(self, msg: ClientControl, ctx: ClientContext):
+        print("got shop command")
+        if self.shop is None:
+            return
+
+        cmd: Action = msg.command  # type: ignore
+        assert isinstance(cmd, Action)
+
+        if ctx.state.name is not None:
+            player = self.get_player(ctx.state.name)
+
+        if player is None:
+            return
+
+        if (
+            cmd == Action.RIGHT
+            or cmd == Action.LEFT
+            or cmd == Action.UP
+            or cmd == Action.DOWN
+        ):
+            self.shop.move_player(player.id, cmd)
+        if cmd == Action.FIRE:
+            self.shop.purchase_current(player.id)
+
+        print(self.shop.cursor_positions)
+        self._send_shop()
+
+    def _on_control_game(self, msg: ClientControl, ctx: ClientContext):
         """Handle player control input via the input queue."""
         if not self.state.running():
             return
@@ -261,6 +332,10 @@ class BomberServer:
                     InputCommand(entity=player, action=cmd, timestamp=now)
                 )
 
+    @property
+    def state(self) -> ServerState:
+        return self.state_machine.get_state()
+
     def on_select(self, msg: ClientSelect, ctx: ClientContext):
         """Handle weapon selection by bomb type."""
         if not self.state.running():
@@ -311,15 +386,22 @@ class BomberServer:
         player_name = msg.name
         player_color = msg.color
         player_appearance = msg.appearance_id
-        self.players.append(SessionPlayer(player_name, None, player_color, player_appearance))  # type: ignore
+        self.players.append(SessionPlayer(name=player_name, color=player_color, appearance=player_appearance, money=self.session.starting_money))  # type: ignore
 
-    def create_player(self, session_player: SessionPlayer) -> None:
-        self.engine.create_player(session_player.name)  # type: ignore
+    def create_game_player(self, session_player: SessionPlayer) -> None:
+        self.engine.create_player(session_player)  # type: ignore
         player = self.engine.get_player_by_name(session_player.name)  # type: ignore
         if player is not None:
             player.color = session_player.color  # type: ignore
             player.sprite_id = session_player.appearance  # type: ignore
             player.initialize_player(self.session.starting_money)
+
+    def get_player(self, name: str) -> SessionPlayer:
+        for p in self.players:
+            if p.name == name:
+                return p
+
+        raise ValueError("Unknown player")
 
     def on_chat(self, msg: ChatText, ctx: ClientContext) -> None:
         sender = ctx.name or "?"
@@ -378,35 +460,41 @@ def main() -> None:
     headless = not args.display
     session = args.session
     server = BomberServer(cfg, session, headless, map_path)
-    ready = server.run_lobby()
-    if not ready:
-        exit(0)
+    running = True
+    while running:
+        server.next_state()
+        server.run_state()
+    # ready = server.run_lobby()
+    # if not ready:
+    #     exit(0)
 
-    # TODO: implement server states
-    state = server.get_state()
-    if state == ServerState.GAME:
-        server.start_game()
-        if headless:
-            while True:
-                _ = server.get_render_state()
-                time.sleep(1)
-        else:
-            window = LanibombersWindow()
-            view = GameView(server.get_render_state_unsafe)
-            window.show_view(view)
-            arcade.run()
-    elif state == ServerState.SHOP:
-        # TODO: shop logic
-        pass
-    elif state == ServerState.END:
-        # TODO: end logic
-        pass
-    elif state == ServerState.LOBBY:
-        raise ValueError("Invalid session state")
-    elif state == ServerState.STARTING:
-        raise ValueError("Invalid session state")
-    else:
-        raise ValueError("Invalid session state")
+    # # TODO: implement server states
+    # running = True
+    # while running:
+    #     state = server.get_state()
+    #     if state == ServerState.GAME:
+    #         server.start_game()
+    #         if headless:
+    #             while True:
+    #                 _ = server.get_render_state()
+    #                 time.sleep(1)
+    #         else:
+    #             window = LanibombersWindow()
+    #             view = GameView(server.get_render_state_unsafe)
+    #             window.show_view(view)
+    #             arcade.run()
+    #     elif state == ServerState.SHOP:
+    #         # TODO: shop logic
+    #         pass
+    #     elif state == ServerState.END:
+    #         # TODO: end logic
+    #         running = False
+    #     elif state == ServerState.LOBBY:
+    #         raise ValueError("Invalid session state")
+    #     elif state == ServerState.STARTING:
+    #         raise ValueError("Invalid session state")
+    #     else:
+    #         raise ValueError("Invalid session state")
 
 
 if __name__ == "__main__":

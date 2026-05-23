@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import List
-
+from typing import List, Tuple
+from uuid import UUID
 import numpy as np
-
+from common.item_dictionary import ItemType
 from game_engine.entities import DynamicEntity, Pickup, Bomb, Player
 
 
@@ -39,3 +39,9 @@ class RenderState:
     server_time: float = 0.0  # Server clock at interpolation time
     sounds: List[int] = field(default_factory=list)
     running: bool = True
+
+
+@dataclass
+class ShopRenderState:
+    renderState: RenderState
+    cursor_positions: List[Tuple[UUID, ItemType | str]] = field(default_factory=list)

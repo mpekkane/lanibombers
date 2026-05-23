@@ -122,8 +122,10 @@ class ServerFinderView(arcade.View):
                 )
                 self._name_sent = True
 
-            simulation = self.window.client_simulation
-            if simulation is not None and simulation.has_state():
+            # simulation = self.window.client_simulation
+            # if simulation is not None and simulation.has_state():
+            #     self.window.view_complete()
+            if self.window.got_shop:
                 self.window.view_complete()
             elif self._connect_elapsed >= self._connect_timeout:
                 print("[ServerFinderView] timed out waiting for first game state")

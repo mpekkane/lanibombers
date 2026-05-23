@@ -1,12 +1,48 @@
 from __future__ import annotations
 from enum import IntEnum
-from typing import List
+from typing import List, Optional, Tuple, Dict
 from common.config_reader import ConfigReader
+from game_engine.entities import Player
+from uuid import UUID, uuid4
+from game_engine.entities import BombType, ToolType
 
 
 class SessionMapType(IntEnum):
     RANDOM = 0
     LOAD = 1
+
+
+class SessionPlayer:
+
+    def __init__(
+        self,
+        name: str,
+        color: Tuple[int, int, int],
+        appearance: int,
+        money: int,
+    ) -> None:
+        self.id: UUID = uuid4()
+        self.name = name
+        self.color = color
+        self.appearance = appearance
+        self.created = False
+        self.money = money
+        self.inventory: List[Tuple[BombType, int]] = []
+        self.tools: Dict[ToolType, int] = {}
+        self.dig_power = 10
+        self.max_health = 100
+
+    def to_player(self) -> Player:
+        return Player(
+            id=self.id,
+            name=self.name,
+            color=self.color,
+            sprite_id=self.appearance,
+            money=self.money,
+            inventory=self.inventory,
+            tools=self.tools,
+            dig_power=self.dig_power,
+        )
 
 
 class SessionMap:

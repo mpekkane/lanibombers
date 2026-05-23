@@ -55,6 +55,9 @@ from game_engine.monster_controller import MonsterController
 from game_engine.render_state import ExplosionVisual, RenderState, SoundType
 from game_engine.entities import Tool, Treasure
 from game_engine.utils import xy_to_tile, clamp
+from game_engine.session_parser import (
+    SessionPlayer,
+)
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -191,19 +194,24 @@ class GameEngine:
         self.monster_controllers.clear()
         self.event_resolver.stop()
 
-    def create_player(self, name: str) -> None:
-        assert name not in self.players, "Name already in use"
+    def create_player(self, session_player: SessionPlayer) -> None:
+        assert session_player.name not in self.players, "Name already in use"
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(
             x=start_pose[0] + 0.5,
             y=start_pose[1] + 0.5,
             direction=Direction.RIGHT,
-            name=name,
+            name=session_player.name,
             sprite_id=num_players + 1,
             state="idle",
             speed=3,
             fight_power=20,
+            health=session_player.max_health,
+            dig_power=session_player.dig_power,
+            inventory=session_player.inventory,
+            tools=session_player.tools,
+            money=session_player.money
         )
         return self._create_player(player)
 
@@ -1508,7 +1516,6 @@ class GameEngine:
                 val = random.choice(available)
                 entity.x = val[0] + 0.5
                 entity.y = val[1] + 0.5
-
 
     def use_switch(self) -> None:
         if self.switch_state == SwitchState.OFF:

@@ -8,7 +8,12 @@ from game_engine.client_simulation import ClientSimulation
 from game_engine.render_state import RenderState
 from game_engine.sound_engine import SoundEngine
 from network_stack.bomber_network_client import BomberNetworkClient
-from network_stack.messages.messages import GameState, ClientControl, ClientSelect
+from network_stack.messages.messages import (
+    GameState,
+    ClientControl,
+    ClientSelect,
+    ShopState,
+)
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
 from common.config_reader import ConfigReader
@@ -21,6 +26,8 @@ from renderer.views.scoreboard_view import ScoreboardView
 from renderer.views.server_finder_view import ServerFinderView
 from renderer.game_renderer import GameView
 from renderer.shop_renderer import ShopView
+from game_engine.shop import Shop
+from game_engine.clock import Clock
 
 WINDOW_WIDTH = 1708
 WINDOW_HEIGHT = 960
@@ -59,6 +66,8 @@ class LanibombersWindow(arcade.Window):
         self.item_hotkeys: Dict[BombType, str] = {}
         # This is the main state machine that handles the program control flow
         self.state_machine = ClientStateMachine()
+        self.shop: Optional[Shop] = None
+        self.got_shop = False
 
     def render_view(self) -> None:
         """Render the next view on screen"""
@@ -107,8 +116,19 @@ class LanibombersWindow(arcade.Window):
             return ServerFinderView()
         # TODO: shop view
         elif state == ClientState.SHOP:
-            pass
-            # return ShopView()
+            while not self.got_shop:
+                Clock.sleep(1)
+            assert self.shop is not None
+            view = ShopView(
+                self.shop.get_state,
+                client_player_name=self.name,
+                shop_items=self.shop.items,
+                cursor_positions=self.shop.cursor_positions,
+                next_map_tiles=self.shop.tilemap,
+                rounds_left=5,
+            )  # FIXME: rounds left
+            view.bind_input_callback(self.on_press)
+            return view
         elif state == ClientState.GAME:
             view = GameView(
                 self.get_render_state,
@@ -139,6 +159,7 @@ class LanibombersWindow(arcade.Window):
             simulation.receive_state(msg.to_render())  # type: ignore[attr-defined]
 
         client.set_callback(GameState, _on_game_state)
+        client.set_callback(ShopState, self._on_shop_state)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -149,6 +170,20 @@ class LanibombersWindow(arcade.Window):
 
     def _on_disconnect(self, reason: str) -> None:
         print(f"Disconnected from server: {reason}")
+
+    def _on_shop_state(self, msg: ShopState) -> None:
+        print("got shop")
+        shop = ShopState.to_shop(msg)
+        if not self.got_shop:
+            self.shop = shop
+            self.got_shop = True
+        else:
+            self.shop.cursor_positions = shop.cursor_positions
+            self.shop.state = shop.state
+            self.shop.items = shop.items
+            self.shop.players = shop.players
+
+        print(self.shop.cursor_positions)
 
     def setup_input(self, key_cfg_path: str = "cfg/player.yaml") -> None:
         """Parse key bindings, weapon order, and hotkeys from player config."""
@@ -233,6 +268,9 @@ class LanibombersWindow(arcade.Window):
         self.network_client.send(ClientSelect(bomb_type=idx))  # type: ignore[call-arg]
 
     def on_press(self, symbol: int, modifiers: int) -> None:
+
+        print(f"press {symbol}")
+
         """Translate arcade key press to a network message and send to server."""
         if self.network_client is None:
             return
@@ -282,6 +320,7 @@ class LanibombersWindow(arcade.Window):
             action = None
         if action is not None:
             self.network_client.send(ClientControl(command=action))  # type: ignore[call-arg]
+            print(f"send {action}")
 
     # ------------------------------------------------------------------
     # Disconnect

@@ -12,14 +12,12 @@ from common.item_dictionary import READY_ITEM
 from common.config_reader import ConfigReader
 from common.keymapper import map_keys
 
-from game_engine.entities.player import Player
-
 import arcade
 from renderer.lanibombers_window import LanibombersWindow
 from renderer.shop_renderer import ShopView
 from game_engine.shop import Shop
 from uuid import UUID
-
+from game_engine.session_parser import SessionPlayer
 
 ENEMY_COLORS = [
     (0xDB, 0x00, 0x00),
@@ -48,15 +46,13 @@ STARTER_INVENTORIES = [
 ]
 
 
-def make_mock_players() -> list[Player]:
+def make_mock_players() -> list[SessionPlayer]:
     """Create mock players for testing (1 client + 15 enemies = 16 total)."""
-    p1 = Player(
+    p1 = SessionPlayer(
         name="TestPlayer",
-        sprite_id=1,
+        appearance=1,
         color=(0x00, 0x00, 0x8B),
         money=1500,
-        x=5.0,
-        y=5.0,
     )
     p1.dig_power = 25
     p1.inventory = [
@@ -72,13 +68,11 @@ def make_mock_players() -> list[Player]:
 
     players = [p1]
     for i in range(15):
-        enemy = Player(
+        enemy = SessionPlayer(
             name=f"Enemy{i + 1}",
-            sprite_id=(i % 4) + 1,
+            appearance=(i % 4) + 1,
             color=ENEMY_COLORS[i],
             money=random.randint(100, 1000),
-            x=float(5 + i * 4),
-            y=float(5 + (i % 5) * 8),
         )
         enemy.dig_power = random.randint(5, 30)
         enemy.inventory = list(STARTER_INVENTORIES[i % len(STARTER_INVENTORIES)])

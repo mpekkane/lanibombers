@@ -21,7 +21,7 @@ class ServerStateMachine:
         if self.state == ServerState.STARTING:
             self.state = ServerState.LOBBY
         elif self.state == ServerState.LOBBY:
-            self.state = ServerState.GAME  # FIXME:
+            self.state = ServerState.SHOP
         elif self.state == ServerState.SHOP:
             self.state = ServerState.GAME
         elif self.state == ServerState.GAME:
@@ -82,7 +82,7 @@ class ClientStateMachine:
         elif self.state == ClientState.SETUP:
             self.state = ClientState.MENU
         elif self.state == ClientState.CONNECT:
-            self.state = ClientState.GAME  # FIXME:
+            self.state = ClientState.SHOP  # FIXME:
         elif self.state == ClientState.GAME:
             if action == ClientStateAction.END:
                 self.state = ClientState.ENDING

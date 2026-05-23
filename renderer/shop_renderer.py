@@ -13,7 +13,7 @@ from PIL import Image
 
 from common.bomb_dictionary import BombType
 from common.item_dictionary import ItemType, get_item_icon
-from game_engine.render_state import RenderState
+from game_engine.render_state import ShopRenderState, RenderState
 from game_engine.entities.player import Player
 from renderer.bitmap_text import BitmapText
 from renderer.panel_builder import PanelBuilder
@@ -28,7 +28,7 @@ class ShopView(arcade.View):
 
     def __init__(
         self,
-        get_state: Callable[[], RenderState],
+        get_state: Callable[[], ShopRenderState],
         client_player_name: str,
         shop_items: List[Tuple[ItemType | str, int]],
         cursor_positions: List[Tuple[UUID, ItemType | str]],
@@ -84,7 +84,7 @@ class ShopView(arcade.View):
 
         # Map preview
         self.map_preview_sprite_list = arcade.SpriteList()
-        self._build_map_preview(self.get_state())
+        self._build_map_preview(self.get_state().renderState)
 
         # Rounds left text
         self.rounds_left_sprites = arcade.SpriteList()
@@ -182,7 +182,12 @@ class ShopView(arcade.View):
             self.empty_card_sprites.append(icon_panel_sprite)
 
     def on_update(self, delta_time: float):  # noqa: ARG002
-        state = self.get_state()
+        # print("on update")
+        full_state = self.get_state()
+        state = full_state.renderState
+        self.cursor_positions = full_state.cursor_positions
+
+        # print(self.cursor_positions)
 
         # Find client player
         client_player = None
@@ -274,6 +279,7 @@ class ShopView(arcade.View):
             self._build_other_player_cards(state.players)
 
     def on_draw(self):
+        #print("on draw")
         self.clear()
         self.bg_sprite_list.draw(pixelated=True)
         self.name_sprites.draw(pixelated=True)
@@ -729,3 +735,20 @@ class ShopView(arcade.View):
                         for sprite in count_sprites:
                             self.other_player_info_sprites.append(sprite)
 
+    # ██╗███╗   ██╗██████╗ ██╗   ██╗████████╗
+    # ██║████╗  ██║██╔══██╗██║   ██║╚══██╔══╝
+    # ██║██╔██╗ ██║██████╔╝██║   ██║   ██║
+    # ██║██║╚██╗██║██╔═══╝ ██║   ██║   ██║
+    # ██║██║ ╚████║██║     ╚██████╔╝   ██║
+    # ╚═╝╚═╝  ╚═══╝╚═╝      ╚═════╝    ╚═╝
+
+    def bind_input_callback(self, callback: Callable[[int, int], None]) -> None:
+        self.input_callback = callback
+        self.input_callback_bound = True
+
+    def on_key_press(self, symbol: int, modifiers: int):
+        if self.input_callback is not None:
+            self.input_callback(symbol, modifiers)
+
+    def on_key_release(self, symbol: int, modifiers: int):
+        pass
