@@ -97,6 +97,9 @@ class Session:
         self._current_map += 1
         return next_map
 
+    def session_complete(self) -> bool:
+        return self._current_map >= len(self.maps)
+
     @staticmethod
     def get_dummy() -> Session:
         session = Session(0, False, 0, 0, [])

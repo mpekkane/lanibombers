@@ -6,9 +6,9 @@ down: down
 left: left
 right: motion_right
 stop: backspace
-fire: rctrl
+fire: enter
 choose: tab
-remote: enter
+remote: rshift
 items:
 - name: Small Bomb
   hotkey: '1'

@@ -187,8 +187,6 @@ class ShopView(arcade.View):
         state = full_state.renderState
         self.cursor_positions = full_state.cursor_positions
 
-        # print(self.cursor_positions)
-
         # Find client player
         client_player = None
         for p in state.players:
@@ -278,8 +276,13 @@ class ShopView(arcade.View):
             self._cached_other_players = other_key
             self._build_other_player_cards(state.players)
 
+        if full_state.completed:
+            print("*"*80)
+            print("VIEW COMPLETE")
+            print("*" * 80)
+            self.window.view_complete()
+
     def on_draw(self):
-        #print("on draw")
         self.clear()
         self.bg_sprite_list.draw(pixelated=True)
         self.name_sprites.draw(pixelated=True)

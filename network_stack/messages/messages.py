@@ -464,9 +464,11 @@ class ShopState(Message):
     dynamic_pricing: bool
     items: List[Tuple[Union[BombType, PowerupType], int]]
     cursor_positions: List[Tuple[UUID, ItemType | str]]
+    running: bool
 
     def to_bytes(self) -> bytes:
-        dynamic_pricing = int(self.dynamic_pricing).to_bytes(1, "big")
+        b_dynamic_pricing = int(self.dynamic_pricing).to_bytes(1, "big")
+        b_running = int(self.running).to_bytes(1, "big")
         b_players = pickle.dumps(self.players)
         b_state = pickle.dumps(self.state)
         b_items = pickle.dumps(self.items)
@@ -479,7 +481,8 @@ class ShopState(Message):
         b_cursor_positions_size = len(b_cursor_positions).to_bytes(2, "big")
 
         return (
-            dynamic_pricing
+            b_dynamic_pricing
+            + b_running
             + b_players_size
             + b_state_size
             + b_items_size
@@ -493,11 +496,12 @@ class ShopState(Message):
     @classmethod
     def from_bytes(cls, payload: bytes) -> ShopState:
         dynamic_pricing = bool(int(payload[0]))
-        players_size = int.from_bytes(payload[1:3], "big")
-        state_size = int.from_bytes(payload[3:5], "big")
-        items_size = int.from_bytes(payload[5:7], "big")
-        cursor_positions_size = int.from_bytes(payload[7:9], "big")
-        start = 9
+        running = bool(int(payload[1]))
+        players_size = int.from_bytes(payload[2:4], "big")
+        state_size = int.from_bytes(payload[4:6], "big")
+        items_size = int.from_bytes(payload[6:8], "big")
+        cursor_positions_size = int.from_bytes(payload[8:10], "big")
+        start = 10
         stop = start + players_size
         players = pickle.loads(payload[start:stop])
         start = stop
@@ -516,6 +520,7 @@ class ShopState(Message):
             state=state,
             items=items,
             cursor_positions=cursor_positions,
+            running=running
         )
 
     @staticmethod
@@ -526,6 +531,7 @@ class ShopState(Message):
             state=shop.state,
             items=shop.items,
             cursor_positions=shop.cursor_positions,
+            running=shop.all_done
         )
 
     @staticmethod

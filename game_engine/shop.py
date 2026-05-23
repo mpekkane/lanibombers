@@ -63,6 +63,16 @@ class Shop:
             self.cursor_positions.append((p.id, self.items[0][0]))
             self.cursor_visual_positions.append((p.id, 0))
 
+    @property
+    def all_done(self) -> bool:
+        all_done = True
+        for player, state in self.state:
+            if not state:
+                all_done = False
+                break
+
+        return all_done
+
     def update_state(self, items, state, cursor_positions):
         self.items = items
         self.state = state
@@ -82,7 +92,9 @@ class Shop:
         )
 
         return ShopRenderState(
-            renderState=renderState, cursor_positions=self.cursor_positions
+            renderState=renderState,
+            completed=self.all_done,
+            cursor_positions=self.cursor_positions,
         )
 
     def get_player(self, player_name: str) -> Optional[SessionPlayer]:
@@ -92,6 +104,19 @@ class Shop:
         else:
             return None
 
+    def get_player_state(self, player_name: str) -> bool:
+        for i, (name, state) in enumerate(self.state):
+            if name == player_name:
+                return state
+        else:
+            return False
+
+    def get_player_state_by_id(self, id: UUID) -> bool:
+        player = self.get_player_by_id(id)
+        if player is None:
+            return False
+        return self.get_player_state(player.name)
+
     def get_player_by_id(self, id: UUID) -> Optional[SessionPlayer]:
         for p in self.players:
             if p.id == id:
@@ -100,6 +125,9 @@ class Shop:
             return None
 
     def move_player(self, id: UUID, action: Action):
+        state = self.get_player_state_by_id(id)
+        if state:
+            return
         old = None
         for pid, vp in self.cursor_visual_positions:
             if pid == id:
@@ -127,9 +155,7 @@ class Shop:
             if col < self.COLS - 1 and new < num_items:
                 new_pos = new
 
-        print(f"Shop: move from {old} to {new_pos}")
-
-        new_item = self.items[new_pos]
+        new_item = self.items[new_pos][0]
         self.move(id, new_item)
         for idx, (p_id, p_pos) in enumerate(self.cursor_visual_positions):
             if p_id == id:
@@ -201,8 +227,6 @@ class Shop:
                 client_player.inventory[i] = (bt, count + 1)
                 return
         client_player.inventory.append((item, 1))
-
-        print(f"Shop: purchase {item_index}")
 
     def apply_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
         """Apply a powerup to a player."""

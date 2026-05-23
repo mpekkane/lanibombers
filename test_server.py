@@ -94,7 +94,7 @@ class BomberServer:
             raise ValueError("Invalid server state")
 
     def next_state(self) -> None:
-        self.state_machine.update()
+        self.state_machine.update(quit=self.session.session_complete())
 
     def get_state(self) -> ServerState:
         return self.state_machine.get_state()
@@ -168,8 +168,19 @@ class BomberServer:
         # update_thread = threading.Thread(target=self.update_state, daemon=True)
         # update_thread.start()
 
+        self.run_game()
+
+    def run_game(self) -> None:
+        while self.engine.running:
+            render_state = self.engine.get_render_state()
+            self.server.broadcast(GameState.from_render(render_state), None)
+
+            Clock.sleep(1)
+        self.end_game()
+
     def end_game(self) -> None:
-        pass
+        print("Game has ended. Todo")
+        exit(0)
 
     ##################
     # game engine
@@ -227,7 +238,6 @@ class BomberServer:
     def _send_shop(self) -> None:
         if self.shop is None:
             return
-
         self.server.broadcast(ShopState.from_shop(self.shop), None)
 
     ##################
@@ -243,7 +253,6 @@ class BomberServer:
             pass
 
     def _on_control_shop(self, msg: ClientControl, ctx: ClientContext):
-        print("got shop command")
         if self.shop is None:
             return
 
@@ -267,6 +276,7 @@ class BomberServer:
             self.shop.purchase_current(player.id)
 
         print(self.shop.cursor_positions)
+        self.shop_complete = self.shop.all_done
         self._send_shop()
 
     def _on_control_game(self, msg: ClientControl, ctx: ClientContext):

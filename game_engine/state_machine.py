@@ -82,7 +82,9 @@ class ClientStateMachine:
         elif self.state == ClientState.SETUP:
             self.state = ClientState.MENU
         elif self.state == ClientState.CONNECT:
-            self.state = ClientState.SHOP  # FIXME:
+            self.state = ClientState.SHOP
+        elif self.state == ClientState.SHOP:
+            self.state = ClientState.GAME
         elif self.state == ClientState.GAME:
             if action == ClientStateAction.END:
                 self.state = ClientState.ENDING

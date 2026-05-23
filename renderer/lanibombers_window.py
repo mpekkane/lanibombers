@@ -130,6 +130,11 @@ class LanibombersWindow(arcade.Window):
             view.bind_input_callback(self.on_press)
             return view
         elif state == ClientState.GAME:
+            simulation = self.client_simulation
+            ok = False
+            while not ok:
+                ok = simulation is not None and simulation.has_state()
+                Clock.sleep(0.1)
             view = GameView(
                 self.get_render_state,
                 client_player_name=self.name,
@@ -172,7 +177,6 @@ class LanibombersWindow(arcade.Window):
         print(f"Disconnected from server: {reason}")
 
     def _on_shop_state(self, msg: ShopState) -> None:
-        print("got shop")
         shop = ShopState.to_shop(msg)
         if not self.got_shop:
             self.shop = shop
@@ -182,8 +186,6 @@ class LanibombersWindow(arcade.Window):
             self.shop.state = shop.state
             self.shop.items = shop.items
             self.shop.players = shop.players
-
-        print(self.shop.cursor_positions)
 
     def setup_input(self, key_cfg_path: str = "cfg/player.yaml") -> None:
         """Parse key bindings, weapon order, and hotkeys from player config."""
@@ -320,7 +322,6 @@ class LanibombersWindow(arcade.Window):
             action = None
         if action is not None:
             self.network_client.send(ClientControl(command=action))  # type: ignore[call-arg]
-            print(f"send {action}")
 
     # ------------------------------------------------------------------
     # Disconnect

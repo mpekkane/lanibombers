@@ -44,4 +44,5 @@ class RenderState:
 @dataclass
 class ShopRenderState:
     renderState: RenderState
+    completed: bool
     cursor_positions: List[Tuple[UUID, ItemType | str]] = field(default_factory=list)
