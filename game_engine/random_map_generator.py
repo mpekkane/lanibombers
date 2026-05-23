@@ -91,6 +91,9 @@ class RandomMapGenerator:
 
         tools: List[Tool] = []
         num_tool = random.randint(min_tools, max_tools)
+        available_tool_types = list(ToolType)
+        available_tool_types.remove(ToolType.KEVLAR_VEST)
+        available_tool_types.remove(ToolType.SUPER_DRILL)
         for _ in range(num_tool):
             ok = False
             while not ok:
@@ -98,8 +101,11 @@ class RandomMapGenerator:
                 y = random.randint(dist_from_edge, height - dist_from_edge)
                 if (x, y) not in placed_items:
                     ok = True
-            type = random.choice(list(ToolType))
-            tools.append(Tool.create(x, y, type))
+            type = random.choice(available_tool_types)
+            created_tool = Tool.create(x, y, type)
+            if created_tool == None:
+                a = 1
+            tools.append(created_tool)
             placed_items.append((x, y))
 
         empty_len = 8

@@ -53,6 +53,7 @@ class Tool(Pickup):
     """Tool item that can be picked up to increase dig power."""
     tool_type: ToolType
 
+    # TODO: kevlar vests and superdrills don't have tile ids?
     @staticmethod
     def create(x: int, y: int, tool_type: ToolType) -> Tool:
         if tool_type == ToolType.MEDPACK:
@@ -65,6 +66,8 @@ class Tool(Pickup):
             return Tool(x=x, y=y, tool_type=ToolType.DRILL, visual_id=DRILL_ID)
         elif tool_type == ToolType.CRATE:
             return Tool(x=x, y=y, tool_type=ToolType.CRATE, visual_id=CRATE_ID)
+        else:
+            raise ValueError("Undefined tool")
 
     def __post_init__(self):
         self.pickup_type = PickupType.TOOL
