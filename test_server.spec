@@ -5,7 +5,7 @@ a = Analysis(
     ['test_server.py'],
     pathex=[],
     binaries=[],
-    datas=[('cfg', 'cfg')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['server.ico'],
 )

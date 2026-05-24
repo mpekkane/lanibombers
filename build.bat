@@ -9,6 +9,7 @@ REM ---- Target dispatcher ----
 if "%1"=="" goto all
 if "%1"=="all" goto all
 if "%1"=="init" goto init
+if "%1"=="complete" goto complete
 if "%1"=="server-init" goto server_init
 if "%1"=="server" goto server
 if "%1"=="client-init" goto client_init
@@ -30,6 +31,10 @@ call "%~f0" server-init
 call "%~f0" client-init
 goto end
 
+:complete
+goto init
+goto all
+
 :server_init
 echo === Building server (init) ===
 %PI% --onefile --name "test_server" --add-data "cfg;cfg" test_server.py
@@ -42,12 +47,12 @@ goto end
 
 :client_init
 echo === Building client (init) ===
-%PI% --onefile --name "test_client" --add-data "cfg;cfg" test_client.py
+%PI% --onefile --name "gui_client" --add-data "cfg;cfg" gui_client.py
 goto end
 
 :client
 echo === Building client (spec) ===
-%PI% test_client.spec
+%PI% gui_client.spec
 goto end
 
 :clean

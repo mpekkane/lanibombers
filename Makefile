@@ -2,18 +2,19 @@
 
 all: server client
 init: server-init client-init
+complete: server-init client-init server client
 
 server-init:
-	pyinstaller --onefile --name "test_server" test_server.py
+	python -m PyInstaller --onefile --name "test_server" test_server.py
 
 server:
-	pyinstaller test_server.spec
+	python -m PyInstaller test_server.spec
 
 client-init:
-	pyinstaller --onefile --name "test_client" test_client.py
+	python -m PyInstaller --onefile --name "gui_client" gui_client.py
 
 client:
-	pyinstaller test_client.spec
+	python -m PyInstaller gui_client.spec
 
 clean:
 	rm -rf build
