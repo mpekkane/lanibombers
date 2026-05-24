@@ -44,7 +44,8 @@ class Player(DynamicEntity):
         # self.inventory = []
         # self.money = money
         # FIXME: debug
-        self.test_inventory()
+        # self.test_inventory()
+        pass
 
     def choose(self) -> None:
         if not self.inventory:

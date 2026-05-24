@@ -88,6 +88,7 @@ class LanibombersWindow(arcade.Window):
             which state we will go to. This variable tells that choice.
             Defaults to ClientStateAction.NONE.
         """
+        self.clean_view()
         if action == ClientStateAction.QUIT:
             self.close()
         else:
@@ -117,6 +118,7 @@ class LanibombersWindow(arcade.Window):
         # TODO: shop view
         elif state == ClientState.SHOP:
             while not self.got_shop:
+                print("waiting for a shop")
                 Clock.sleep(1)
             assert self.shop is not None
             view = ShopView(
@@ -130,10 +132,14 @@ class LanibombersWindow(arcade.Window):
             view.bind_input_callback(self.on_press)
             return view
         elif state == ClientState.GAME:
-            simulation = self.client_simulation
+            self.create_game_simulation()
             ok = False
             while not ok:
-                ok = simulation is not None and simulation.has_state()
+                print("witing for a state")
+                ok = (
+                    self.client_simulation is not None
+                    and self.client_simulation.has_state()
+                )
                 Clock.sleep(0.1)
             view = GameView(
                 self.get_render_state,
@@ -141,13 +147,41 @@ class LanibombersWindow(arcade.Window):
                 item_hotkeys=self.item_hotkeys,
             )
             view.bind_input_callback(self.on_press)
-            self._connecting = False
             return view
         # TODO: ending view
         elif state == ClientState.ENDING:
             return ScoreboardView(["fix", "me", "test", "ing"])
         elif state == ClientState.QUIT:
             return None
+
+    def clean_view(self) -> None:
+        """This performs needed cleanup after view is done
+        """
+        state = self.state_machine.get_state()
+        if state == ClientState.STARTING:
+            return
+        elif state == ClientState.MENU:
+            return
+        elif state == ClientState.INFO:
+            return
+        elif state == ClientState.SETUP:
+            return
+        elif state == ClientState.CONNECT:
+            return
+        elif state == ClientState.LOBBY:
+            return
+        elif state == ClientState.SHOP:
+            self.shop = None
+            self.got_shop = False
+        elif state == ClientState.GAME:
+            self.client_simulation = None
+        elif state == ClientState.ENDING:
+            return
+        elif state == ClientState.QUIT:
+            return
+
+    def _on_game_state(self, msg: GameState) -> None:
+        self.client_simulation.receive_state(msg.to_render())
 
     def connect(self, host: str, port: int, player_config: dict) -> None:
         """Create and start a BomberNetworkClient for the given server."""
@@ -158,25 +192,26 @@ class LanibombersWindow(arcade.Window):
 
         self.sound_engine.stop_music()
         self.sound_engine.game()
-        simulation = ClientSimulation(sound_engine=self.sound_engine)
 
-        def _on_game_state(msg: GameState) -> None:
-            simulation.receive_state(msg.to_render())  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
 
-        client.set_callback(GameState, _on_game_state)
+        client.set_callback(GameState, self._on_game_state)
         client.set_callback(ShopState, self._on_shop_state)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
         self.network_client = client
-        self.client_simulation = simulation
         self.player_config = player_config
         self.setup_input()
+
+    def create_game_simulation(self) -> None:
+        self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)
 
     def _on_disconnect(self, reason: str) -> None:
         print(f"Disconnected from server: {reason}")
 
     def _on_shop_state(self, msg: ShopState) -> None:
+        print("got shop")
         shop = ShopState.to_shop(msg)
         if not self.got_shop:
             self.shop = shop
@@ -270,9 +305,6 @@ class LanibombersWindow(arcade.Window):
         self.network_client.send(ClientSelect(bomb_type=idx))  # type: ignore[call-arg]
 
     def on_press(self, symbol: int, modifiers: int) -> None:
-
-        print(f"press {symbol}")
-
         """Translate arcade key press to a network message and send to server."""
         if self.network_client is None:
             return

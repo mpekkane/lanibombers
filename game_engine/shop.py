@@ -17,9 +17,7 @@ from game_engine.agent_state import Action
 class Shop:
     def __init__(self, players: List[SessionPlayer], dynamic_pricing: bool) -> None:
         self.players = players
-        self.state = []
-        for p in self.players:
-            self.state.append((p.name, False))
+
         self.dynamic_pricing = dynamic_pricing
         self.items = [
             (BombType.SMALL_BOMB, 10),
@@ -59,9 +57,8 @@ class Shop:
 
         self.cursor_positions: List[Tuple[UUID, ItemType | str]] = []
         self.cursor_visual_positions: List[Tuple[UUID, int]] = []
-        for p in players:
-            self.cursor_positions.append((p.id, self.items[0][0]))
-            self.cursor_visual_positions.append((p.id, 0))
+        self.state = []
+        self.reset_shop()
 
     @property
     def all_done(self) -> bool:
@@ -77,6 +74,17 @@ class Shop:
         self.items = items
         self.state = state
         self.cursor_positions = cursor_positions
+
+    def reset_shop(self):
+        self.state = []
+        for p in self.players:
+            self.state.append((p.name, False))
+
+        self.cursor_positions: List[Tuple[UUID, ItemType | str]] = []
+        self.cursor_visual_positions: List[Tuple[UUID, int]] = []
+        for p in self.players:
+            self.cursor_positions.append((p.id, self.items[0][0]))
+            self.cursor_visual_positions.append((p.id, 0))
 
     def get_state(self) -> ShopRenderState:
         width, height = 64, 45

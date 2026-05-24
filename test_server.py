@@ -94,7 +94,13 @@ class BomberServer:
             raise ValueError("Invalid server state")
 
     def next_state(self) -> None:
+        print(f"Session complete {self.session.session_complete()}")
         self.state_machine.update(quit=self.session.session_complete())
+        print(f"Next state: {self.state}")
+
+    @property
+    def state(self) -> ServerState:
+        return self.get_state()
 
     def get_state(self) -> ServerState:
         return self.state_machine.get_state()
@@ -158,6 +164,9 @@ class BomberServer:
             if not player.created:
                 self.create_game_player(player)
                 player.created = True
+                print(f"created player {player.name}:")
+                gp = self.engine.get_player_by_name(player.name)
+                print(f"{gp.x}, {gp.y}")
 
         # FIXME: temp to check logic
         # self.state = ServerState.GAME
@@ -176,7 +185,8 @@ class BomberServer:
             self.server.broadcast(GameState.from_render(render_state), None)
 
             Clock.sleep(1)
-        self.end_game()
+        for player in self.players:
+            player.created = False
 
     def end_game(self) -> None:
         print("Game has ended. Todo")
@@ -234,6 +244,7 @@ class BomberServer:
             )
         else:
             self.shop.players = self.players
+            self.shop.reset_shop()
 
     def _send_shop(self) -> None:
         if self.shop is None:
@@ -275,7 +286,6 @@ class BomberServer:
         if cmd == Action.FIRE:
             self.shop.purchase_current(player.id)
 
-        print(self.shop.cursor_positions)
         self.shop_complete = self.shop.all_done
         self._send_shop()
 
@@ -341,10 +351,6 @@ class BomberServer:
                 self.engine.input_queue.submit(
                     InputCommand(entity=player, action=cmd, timestamp=now)
                 )
-
-    @property
-    def state(self) -> ServerState:
-        return self.state_machine.get_state()
 
     def on_select(self, msg: ClientSelect, ctx: ClientContext):
         """Handle weapon selection by bomb type."""

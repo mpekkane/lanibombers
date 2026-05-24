@@ -84,7 +84,7 @@ class GameView(arcade.View):
         But now we can open the window to show other stuff in beginning.
         """
         # Enable performance timings early if stats are requested
-        if self.show_stats:
+        if self.show_stats and not arcade.timings_enabled():
             arcade.enable_timings()
 
         self.window.set_update_rate(1 / TARGET_FPS)
@@ -388,5 +388,3 @@ class GameView(arcade.View):
 
     def on_key_release(self, symbol: int, modifiers: int):
         pass
-
-
