@@ -1,9 +1,11 @@
 """Music and sound effects handler"""
+
 import os
 import arcade
 import random
 import pyglet.media as media
 from typing import List, Optional
+from game_engine.clock import Clock
 
 SOUND_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sounds")
 MUSIC_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "music")
@@ -15,15 +17,15 @@ class SoundEngine:
         self.fx_volume = max(min(fx_volume, 1.0), 0.0)
 
         # init sounds
-        self._treasure_sound = arcade.load_sound(f"{SOUND_PATH}/KILI.wav")
-        self._dig_sound = arcade.load_sound(f"{SOUND_PATH}/PICAXE.wav")
-        self._win_sound = arcade.load_sound(f"{SOUND_PATH}/APPLAUSE.wav")
-        self._die_sound = arcade.load_sound(f"{SOUND_PATH}/AARGH.wav")
-        self._explosion1_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS1.wav")
-        self._explosion2_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS2.wav")
-        self._explosion3_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS3.wav")
-        self._explosion4_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS4.wav")
-        self._explosion5_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS5.wav")
+        self._treasure_sound = arcade.load_sound(f"{SOUND_PATH}/KILI.mp3")
+        self._dig_sound = arcade.load_sound(f"{SOUND_PATH}/PICAXE.mp3")
+        self._win_sound = arcade.load_sound(f"{SOUND_PATH}/APPLAUSE.mp3")
+        self._die_sound = arcade.load_sound(f"{SOUND_PATH}/AARGH.mp3")
+        self._explosion1_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS1.mp3")
+        self._explosion2_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS2.mp3")
+        self._explosion3_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS3.mp3")
+        self._explosion4_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS4.mp3")
+        self._explosion5_sound = arcade.load_sound(f"{SOUND_PATH}/EXPLOS5.mp3")
         self._explosions = [
             self._explosion1_sound,
             self._explosion2_sound,
@@ -31,46 +33,69 @@ class SoundEngine:
             self._explosion4_sound,
             self._explosion5_sound,
         ]
-        self._small_explosion_sound = arcade.load_sound(f"{SOUND_PATH}/PIKKUPOM.wav")
-        self._urethane_sound = arcade.load_sound(f"{SOUND_PATH}/URETHAN.wav")
-        self._monster = arcade.load_sound(f"{SOUND_PATH}/KARJAISU.wav")
+        self._small_explosion_sound = arcade.load_sound(f"{SOUND_PATH}/PIKKUPOM.mp3")
+        self._urethane_sound = arcade.load_sound(f"{SOUND_PATH}/URETHAN.mp3")
+        self._monster = arcade.load_sound(f"{SOUND_PATH}/KARJAISU.mp3")
 
         # init music
         try:
-            self._shop_music = arcade.load_sound(f"{MUSIC_PATH}/HUIPPE.wav")
-            self._game_music = arcade.load_sound(f"{MUSIC_PATH}/OEKU.wav")
+            self._shop_music = arcade.load_sound(f"{MUSIC_PATH}/kauppa.mp3")
+            self._game_music_1 = arcade.load_sound(f"{MUSIC_PATH}/biisi1.mp3")
+            self._game_music_2 = arcade.load_sound(f"{MUSIC_PATH}/biisi2.mp3")
+            self._game_music_3 = arcade.load_sound(f"{MUSIC_PATH}/biisi3.mp3")
+            self._game_music_4 = arcade.load_sound(f"{MUSIC_PATH}/biisi4.mp3")
+            self._game_music_5 = arcade.load_sound(f"{MUSIC_PATH}/biisi5.mp3")
+            self._game_music = [
+                self._game_music_1,
+                self._game_music_2,
+                self._game_music_3,
+                self._game_music_4,
+                self._game_music_5,
+            ]
             self._music_enabled = True
         except FileNotFoundError:
-            print("No music wavs found. Music disabled")
+            print("No music mp3s found. Music disabled")
             self._music_enabled = False
         self._shop_playback: Optional[media.Player] = None
         self._game_playback: Optional[media.Player] = None
         self._playbacks: List[media.Player] = []
 
     def _play(self, sound: arcade.Sound, loop: bool, volume: float) -> media.Player:
-        playback = sound.play(loop=loop, volume=volume)
+        playback = sound.play(loop=loop, volume=volume, speed=1.0, pan=0.0)
         self._playbacks.append(playback)
         return playback
 
     def _play_fx(self, sound: arcade.Sound) -> media.Player:
         return self._play(sound, loop=False, volume=self.fx_volume)
 
-    def _play_music(self, sound: arcade.Sound) -> media.Player:
-        return self._play(sound, loop=True, volume=self.music_volume)
+    def _play_music(self, sound: arcade.Sound, loop: bool = False) -> media.Player:
+        return self._play(sound, loop=loop, volume=self.music_volume)
 
     def shop(self) -> None:
         if not self._music_enabled:
             return
         if self._game_playback is not None:
             arcade.stop_sound(self._game_playback)
-        self._shop_playback = self._play_music(self._shop_music)
+        self._shop_playback = self._play_music(self._shop_music, loop=True)
 
     def game(self) -> None:
         if not self._music_enabled:
             return
         if self._shop_playback is not None:
             arcade.stop_sound(self._shop_playback)
-        self._game_playback = self._play_music(self._game_music)
+        song = random.choice(self._game_music)
+        self._game_playback = self._play_music(song)
+
+        @self._game_playback.event
+        def on_player_eos():
+            self.game()
+
+    def scoreboard(self) -> None:
+        player = self._play_fx(self._win_sound)
+
+        @player.event
+        def on_player_eos():
+            self.shop()
 
     def stop_music(self) -> None:
         if self._game_playback is not None:
@@ -107,3 +132,33 @@ class SoundEngine:
 
     def monster(self) -> None:
         self._play_fx(self._monster)
+
+    def diagnostics(self) -> None:
+        print("Sound diagnostics")
+
+        sounds = [
+            (self._treasure_sound,"_treasure_sound"),
+            (self._dig_sound,"_dig_sound"),
+            (self._win_sound,"_win_sound"),
+            (self._die_sound,"_die_sound"),
+            (self._explosion1_sound,"_explosion1_sound"),
+            (self._explosion2_sound,"_explosion2_sound"),
+            (self._explosion3_sound,"_explosion3_sound"),
+            (self._explosion4_sound,"_explosion4_sound"),
+            (self._explosion5_sound,"_explosion5_sound"),
+            (self._small_explosion_sound,"_small_explosion_sound"),
+            (self._urethane_sound,"_urethane_sound"),
+            (self._monster,"_monster"),
+            (self._shop_music,"_shop_music"),
+            (self._game_music_1,"_game_music_1"),
+            (self._game_music_2,"_game_music_2"),
+            (self._game_music_3,"_game_music_3"),
+            (self._game_music_4,"_game_music_4"),
+            (self._game_music_5,"_game_music_5"),
+        ]
+
+        for sound, name in sounds:
+            print(f"PLay: {name}")
+            playback = self._play(sound, loop=False, volume=1.0)
+            Clock.sleep(1)
+            self.stop_all()

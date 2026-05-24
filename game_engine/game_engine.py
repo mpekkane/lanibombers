@@ -355,6 +355,7 @@ class GameEngine:
                 player_died = player.take_damage(int(dmg))
                 if player_died:
                     self.player_death_times.append((player.id, player.name, Clock.now()))
+                    self.pending_sounds.append(SoundType.DIE)
 
         for monster in self.monsters:
             if monster.state == "dead":

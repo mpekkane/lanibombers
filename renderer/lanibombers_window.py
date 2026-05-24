@@ -74,6 +74,8 @@ class LanibombersWindow(arcade.Window):
         self.session_end = False
         self.standings: Optional[List[PlayerResult]] = None
 
+        # self.sound_engine.diagnostics()
+
     def render_view(self) -> None:
         """Render the next view on screen"""
         view = self.get_view_for_state()
@@ -122,10 +124,14 @@ class LanibombersWindow(arcade.Window):
             return ServerFinderView()
         # TODO: shop view
         elif state == ClientState.SHOP:
+            self.sound_engine.stop_music()
+            self.sound_engine.shop()
             while not self.got_shop:
                 print("waiting for a shop")
                 Clock.sleep(1)
                 if self.session_end:
+                    self.sound_engine.stop_music()
+                    self.sound_engine.scoreboard()
                     assert self.standings is not None
                     return ScoreboardView(self.standings)
             assert self.shop is not None
@@ -140,6 +146,8 @@ class LanibombersWindow(arcade.Window):
             view.bind_input_callback(self.on_press)
             return view
         elif state == ClientState.GAME:
+            self.sound_engine.stop_music()
+            self.sound_engine.game()
             self.create_game_simulation()
             ok = False
             while not ok:
@@ -158,6 +166,8 @@ class LanibombersWindow(arcade.Window):
             return view
         # TODO: ending view
         elif state == ClientState.ENDING:
+            self.sound_engine.stop_music()
+            self.sound_engine.scoreboard()
             assert self.standings is not None
             return ScoreboardView(self.standings)
         elif state == ClientState.QUIT:
@@ -200,7 +210,7 @@ class LanibombersWindow(arcade.Window):
         client.acquired_server = True
 
         self.sound_engine.stop_music()
-        self.sound_engine.game()
+        # self.sound_engine.game()
 
         # type: ignore[attr-defined]
 
