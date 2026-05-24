@@ -375,30 +375,95 @@ class GameView(arcade.View):
         elapsed = Clock.now() - self.start_time
         notify_len = 10
         if elapsed < notify_len:
-            state = self.render_state_function()
-            client_player = self.find_client_player(state.players)
+            self.draw_player_position_indicator(notify_len)
 
-            ratio = elapsed / notify_len
-            remaining = notify_len - elapsed
-            alpha = int(255 * (1 - ratio))
-            col = [
-                client_player.color[0],
-                client_player.color[1],
-                client_player.color[2],
-                alpha,
-            ]
+        # round countdown
+        if self.window.countdown is not None and self.window.countdown > 0:
+            self.draw_countdown()
 
-            if elapsed < notify_len/2:
-                radius = remaining**2
-            else:
-                radius = 25 + 5 * np.sin(5 * elapsed)
-            arcade.draw_circle_outline(
-                center_x=(client_player.x) * 20,
-                center_y=(state.height - client_player.y) * 20,
-                radius=radius,
-                color=col,
-                border_width=remaining,
+    def draw_player_position_indicator(self, notify_len: int):
+        elapsed = Clock.now() - self.start_time
+        state = self.render_state_function()
+        client_player = self.find_client_player(state.players)
+
+        ratio = elapsed / notify_len
+        remaining = notify_len - elapsed
+        alpha = int(255 * (1 - ratio))
+        col = [
+            client_player.color[0],
+            client_player.color[1],
+            client_player.color[2],
+            alpha,
+        ]
+
+        if elapsed < notify_len/2:
+            radius = remaining**2
+        else:
+            radius = 25 + 5 * np.sin(5 * elapsed)
+        arcade.draw_circle_outline(
+            center_x=(client_player.x) * 20,
+            center_y=(state.height - client_player.y) * 20,
+            radius=radius,
+            color=col,
+            border_width=remaining,
+        )
+
+    def draw_countdown(self):
+        state = self.render_state_function()
+        countdown = self.window.countdown
+        text = str(int(countdown))
+
+        x = state.width / 2 * 20
+        y = state.height / 2 * 20
+
+        color = GameView.countdown_color(countdown)
+
+        # Shadow
+        arcade.draw_text(
+            text,
+            x + 5,
+            y - 5,
+            arcade.color.BLACK,
+            font_size=100,
+            anchor_x="center",
+            anchor_y="center",
+        )
+
+        # Outline
+        for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
+            arcade.draw_text(
+                text,
+                x + dx,
+                y + dy,
+                arcade.color.WHITE,
+                font_size=100,
+                anchor_x="center",
+                anchor_y="center",
             )
+
+        # Main text
+        arcade.draw_text(
+            text,
+            x,
+            y,
+            color,
+            font_size=100,
+            anchor_x="center",
+            anchor_y="center",
+        )
+
+    @staticmethod
+    def countdown_color(countdown: float) -> tuple[int, int, int]:
+        if countdown > 3:
+            return arcade.color.WHITE
+
+        t = max(0.0, min(1.0, (3.0 - countdown) / 2.0))
+
+        r = 255
+        g = int(60 * (1.0 - t))
+        b = int(40 * (1.0 - t))
+
+        return (r, g, b)
 
     # ██╗███╗   ██╗██████╗ ██╗   ██╗████████╗
     # ██║████╗  ██║██╔══██╗██║   ██║╚══██╔══╝

@@ -14,7 +14,8 @@ from network_stack.messages.messages import (
     ClientSelect,
     ShopState,
     Scoreboard,
-    SessionInfo
+    SessionInfo,
+    Countdown
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -75,6 +76,7 @@ class LanibombersWindow(arcade.Window):
         self.session_end = False
         self.standings: Optional[List[PlayerResult]] = None
         self.got_session = False
+        self.countdown = None
         # self.sound_engine.diagnostics()
 
     def render_view(self) -> None:
@@ -196,6 +198,7 @@ class LanibombersWindow(arcade.Window):
             self.got_session = False
         elif state == ClientState.GAME:
             self.client_simulation = None
+            self.countdown = None
         elif state == ClientState.ENDING:
             return
         elif state == ClientState.QUIT:
@@ -220,6 +223,7 @@ class LanibombersWindow(arcade.Window):
         client.set_callback(ShopState, self._on_shop_state)
         client.set_callback(Scoreboard, self._on_scoreboard)
         client.set_callback(SessionInfo, self._on_session_info)
+        client.set_callback(Countdown, self._on_countdown)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -252,6 +256,9 @@ class LanibombersWindow(arcade.Window):
         self.next_tilemap = msg.tilemap
         self.next_pickups = msg.pickups
         self.got_session = True
+
+    def _on_countdown(self, msg: Countdown) -> None:
+        self.countdown = msg.count
 
     def _on_scoreboard(self, msg: Scoreboard) -> None:
         results = []

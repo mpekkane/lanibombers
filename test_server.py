@@ -19,6 +19,7 @@ from network_stack.messages.messages import (
     ShopState,
     Scoreboard,
     SessionInfo,
+    Countdown
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -186,9 +187,9 @@ class BomberServer:
 
         # FIXME: temp to check logic
         # self.state = ServerState.GAME
-        self.engine.start()
-        if self.sound_engine:
-            self.sound_engine.game()
+        # self.engine.start()
+        # if self.sound_engine:
+        #     self.sound_engine.game()
         self.render_callback(self.engine.get_render_state())
         # update_thread = threading.Thread(target=self.update_state, daemon=True)
         # update_thread.start()
@@ -196,6 +197,21 @@ class BomberServer:
         self.run_game()
 
     def run_game(self) -> None:
+        # round countdown
+        countdown_length = 10
+        count = -1
+        start = Clock.now()
+        elapsed = Clock.now() - start
+        while elapsed < countdown_length:
+            elapsed = Clock.now() - start
+            new_count = countdown_length-int(elapsed)
+            if new_count != count:
+                count = new_count
+                self.server.broadcast(Countdown(count=count))
+            Clock.sleep(0.1)
+
+        self.engine.start()
+
         # wait while running
         while self.engine.running:
             render_state = self.engine.get_render_state()

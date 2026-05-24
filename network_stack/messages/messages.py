@@ -633,3 +633,27 @@ class SessionInfo(Message):
             tilemap=tilemap,
             pickups=pickups,
         )
+
+
+@register_message
+@dataclass(frozen=True)
+class Countdown(Message):
+
+    TYPE: ClassVar[int] = 14
+    count: int
+
+    def to_bytes(self) -> bytes:
+        # main data
+        b_count = self.count.to_bytes(1, "big")
+
+        return (
+            b_count
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> GameState:
+        count = int(payload[0])
+
+        return cls(
+            count=count
+        )

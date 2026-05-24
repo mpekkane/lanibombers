@@ -163,6 +163,9 @@ class GameEngine:
             n, self.map_data, self.spawn_type
         )
 
+        for pos in self.starting_poses:
+            self.tiles[pos[1]][pos[0]] = Tile.create_empty()
+
     def start(self) -> None:
         """Start the game engine and event processing."""
         self.input_queue.set_notify(self.event_resolver.notify)
