@@ -18,6 +18,7 @@ from game_engine.render_state import RenderState, ExplosionVisual
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
 from common.bomb_dictionary import BombType
+from game_engine.clock import Clock
 
 # ============================================================================
 # Configuration
@@ -68,7 +69,7 @@ class GameView(arcade.View):
         self.show_grid = show_grid
         self.input_callback: Optional[Callable[[int, int], None]] = None
         self.input_callback_bound = False
-
+        self.start_time = Clock.now()
         self.closing = False
         self.elapsed_since_closing = 0.0
         self.CLOSE_TIMEOUT = 5.0
@@ -193,6 +194,7 @@ class GameView(arcade.View):
             state.width,
             state.height,
         )
+
         # Store base camera position before shake is applied
         self._cam_position = (cam_x, cam_y)
 
@@ -252,9 +254,7 @@ class GameView(arcade.View):
     # ██║  ██║███████╗███████╗██║     ███████╗██║  ██║███████║
     # ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝
 
-    def find_client_player(
-        self, players: List[Player]
-    ) -> Optional[Player]:
+    def find_client_player(self, players: List[Player]) -> Optional[Player]:
         """Find the client's player by name.
 
         Args:
@@ -370,6 +370,35 @@ class GameView(arcade.View):
             self.ui_camera.position = (center_x, center_y)
             self.ui_camera.use()
             self.header_renderer.draw_perf_graphs()
+
+        # initial position indicator
+        elapsed = Clock.now() - self.start_time
+        notify_len = 10
+        if elapsed < notify_len:
+            state = self.render_state_function()
+            client_player = self.find_client_player(state.players)
+
+            ratio = elapsed / notify_len
+            remaining = notify_len - elapsed
+            alpha = int(255 * (1 - ratio))
+            col = [
+                client_player.color[0],
+                client_player.color[1],
+                client_player.color[2],
+                alpha,
+            ]
+
+            if elapsed < notify_len/2:
+                radius = remaining**2
+            else:
+                radius = 25 + 5 * np.sin(5 * elapsed)
+            arcade.draw_circle_outline(
+                center_x=(client_player.x) * 20,
+                center_y=(state.height - client_player.y) * 20,
+                radius=radius,
+                color=col,
+                border_width=remaining,
+            )
 
     # ██╗███╗   ██╗██████╗ ██╗   ██╗████████╗
     # ██║████╗  ██║██╔══██╗██║   ██║╚══██╔══╝
