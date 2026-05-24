@@ -3,11 +3,10 @@ Test code for server-side
 """
 
 import uuid
-import time
-from enum import IntEnum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from argparse import ArgumentParser
 from pathlib import Path
+import numpy as np
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
 from network_stack.messages.messages import (
     Name,
@@ -18,6 +17,7 @@ from network_stack.messages.messages import (
     ClientSelect,
     GameState,
     ShopState,
+    Scoreboard
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -28,13 +28,8 @@ from common.bomb_dictionary import BombType
 from game_engine import GameEngine
 from game_engine.sound_engine import SoundEngine
 from game_engine.render_state import SoundType
-import arcade
-from renderer.game_renderer import GameView
-from renderer.lanibombers_window import LanibombersWindow
-from game_engine.entities import Player
 from game_engine.session_parser import (
     Session,
-    SessionMap,
     SessionMapType,
     SessionPlayer,
 )
@@ -180,16 +175,40 @@ class BomberServer:
         self.run_game()
 
     def run_game(self) -> None:
+        # wait while running
         while self.engine.running:
             render_state = self.engine.get_render_state()
             self.server.broadcast(GameState.from_render(render_state), None)
 
             Clock.sleep(1)
+
+        # round has ended, clean up player object, award score
+        score_data = np.array(self.engine.player_death_times)
+
+        death_times = score_data[:, 2].astype(dtype=np.float32)
+        sort_indices = np.argsort(death_times)
+        score_data = score_data[sort_indices]
+
         for player in self.players:
+            ranking = np.where(score_data == player.name)[0][0]
+            pts = len(self.players) - ranking
+
             player.created = False
+            gp = self.engine.get_player_by_name(player.name)
+            player.inventory = gp.inventory
+            player.money = gp.money
+            player.tools = gp.tools
+            player.dig_power = gp.dig_power
+            player.score += pts
 
     def end_game(self) -> None:
-        print("Game has ended. Todo")
+        print("Game has ended.")
+        start = Clock.now()
+        dt = Clock.now() - start
+        while dt < 30.0:
+            self.server.broadcast(Scoreboard(players=self.players), None)
+            Clock.sleep(1)
+            dt = Clock.now() - start
         exit(0)
 
     ##################

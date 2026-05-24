@@ -50,12 +50,14 @@ class DynamicEntity(GameObject):
     money: int = 0
     fight_power: int = 0
 
-    def take_damage(self, amount: int):
+    def take_damage(self, amount: int) -> bool:
         """Reduce health by amount. Sets state to 'dead' if health reaches 0."""
         self.health -= amount
         if self.health <= 0:
             self.health = 0
             self.state = "dead"
+            return True
+        return False
 
     def add_money(self, amount: int):
         """Add money to the entity."""

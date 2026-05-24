@@ -44,7 +44,6 @@ RANK_BASE_COLORS = [
 ]
 
 
-
 @dataclass
 class PlayerResult:
     name: str

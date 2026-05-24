@@ -6,6 +6,7 @@ from itertools import chain
 import random
 from enum import Enum
 from copy import deepcopy
+from uuid import UUID
 from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
@@ -92,6 +93,7 @@ class GameEngine:
         ]
         self.explosions = np.zeros((self.height, self.width), dtype=np.uint8)
         self.players: List[Player] = []
+        self.player_death_times: List[Tuple[UUID, str, float]] = []
         self.player_map: Dict[str, int] = {}
         self.monsters: List[DynamicEntity] = []
         self.pickups: List[List[Optional[Pickup]]] = [
@@ -350,7 +352,9 @@ class GameEngine:
             px, py = xy_to_tile(player.x, player.y)
             dmg = damage_array[py, px]
             if dmg > 0:
-                player.take_damage(int(dmg))
+                player_died = player.take_damage(int(dmg))
+                if player_died:
+                    self.player_death_times.append((player.id, player.name, Clock.now()))
 
         for monster in self.monsters:
             if monster.state == "dead":

@@ -31,6 +31,7 @@ class SessionPlayer:
         self.tools: Dict[ToolType, int] = {}
         self.dig_power = 10
         self.max_health = 100
+        self.score = 0
 
     def to_player(self) -> Player:
         return Player(

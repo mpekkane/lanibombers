@@ -544,3 +544,33 @@ class ShopState(Message):
             state=state.state, items=state.items, cursor_positions=state.cursor_positions
         )
         return shop
+
+
+@register_message
+@dataclass(frozen=True)
+class Scoreboard(Message):
+
+    TYPE: ClassVar[int] = 12
+    players: List[SessionPlayer]
+
+    def to_bytes(self) -> bytes:
+        b_players = pickle.dumps(self.players)
+
+        # auxiliary data
+        b_players_size = len(b_players).to_bytes(2, "big")
+
+        return (
+            b_players_size
+            + b_players
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ShopState:
+        players_size = int.from_bytes(payload[0:2], "big")
+        start = 2
+        stop = start + players_size
+        players = pickle.loads(payload[start:stop])
+
+        return cls(
+            players=players,
+        )

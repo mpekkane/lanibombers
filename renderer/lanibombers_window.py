@@ -13,6 +13,7 @@ from network_stack.messages.messages import (
     ClientControl,
     ClientSelect,
     ShopState,
+    Scoreboard
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -22,12 +23,14 @@ from renderer.views.title_view import TitleView
 from renderer.views.main_menu_view import MainMenuView
 from renderer.views.info_view import InfoView
 from renderer.views.player_setup_view import PlayerSetupView
-from renderer.views.scoreboard_view import ScoreboardView
+from renderer.views.scoreboard_view import ScoreboardView, PlayerResult
 from renderer.views.server_finder_view import ServerFinderView
 from renderer.game_renderer import GameView
 from renderer.shop_renderer import ShopView
 from game_engine.shop import Shop
 from game_engine.clock import Clock
+from renderer.player_colorizer import PLAYER_COLORS
+
 
 WINDOW_WIDTH = 1708
 WINDOW_HEIGHT = 960
@@ -68,6 +71,8 @@ class LanibombersWindow(arcade.Window):
         self.state_machine = ClientStateMachine()
         self.shop: Optional[Shop] = None
         self.got_shop = False
+        self.session_end = False
+        self.standings: Optional[List[PlayerResult]] = None
 
     def render_view(self) -> None:
         """Render the next view on screen"""
@@ -120,6 +125,9 @@ class LanibombersWindow(arcade.Window):
             while not self.got_shop:
                 print("waiting for a shop")
                 Clock.sleep(1)
+                if self.session_end:
+                    assert self.standings is not None
+                    return ScoreboardView(self.standings)
             assert self.shop is not None
             view = ShopView(
                 self.shop.get_state,
@@ -150,7 +158,8 @@ class LanibombersWindow(arcade.Window):
             return view
         # TODO: ending view
         elif state == ClientState.ENDING:
-            return ScoreboardView(["fix", "me", "test", "ing"])
+            assert self.standings is not None
+            return ScoreboardView(self.standings)
         elif state == ClientState.QUIT:
             return None
 
@@ -197,6 +206,7 @@ class LanibombersWindow(arcade.Window):
 
         client.set_callback(GameState, self._on_game_state)
         client.set_callback(ShopState, self._on_shop_state)
+        client.set_callback(Scoreboard, self._on_scoreboard)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -221,6 +231,26 @@ class LanibombersWindow(arcade.Window):
             self.shop.state = shop.state
             self.shop.items = shop.items
             self.shop.players = shop.players
+
+    def _on_scoreboard(self, msg: Scoreboard) -> None:
+        results = []
+
+        for player in msg.players:
+            color_idx = None
+            for i, col in enumerate(PLAYER_COLORS):
+                if col == player.color:
+                    color_idx = i
+            assert color_idx is not None
+            result = PlayerResult(
+                name=player.name,
+                appearance=player.appearance,
+                color=color_idx,
+                score=player.score,
+                money=player.money,
+            )
+            results.append(result)
+        self.standings = results
+        self.session_end = True
 
     def setup_input(self, key_cfg_path: str = "cfg/player.yaml") -> None:
         """Parse key bindings, weapon order, and hotkeys from player config."""
