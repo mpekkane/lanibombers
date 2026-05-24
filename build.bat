@@ -37,7 +37,7 @@ goto all
 
 :server_init
 echo === Building server (init) ===
-%PI% --onefile --name "test_server" --add-data "cfg;cfg" test_server.py
+%PI% --onefile --name "test_server" --add-data "cfg;cfg" --add-data "assets;assets" test_server.py
 goto end
 
 :server
@@ -47,7 +47,7 @@ goto end
 
 :client_init
 echo === Building client (init) ===
-%PI% --onefile --name "gui_client" --add-data "cfg;cfg" gui_client.py
+%PI% --onefile --name "gui_client" --add-data "cfg;cfg" --add-data "assets;assets" gui_client.py
 goto end
 
 :client

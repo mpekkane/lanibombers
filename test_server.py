@@ -520,7 +520,7 @@ def ping(server: BomberServer) -> None:
 
 
 def main() -> None:
-    assert Path("assets").exists(), "Assets missing"
+    #assert Path("assets").exists(), "Assets missing"
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
     parser.add_argument("--map", "-m", type=str, default="")
