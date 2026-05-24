@@ -57,7 +57,7 @@ def _refine(initial: List[Tuple[int, int]], map_data: MapData) -> List[Tuple[int
             for new_h in range(min_h, max_h + 1):
                 for new_w in range(min_w, max_w + 1):
                     pos = (new_h, new_w)
-                    tile = map_data.tiles[new_h][new_w]
+                    tile = map_data.tiles[new_w][new_h]
 
                     if tile.tile_type.spawnable() and pos not in fixed:
                         fixed.append(pos)
