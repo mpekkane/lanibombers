@@ -1,10 +1,11 @@
 from __future__ import annotations
 from enum import IntEnum
-from typing import List, Optional, Tuple, Dict
+from typing import List, Tuple, Dict
 from common.config_reader import ConfigReader
 from game_engine.entities import Player
 from uuid import UUID, uuid4
 from game_engine.entities import BombType, ToolType
+from game_engine.spawn_points import SpawnType
 
 
 class SessionMapType(IntEnum):
@@ -83,6 +84,7 @@ class Session:
         floating_market: bool,
         damage_multiplier: float,
         speed_multiplier: float,
+        spawn_type: SpawnType,
         maps: List[SessionMap],
     ) -> None:
         self.valid = True
@@ -90,6 +92,7 @@ class Session:
         self.floating_market = floating_market
         self.damage_multiplier = damage_multiplier
         self.speed_multiplier = speed_multiplier
+        self.spawn_type = spawn_type
         self.maps = maps
         self._current_map = 0
 
@@ -106,7 +109,7 @@ class Session:
 
     @staticmethod
     def get_dummy() -> Session:
-        session = Session(0, False, 0, 0, [])
+        session = Session(0, False, 0, 0, SpawnType.EDGES, [])
         session.valid = False
         return session
 
@@ -119,6 +122,7 @@ class Session:
         floating_market = config.get_config_mandatory("floating_market", bool)
         damage_multiplier = config.get_config_mandatory("damage_multiplier", float)
         speed_multiplier = config.get_config_mandatory("speed_multiplier", float)
+        spawn_type = config.get_config_mandatory("spawn_type", int)
 
         maps = []
         raw_maps = config.get_config_mandatory("maps", list)
@@ -157,7 +161,12 @@ class Session:
                 )
 
         return Session(
-            starting_money, floating_market, damage_multiplier, speed_multiplier, maps
+            starting_money,
+            floating_market,
+            damage_multiplier,
+            speed_multiplier,
+            SpawnType(spawn_type),
+            maps,
         )
 
     @staticmethod
@@ -172,6 +181,7 @@ class Session:
             floating_market=False,
             damage_multiplier=1.0,
             speed_multiplier=1.0,
+            spawn_type=SpawnType.EDGES,
             maps=maps,
         )
         return session

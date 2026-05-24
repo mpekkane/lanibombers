@@ -21,7 +21,7 @@ from renderer.tile_renderer import TileRenderer
 from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.render_state import RenderState
-
+from game_engine.spawn_points import SpawnType
 
 # ============================================================================
 # Configuration
@@ -100,6 +100,7 @@ class SessionSetup(arcade.Window):
         self.map_list = [{"file": self.map_files[0], "index": 0}]
         self.editing_map_entry = False
         self.edit_original_map_index = 0
+        self.spawn_type = SpawnType.EDGES
 
         # Load saved config if it exists
         self._load_config()
@@ -236,29 +237,52 @@ class SessionSetup(arcade.Window):
         """Assemble self.fields from fixed fields + map entries + conditional sub-fields + Save."""
         # Floating market options
         fm_index = 1 if self.floating_market else 0
-
+        spawn_type_list = [
+            SpawnType.EDGES,
+            SpawnType.TRUE_RANDOM,
+            SpawnType.UNIFORM_DIST_RANDOM,
+        ]
+        spawn_index = spawn_type_list.index(self.spawn_type)
         self.fixed_fields = [
             MenuField(
-                name="Starting Money", field_type=FieldType.NUMERIC,
+                name="Starting Money",
+                field_type=FieldType.NUMERIC,
                 value=self.starting_money,
-                step=100, min_value=0, max_value=10000,
+                step=100,
+                min_value=0,
+                max_value=10000,
             ),
             MenuField(
-                name="Floating Market", field_type=FieldType.OPTION,
+                name="Floating Market",
+                field_type=FieldType.OPTION,
                 value=self.floating_market,
                 options=[False, True],
                 option_names=["No", "Yes"],
                 selected_option_index=fm_index,
             ),
             MenuField(
-                name="Damage Multiplier", field_type=FieldType.NUMERIC,
+                name="Damage Multiplier",
+                field_type=FieldType.NUMERIC,
                 value=self.damage_multiplier,
-                step=0.25, min_value=0.25, max_value=5.0,
+                step=0.25,
+                min_value=0.25,
+                max_value=5.0,
             ),
             MenuField(
-                name="Speed Multiplier", field_type=FieldType.NUMERIC,
+                name="Speed Multiplier",
+                field_type=FieldType.NUMERIC,
                 value=self.speed_multiplier,
-                step=0.25, min_value=0.25, max_value=5.0,
+                step=0.25,
+                min_value=0.25,
+                max_value=5.0,
+            ),
+            MenuField(
+                name="Spawn type",
+                field_type=FieldType.OPTION,
+                value=self.spawn_type,
+                options=spawn_type_list,
+                option_names=["Edges", "Random", "Uniform distance"],
+                selected_option_index=spawn_index,
             ),
         ]
 
@@ -716,6 +740,8 @@ class SessionSetup(arcade.Window):
             self.damage_multiplier = changed_field.value
         elif name == "Speed Multiplier":
             self.speed_multiplier = changed_field.value
+        elif name == "Spawn type":
+            self.spawn_type = changed_field.value
         else:
             # Random map sub-fields — route to the owning entry's random_params
             idx = changed_field.map_entry_index
@@ -779,6 +805,9 @@ class SessionSetup(arcade.Window):
         if "speed_multiplier" in config:
             self.speed_multiplier = float(config["speed_multiplier"])
 
+        if "spawn_type" in config:
+            self.spawn_type = SpawnType(int(config["spawn_type"]))
+
         # Load maps list (new format) or single map (old format)
         if "maps" in config:
             self.map_list = []
@@ -835,6 +864,7 @@ class SessionSetup(arcade.Window):
             "floating_market": self.floating_market,
             "damage_multiplier": self.damage_multiplier,
             "speed_multiplier": self.speed_multiplier,
+            "spawn_type": int(self.spawn_type),
             "maps": maps_out,
         }
 

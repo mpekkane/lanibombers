@@ -59,6 +59,12 @@ class TileType(Enum):
     SECURITY_DOOR = "security_door"
     TUNNEL = "tunnel"
 
+    def spawnable(self) -> bool:
+        if self == TileType.EMPTY or self == TileType.BEDROCK or self == TileType.DIRT:
+            return True
+        else:
+            return False
+
 
 @dataclass
 class Tile(GameObject):

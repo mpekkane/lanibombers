@@ -161,9 +161,14 @@ class BomberServer:
         assert self.map_data is not None
 
         # game engine
-        self.engine = GameEngine(self.map_data.width, self.map_data.height)
+        self.engine = GameEngine(
+            self.map_data.width,
+            self.map_data.height,
+            spawn_type=self.session.spawn_type,
+        )
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(self.map_data)
+        self.engine.set_starting_points(num_players=len(self.players))
 
         # local sound engine for server-side rendering
         self.sound_engine = (

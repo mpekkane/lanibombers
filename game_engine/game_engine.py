@@ -59,6 +59,7 @@ from game_engine.utils import xy_to_tile, clamp
 from game_engine.session_parser import (
     SessionPlayer,
 )
+from game_engine.spawn_points import get_spawn_points, SpawnType
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -84,7 +85,7 @@ class SwitchState(Enum):
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
-    def __init__(self, width: int = 64, height: int = 45):
+    def __init__(self, width: int = 64, height: int = 45, spawn_type: SpawnType = SpawnType.EDGES):
         self.running = True
         self.width = width
         self.height = height
@@ -106,13 +107,7 @@ class GameEngine:
         self.event_resolver = EventResolver(resolve=self.resolve)
         self.input_queue = InputQueue()
         # FIXME this has to be set by the map so you don't start in illegal position
-        offset = 0
-        self.starting_poses = [
-            (offset, offset),
-            (offset, width - offset),
-            (height - offset, offset),
-            (height - offset, width - offset),
-        ]
+        self.starting_poses: List[Tuple[int, int]]
         self.prev_time = -1
         self.pending_sounds: List[int] = []
         self.teleports: List[Tuple[int, int]] = []
@@ -123,6 +118,7 @@ class GameEngine:
         self.monster_controllers: List[MonsterController] = []
         self._bioslime_tick_active = False
         self._bioslime_sentinel = _BioslimeTick()
+        self.spawn_type = spawn_type
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self._external_state_callback = callback
@@ -140,6 +136,7 @@ class GameEngine:
         self.height = map_data.height
         self.tiles = map_data.tiles
         self.monsters = map_data.monsters
+        self.map_data = map_data
         for pickup in list(map_data.tools):
             self.pickups[pickup.y][pickup.x] = pickup
         for pickup in list(map_data.treasures):
@@ -156,6 +153,15 @@ class GameEngine:
             for x, tile in enumerate(tiles):
                 if tile.is_security_door():
                     self.security_doors.append((x, y, tile))
+
+    def set_starting_points(self, num_players: Optional[int] = None):
+        if num_players is not None:
+            n = num_players
+        else:
+            n = len(self.players)
+        self.starting_poses = get_spawn_points(
+            n, self.map_data, self.spawn_type
+        )
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -213,7 +219,7 @@ class GameEngine:
             dig_power=session_player.dig_power,
             inventory=session_player.inventory,
             tools=session_player.tools,
-            money=session_player.money
+            money=session_player.money,
         )
         return self._create_player(player)
 
@@ -354,7 +360,9 @@ class GameEngine:
             if dmg > 0:
                 player_died = player.take_damage(int(dmg))
                 if player_died:
-                    self.player_death_times.append((player.id, player.name, Clock.now()))
+                    self.player_death_times.append(
+                        (player.id, player.name, Clock.now())
+                    )
                     self.pending_sounds.append(SoundType.DIE)
 
         for monster in self.monsters:
@@ -1431,7 +1439,9 @@ class GameEngine:
         if entity.direction in (Direction.RIGHT, Direction.LEFT):
             entity.y = round(entity.y - 0.5) + 0.5
 
-    def resolve_dig(self, target: DynamicEntity, event: Event, flags: ResolveFlags) -> None:
+    def resolve_dig(
+        self, target: DynamicEntity, event: Event, flags: ResolveFlags
+    ) -> None:
         if target.state == "dead":
             return
 
@@ -1654,7 +1664,7 @@ class GameEngine:
             bombs=self.bombs,
             server_time=now,
             sounds=sounds,
-            running=self.running
+            running=self.running,
         )
 
     def cleanup_render_state(self):
