@@ -101,6 +101,9 @@ class Session:
     def session_complete(self) -> bool:
         return self._current_map >= len(self.maps)
 
+    def rounds_left(self) -> int:
+        return len(self.maps) - (self._current_map - 1)
+
     @staticmethod
     def get_dummy() -> Session:
         session = Session(0, False, 0, 0, [])

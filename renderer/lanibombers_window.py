@@ -13,7 +13,8 @@ from network_stack.messages.messages import (
     ClientControl,
     ClientSelect,
     ShopState,
-    Scoreboard
+    Scoreboard,
+    SessionInfo
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -73,7 +74,7 @@ class LanibombersWindow(arcade.Window):
         self.got_shop = False
         self.session_end = False
         self.standings: Optional[List[PlayerResult]] = None
-
+        self.got_session = False
         # self.sound_engine.diagnostics()
 
     def render_view(self) -> None:
@@ -125,12 +126,10 @@ class LanibombersWindow(arcade.Window):
         # TODO: shop view
         elif state == ClientState.SHOP:
             self.sound_engine.stop_music()
-            self.sound_engine.shop()
-            while not self.got_shop:
+            while not (self.got_shop and self.got_session):
                 print("waiting for a shop")
                 Clock.sleep(1)
                 if self.session_end:
-                    self.sound_engine.stop_music()
                     self.sound_engine.scoreboard()
                     assert self.standings is not None
                     return ScoreboardView(self.standings)
@@ -140,14 +139,15 @@ class LanibombersWindow(arcade.Window):
                 client_player_name=self.name,
                 shop_items=self.shop.items,
                 cursor_positions=self.shop.cursor_positions,
-                next_map_tiles=self.shop.tilemap,
-                rounds_left=5,
+                next_map_tiles=self.next_tilemap,
+                next_map_pickups=self.next_pickups,
+                rounds_left=self.next_rounds_left,
             )  # FIXME: rounds left
             view.bind_input_callback(self.on_press)
+            self.sound_engine.shop()
             return view
         elif state == ClientState.GAME:
             self.sound_engine.stop_music()
-            self.sound_engine.game()
             self.create_game_simulation()
             ok = False
             while not ok:
@@ -163,6 +163,7 @@ class LanibombersWindow(arcade.Window):
                 item_hotkeys=self.item_hotkeys,
             )
             view.bind_input_callback(self.on_press)
+            self.sound_engine.game()
             return view
         # TODO: ending view
         elif state == ClientState.ENDING:
@@ -192,6 +193,7 @@ class LanibombersWindow(arcade.Window):
         elif state == ClientState.SHOP:
             self.shop = None
             self.got_shop = False
+            self.got_session = False
         elif state == ClientState.GAME:
             self.client_simulation = None
         elif state == ClientState.ENDING:
@@ -217,6 +219,7 @@ class LanibombersWindow(arcade.Window):
         client.set_callback(GameState, self._on_game_state)
         client.set_callback(ShopState, self._on_shop_state)
         client.set_callback(Scoreboard, self._on_scoreboard)
+        client.set_callback(SessionInfo, self._on_session_info)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -241,6 +244,14 @@ class LanibombersWindow(arcade.Window):
             self.shop.state = shop.state
             self.shop.items = shop.items
             self.shop.players = shop.players
+
+    def _on_session_info(self, msg: SessionInfo) -> None:
+        self.next_rounds_left = msg.rounds_left
+        self.next_width = msg.width
+        self.next_height = msg.height
+        self.next_tilemap = msg.tilemap
+        self.next_pickups = msg.pickups
+        self.got_session = True
 
     def _on_scoreboard(self, msg: Scoreboard) -> None:
         results = []

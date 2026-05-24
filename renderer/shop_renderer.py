@@ -18,6 +18,7 @@ from game_engine.entities.player import Player
 from renderer.bitmap_text import BitmapText
 from renderer.panel_builder import PanelBuilder
 from renderer.player_colorizer import PlayerColorizer
+from game_engine.entities import Pickup
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "graphics")
@@ -33,6 +34,7 @@ class ShopView(arcade.View):
         shop_items: List[Tuple[ItemType | str, int]],
         cursor_positions: List[Tuple[UUID, ItemType | str]],
         next_map_tiles: np.ndarray,
+        next_map_pickups: List[Pickup],
         rounds_left: int = 0,
     ):
         super().__init__()
@@ -41,6 +43,7 @@ class ShopView(arcade.View):
         self.shop_items = shop_items
         self.cursor_positions = cursor_positions
         self.next_map_tiles = next_map_tiles
+        self.next_map_pickups = next_map_pickups
         self._initial_rounds_left = rounds_left
 
     def on_show_view(self):
@@ -84,7 +87,7 @@ class ShopView(arcade.View):
 
         # Map preview
         self.map_preview_sprite_list = arcade.SpriteList()
-        self._build_map_preview(self.get_state().renderState)
+        self._build_map_preview()
 
         # Rounds left text
         self.rounds_left_sprites = arcade.SpriteList()
@@ -301,7 +304,7 @@ class ShopView(arcade.View):
         self.other_player_name_sprites.draw(pixelated=True)
         self.other_player_info_sprites.draw(pixelated=True)
 
-    def _build_map_preview(self, state: RenderState) -> None:
+    def _build_map_preview(self) -> None:
         """Build the map preview sprite from next_map_tiles and treasure positions."""
         from common.tile_dictionary import (
             EMPTY_TILE_ID,
@@ -336,7 +339,7 @@ class ShopView(arcade.View):
 
         # Overlay treasure positions (golden)
         COLOR_TREASURE = (255, 215, 0, 255)
-        for pickup in state.pickups:
+        for pickup in self.next_map_pickups:
             px, py = int(pickup.x), int(pickup.y)
             if 0 <= px < w and 0 <= py < h:
                 pixels[px, py] = COLOR_TREASURE

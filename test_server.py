@@ -17,7 +17,8 @@ from network_stack.messages.messages import (
     ClientSelect,
     GameState,
     ShopState,
-    Scoreboard
+    Scoreboard,
+    SessionInfo,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -69,6 +70,7 @@ class BomberServer:
 
         self.shop: Optional[Shop] = None
         self.shop_complete = False
+        self.map_data = None
 
     def run_state(self) -> None:
         state = self.state_machine.get_state()
@@ -119,20 +121,14 @@ class BomberServer:
                 print("No players in the lobby")
                 Clock.sleep(1)
 
-    def run_shop(self) -> None:
-        self.shop_complete = False
-        self._update_shop()
-        self._send_shop()
-        while not self.shop_complete:
-            Clock.sleep(1)
-
-    def start_game(self) -> None:
+    def generate_next_map(self) -> None:
         next_map = self.session.get_next_map()
+        self.rounds_left = self.session.rounds_left()
         if next_map.type == SessionMapType.LOAD:
-            map_data = load_map(next_map.map_path)
+            self.map_data = load_map(next_map.map_path)
         else:
             random_map_generator = RandomMapGenerator()
-            map_data = random_map_generator.generate(
+            self.map_data = random_map_generator.generate(
                 next_map.width,
                 next_map.height,
                 next_map.feature_sizes,
@@ -144,10 +140,30 @@ class BomberServer:
                 next_map.max_rooms,
                 next_map.room_chance,
             )
+        info = SessionInfo(
+            rounds_left=self.rounds_left,
+            width=self.map_data.width,
+            height=self.map_data.height,
+            tilemap=GameEngine.tilemap_to_numpy(self.map_data.tiles),
+            pickups=self.map_data.treasures,
+        )
+        self.server.broadcast(info, None)
+
+    def run_shop(self) -> None:
+        self.generate_next_map()
+        self.shop_complete = False
+        self._update_shop()
+        self._send_shop()
+        while not self.shop_complete:
+            Clock.sleep(1)
+
+    def start_game(self) -> None:
+        assert self.map_data is not None
+
         # game engine
-        self.engine = GameEngine(map_data.width, map_data.height)
+        self.engine = GameEngine(self.map_data.width, self.map_data.height)
         self.engine.set_render_callback(self.render_callback)
-        self.engine.load_map(map_data)
+        self.engine.load_map(self.map_data)
 
         # local sound engine for server-side rendering
         self.sound_engine = (

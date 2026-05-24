@@ -574,3 +574,62 @@ class Scoreboard(Message):
         return cls(
             players=players,
         )
+
+
+@register_message
+@dataclass(frozen=True)
+class SessionInfo(Message):
+
+    TYPE: ClassVar[int] = 13
+    rounds_left: int
+    width: int
+    height: int
+    tilemap: np.ndarray
+    pickups: List[Pickup]
+
+    def to_bytes(self) -> bytes:
+        # main data
+        b_rounds = self.rounds_left.to_bytes(1, "big")
+        b_width = self.width.to_bytes(1, "big")
+        b_height = self.height.to_bytes(1, "big")
+        b_tilemap = self.tilemap.tobytes()
+        b_pickups = pickle.dumps(self.pickups)
+        b_tilemap_size = self.tilemap.size.to_bytes(4, "big")
+        b_pickups_size = len(b_pickups).to_bytes(2, "big")
+
+        return (
+            b_rounds
+            + b_width
+            + b_height
+            + b_tilemap_size
+            + b_pickups_size
+            + b_tilemap
+            + b_pickups
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> GameState:
+        rounds = int(payload[0])
+        width = int(payload[1])
+        height = int(payload[2])
+        tilemap_size = int.from_bytes(payload[3:7], "big")
+        pickups_size = int.from_bytes(payload[7:9], "big")
+        start = 9
+        stop = start + tilemap_size
+        tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
+            (height, width)
+        )
+        start = stop
+        stop = start + pickups_size
+        if pickups_size == 5:
+            pickups = []
+        else:
+            pickups = pickle.loads(payload[start:stop])
+
+        return cls(
+            rounds_left=rounds,
+            width=width,
+            height=height,
+            tilemap=tilemap,
+            pickups=pickups,
+        )

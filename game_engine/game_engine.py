@@ -1611,14 +1611,17 @@ class GameEngine:
         elif direction == Direction.DOWN:
             render_entity.y = entity.y + d
 
+    @staticmethod
+    def tilemap_to_numpy(tiles: list[list[Tile]]) -> np.ndarray:
+        return np.array(
+            [[tile.visual_id for tile in row] for row in tiles], dtype=np.uint8
+        )
+
     def get_render_state(self, now: Optional[float] = None) -> RenderState:
         """Build and return a RenderState for the renderer."""
 
         # Build tilemap as 2D numpy array
-        tilemap = np.array(
-            [[tile.visual_id for tile in row] for row in self.tiles], dtype=np.uint8
-        )
-
+        tilemap = GameEngine.tilemap_to_numpy(self.tiles)
         explosions_copy = self.explosions.copy()
 
         self.cleanup_render_state()
