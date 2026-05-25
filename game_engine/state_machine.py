@@ -1,3 +1,4 @@
+from typing import Optional
 from enum import IntEnum
 
 
@@ -65,7 +66,11 @@ class ClientStateMachine:
         self.state = ClientState.STARTING
 
     # TODO: ending condition, now just test control flow
-    def update(self, action: ClientStateAction = ClientStateAction.NONE) -> ClientState:
+    def update(
+        self,
+        action: ClientStateAction = ClientStateAction.NONE,
+        rounds_left: Optional[int] = None,
+    ) -> ClientState:
         if self.state == ClientState.STARTING:
             self.state = ClientState.MENU
         elif self.state == ClientState.MENU:
@@ -86,12 +91,14 @@ class ClientStateMachine:
         elif self.state == ClientState.SHOP:
             self.state = ClientState.GAME
         elif self.state == ClientState.GAME:
-            if action == ClientStateAction.END:
+            if (
+                rounds_left is not None and rounds_left == 0
+            ) or action == ClientStateAction.END:
                 self.state = ClientState.ENDING
             else:
                 self.state = ClientState.SHOP
         elif self.state == ClientState.ENDING:
-            self.state = ClientState.QUIT
+            self.state = ClientState.MENU
         elif self.state == ClientState.QUIT:
             self.state = ClientState.QUIT
         return self.state

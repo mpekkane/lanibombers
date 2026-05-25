@@ -85,7 +85,7 @@ class SwitchState(Enum):
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
-    def __init__(self, width: int = 64, height: int = 45, spawn_type: SpawnType = SpawnType.EDGES):
+    def __init__(self, width: int = 64, height: int = 45, spawn_type: SpawnType = SpawnType.EDGES, max_round_time: int = -1):
         self.running = True
         self.width = width
         self.height = height
@@ -119,6 +119,8 @@ class GameEngine:
         self._bioslime_tick_active = False
         self._bioslime_sentinel = _BioslimeTick()
         self.spawn_type = spawn_type
+        self.max_round_time = max_round_time
+        self.round_start_time: Optional[float] = None
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self._external_state_callback = callback
@@ -168,6 +170,10 @@ class GameEngine:
 
     def start(self) -> None:
         """Start the game engine and event processing."""
+        self.round_start_time = Clock.now()
+        # server should block commands during countdown, but to prevent premature
+        # commands
+        self.event_resolver.clear()
         self.input_queue.set_notify(self.event_resolver.notify)
         self.event_resolver.pre_process = self.process_inputs
         self.event_resolver.start()
@@ -383,12 +389,17 @@ class GameEngine:
                     self.pickups[y][x] = None
 
         # ending condition: all dead
+        number_players_alive = 0
         all_dead = True
         for player in self.players:
             if player.state != "dead":
                 all_dead = False
-                break
-        self.running = not all_dead
+                number_players_alive += 1
+
+        if len(self.players) > 1 and number_players_alive == 1:
+            self.running = False
+        if all_dead:
+            self.running = False
 
     def clear_entity_move_events(
         self, player: DynamicEntity, resolve_time: float = 0.0
@@ -1632,6 +1643,11 @@ class GameEngine:
 
     def get_render_state(self, now: Optional[float] = None) -> RenderState:
         """Build and return a RenderState for the renderer."""
+        # round time limit
+        if self.round_start_time is not None:
+            if self.max_round_time > 0:
+                if Clock.now() - self.round_start_time > self.max_round_time:
+                    self.running = False
 
         # Build tilemap as 2D numpy array
         tilemap = GameEngine.tilemap_to_numpy(self.tiles)

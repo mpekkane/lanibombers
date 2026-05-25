@@ -72,6 +72,7 @@ class BomberServer:
         self.shop: Optional[Shop] = None
         self.shop_complete = False
         self.map_data = None
+        self.game_on_countdown = False
 
     def run_state(self) -> None:
         state = self.state_machine.get_state()
@@ -95,6 +96,16 @@ class BomberServer:
         print(f"Session complete {self.session.session_complete()}")
         self.state_machine.update(quit=self.session.session_complete())
         print(f"Next state: {self.state}")
+
+        if self.session.session_complete():
+            info = SessionInfo(
+                rounds_left=0,
+                width=0,
+                height=0,
+                tilemap=np.array([]),
+                pickups=[],
+            )
+            self.server.broadcast(info, None)
 
     @property
     def state(self) -> ServerState:
@@ -166,6 +177,7 @@ class BomberServer:
             self.map_data.width,
             self.map_data.height,
             spawn_type=self.session.spawn_type,
+            max_round_time=-1
         )
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(self.map_data)
@@ -198,6 +210,7 @@ class BomberServer:
 
     def run_game(self) -> None:
         # round countdown
+        self.game_on_countdown = True
         countdown_length = 10
         count = -1
         start = Clock.now()
@@ -211,6 +224,7 @@ class BomberServer:
             Clock.sleep(0.1)
 
         self.engine.start()
+        self.game_on_countdown = False
 
         # wait while running
         while self.engine.running:
@@ -220,23 +234,55 @@ class BomberServer:
             Clock.sleep(1)
 
         # round has ended, clean up player object, award score
-        score_data = np.array(self.engine.player_death_times)
-
-        death_times = score_data[:, 2].astype(dtype=np.float32)
-        sort_indices = np.argsort(death_times)
-        score_data = score_data[sort_indices]
-
+        points_by_name = self.score_players()
         for player in self.players:
-            ranking = np.where(score_data == player.name)[0][0]
-            pts = len(self.players) - ranking
-
             player.created = False
+
             gp = self.engine.get_player_by_name(player.name)
             player.inventory = gp.inventory
             player.money = gp.money
             player.tools = gp.tools
             player.dig_power = gp.dig_power
-            player.score += pts
+
+            player.score += points_by_name[player.name]
+
+    def score_players(self):
+        # round has ended, clean up player object, award score
+        # self.player_death_times: List[Tuple[UUID, str, float]]
+
+        n_players = len(self.players)
+
+        score_data = np.array(self.engine.player_death_times, dtype=object)
+
+        if len(score_data) > 0:
+            death_times = score_data[:, 2].astype(dtype=np.float32)
+            sort_indices = np.argsort(death_times)
+
+            # Earliest death first
+            dead_names_in_order = list(score_data[sort_indices, 1])
+        else:
+            dead_names_in_order = []
+
+        dead_names = set(dead_names_in_order)
+
+        survivor_names = [
+            player.name
+            for player in self.players
+            if player.name not in dead_names
+        ]
+
+        points_by_name = {}
+
+        # All survivors get the maximum score
+        for name in survivor_names:
+            points_by_name[name] = n_players
+
+        # Dead players get increasing points by survival order:
+        # earliest death gets 1, latest death gets n_players - n_survivors
+        for death_rank, name in enumerate(dead_names_in_order):
+            points_by_name[name] = death_rank + 1
+
+        return points_by_name
 
     def end_game(self) -> None:
         print("Game has ended.")
@@ -313,7 +359,8 @@ class BomberServer:
 
     def on_control(self, msg: ClientControl, ctx: ClientContext):
         if self.state_machine.get_state() == ServerState.GAME:
-            self._on_control_game(msg, ctx)
+            if not self.game_on_countdown:
+                self._on_control_game(msg, ctx)
         elif self.state_machine.get_state() == ServerState.SHOP:
             self._on_control_shop(msg, ctx)
         else:

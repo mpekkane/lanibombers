@@ -20,6 +20,7 @@ from network_stack.messages.messages import (
     encode_message,
     decode_message,
 )
+from twisted.internet.endpoints import TCP4ClientEndpoint
 
 
 class TCPClientProtocol(TransportClientProtocol):
@@ -94,12 +95,16 @@ class TCPClient(TransportClient):
         on_message: OnMessage,
         on_connect: Optional[OnConnect] = None,
         on_disconnect: Optional[OnDisconnect] = None,
+        local_ip: Optional[str] = None,
     ):
         self._ip = ip
         self._port = port
+        self._local_ip = local_ip
         self._on_message = on_message
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
+
+        print(f"TCP client, local ip: {local_ip}")
 
         self._factory = TCPClientFactory(
             build_proto=lambda: TCPClientProtocol(
@@ -113,7 +118,13 @@ class TCPClient(TransportClient):
 
     def start(self) -> None:
         def _run():
-            reactor.connectTCP(self._ip, self._port, self._factory)  # type: ignore
+            endpoint = TCP4ClientEndpoint(
+                reactor,
+                self._ip,
+                self._port,
+                bindAddress=(self._local_ip, 0) if self._local_ip else None,
+            )
+            endpoint.connect(self._factory)
             reactor.run(installSignalHandlers=False)  # type: ignore
 
         self._reactor_thread = threading.Thread(target=_run, daemon=True)

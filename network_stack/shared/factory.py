@@ -31,6 +31,7 @@ def get_client(
     on_message: OnMessage,
     on_connect: Optional[OnConnect] = None,
     on_disconnect: Optional[OnDisconnect] = None,
+    local_ip: Optional[str] = None,
 ) -> TransportClient:
     if protocol == "udp":
         return UDPClient(
@@ -47,6 +48,7 @@ def get_client(
             on_message=on_message,
             on_connect=on_connect,
             on_disconnect=on_disconnect,
+            local_ip=local_ip
         )
     raise ValueError(protocol)
 

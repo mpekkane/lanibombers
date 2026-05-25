@@ -24,7 +24,7 @@ DisconnectHandler = Callable[[str], None]
 
 
 class BomberNetworkClient:
-    def __init__(self, cfg_path: str) -> None:
+    def __init__(self, cfg_path: str, local_ip: Optional[str] = None) -> None:
         "Init class, read config from YAML"
         self.config = ConfigReader(cfg_path)
         self.base_addr = self.config.get_config_mandatory("base_addr", str)
@@ -40,6 +40,7 @@ class BomberNetworkClient:
         self.connected = False
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
         self.on_disconnect_handler: Optional[DisconnectHandler] = None
+        self.local_ip = local_ip
 
     def find_host(self) -> bool:
         scanner = get_scanner(
@@ -82,6 +83,7 @@ class BomberNetworkClient:
             on_message=self.on_msg,
             on_connect=_on_connect,
             on_disconnect=_on_disconnect,
+            local_ip=self.local_ip
         )
         client.start()
         self.client = client

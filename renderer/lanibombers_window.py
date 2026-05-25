@@ -54,7 +54,7 @@ def _parse_color(color_str) -> tuple:
 class LanibombersWindow(arcade.Window):
     """Single window for the entire client. Views handle all screens."""
 
-    def __init__(self):
+    def __init__(self, local_ip: Optional[str] = None, player_config_path: Optional[str] = None):
         super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, vsync=True)
         self.sound_engine: SoundEngine = SoundEngine(music_volume=0.5, fx_volume=1.0)
         self.player_config: dict | None = None
@@ -77,7 +77,9 @@ class LanibombersWindow(arcade.Window):
         self.standings: Optional[List[PlayerResult]] = None
         self.got_session = False
         self.countdown = None
-        # self.sound_engine.diagnostics()
+        self.local_ip = local_ip
+        self.player_config_path = player_config_path
+        self.next_rounds_left: Optional[int] = None
 
     def render_view(self) -> None:
         """Render the next view on screen"""
@@ -102,7 +104,7 @@ class LanibombersWindow(arcade.Window):
         if action == ClientStateAction.QUIT:
             self.close()
         else:
-            self.state_machine.update(action)
+            self.state_machine.update(action, self.next_rounds_left)
             self.render_view()
 
     def get_view_for_state(self) -> Optional[arcade.View]:
@@ -112,6 +114,7 @@ class LanibombersWindow(arcade.Window):
             arcade.View: Returns the view to be rendered
         """
         state = self.state_machine.get_state()
+        self.sound_engine.stop_music()
         if state == ClientState.STARTING:
             return TitleView()
         elif state == ClientState.MENU:
@@ -127,9 +130,7 @@ class LanibombersWindow(arcade.Window):
             return ServerFinderView()
         # TODO: shop view
         elif state == ClientState.SHOP:
-            self.sound_engine.stop_music()
             while not (self.got_shop and self.got_session):
-                print("waiting for a shop")
                 Clock.sleep(1)
                 if self.session_end:
                     self.sound_engine.scoreboard()
@@ -149,11 +150,9 @@ class LanibombersWindow(arcade.Window):
             self.sound_engine.shop()
             return view
         elif state == ClientState.GAME:
-            self.sound_engine.stop_music()
             self.create_game_simulation()
             ok = False
             while not ok:
-                print("witing for a state")
                 ok = (
                     self.client_simulation is not None
                     and self.client_simulation.has_state()
@@ -169,7 +168,6 @@ class LanibombersWindow(arcade.Window):
             return view
         # TODO: ending view
         elif state == ClientState.ENDING:
-            self.sound_engine.stop_music()
             self.sound_engine.scoreboard()
             assert self.standings is not None
             return ScoreboardView(self.standings)
@@ -205,11 +203,12 @@ class LanibombersWindow(arcade.Window):
             return
 
     def _on_game_state(self, msg: GameState) -> None:
-        self.client_simulation.receive_state(msg.to_render())
+        if self.client_simulation is not None:
+            self.client_simulation.receive_state(msg.to_render())
 
     def connect(self, host: str, port: int, player_config: dict) -> None:
         """Create and start a BomberNetworkClient for the given server."""
-        client = BomberNetworkClient(_CLIENT_CFG_PATH)
+        client = BomberNetworkClient(_CLIENT_CFG_PATH, self.local_ip)
         client.server_ip = host
         client.server_port = port
         client.acquired_server = True
@@ -229,7 +228,10 @@ class LanibombersWindow(arcade.Window):
 
         self.network_client = client
         self.player_config = player_config
-        self.setup_input()
+        if self.player_config_path is not None:
+            self.setup_input(self.player_config_path)
+        else:
+            self.setup_input()
 
     def create_game_simulation(self) -> None:
         self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)
@@ -238,7 +240,6 @@ class LanibombersWindow(arcade.Window):
         print(f"Disconnected from server: {reason}")
 
     def _on_shop_state(self, msg: ShopState) -> None:
-        print("got shop")
         shop = ShopState.to_shop(msg)
         if not self.got_shop:
             self.shop = shop
@@ -294,6 +295,7 @@ class LanibombersWindow(arcade.Window):
             self._remote,
         ) = map_keys(config)
         self.name = config.get_config("player_name") or ""
+        print(self.name)
         self.color = _parse_color(config.get_config("color"))
         self.appearance_id = int(config.get_config("appearance_id") or 1)
         self._hotkey_keys = {}

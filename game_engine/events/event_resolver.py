@@ -40,6 +40,10 @@ class EventResolver:
             self._thread.join(timeout=2.0)
             self._thread = None
 
+    def clear(self) -> None:
+        """Clears all events from the queue"""
+        self.queue.clear()
+
     def notify(self) -> None:
         """Wake the resolver thread (new input available)."""
         with self._cond:

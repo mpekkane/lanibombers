@@ -31,6 +31,11 @@ class EventQueue:
         heapq.heappush(self._events, event)
         self._event_map[event.id] = event
 
+    def clear(self) -> None:
+        """Clears all events"""
+        self._events = []
+        self._event_map = {}
+
     def peek_next(self) -> Optional[Event]:
         """Return the next event without removing it."""
         self._cleanup_cancelled()
