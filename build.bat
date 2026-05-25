@@ -11,8 +11,10 @@ if "%1"=="all" goto all
 if "%1"=="init" goto init
 if "%1"=="complete" goto complete
 if "%1"=="server-init" goto server_init
+if "%1"=="server-all" goto server_all
 if "%1"=="server" goto server
 if "%1"=="client-init" goto client_init
+if "%1"=="client-all" goto client_all
 if "%1"=="client" goto client
 if "%1"=="clean" goto clean
 
@@ -32,18 +34,27 @@ call "%~f0" client-init
 goto end
 
 :complete
-goto init
-goto all
+call "%~f0" init
+call "%~f0" all
+goto end
+
+:server_all
+call "%~f0" server-init
+goto server
 
 :server_init
 echo === Building server (init) ===
-%PI% --onefile --name "test_server" --add-data "cfg;cfg" --add-data "assets;assets" test_server.py
+%PI% --onefile --name "test_server" --add-data "cfg;cfg" --add-data "assets;assets" --add-data "common/room_templates;common/room_templates" test_server.py
 goto end
 
 :server
 echo === Building server (spec) ===
 %PI% test_server.spec
 goto end
+
+:server_all
+call "%~f0" client-init
+goto client
 
 :client_init
 echo === Building client (init) ===
