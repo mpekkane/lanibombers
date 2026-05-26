@@ -1,78 +1,78 @@
-player_name: player1
-appearance_id: 1
-color: '#00008B'
-up: motion_up
-down: down
-left: left
-right: motion_right
-stop: backspace
-fire: enter
-choose: tab
-remote: rshift
+player_name: player6
+appearance_id: 2
+color: '#FFFFFF'
+up: w
+down: s
+left: a
+right: d
+stop: e
+fire: c
+choose: x
+remote: z
 items:
 - name: Small Bomb
-  hotkey: '1'
+  hotkey: y
   menu_order: 0
 - name: Big Bomb
-  hotkey: '2'
+  hotkey: u
   menu_order: 1
 - name: Dynamite
-  hotkey: '3'
+  hotkey: i
   menu_order: 2
 - name: C4
-  hotkey: '4'
+  hotkey: o
   menu_order: 3
 - name: Landmine
-  hotkey: '5'
+  hotkey: p
   menu_order: 4
 - name: Small Remote
-  hotkey: '6'
+  hotkey: h
   menu_order: 5
 - name: Big Remote
-  hotkey: '7'
+  hotkey: j
   menu_order: 6
 - name: Urethane
-  hotkey: '8'
+  hotkey: k
   menu_order: 7
 - name: Small Cross
-  hotkey: '9'
+  hotkey: l
   menu_order: 8
 - name: Big Cross
   hotkey: '0'
   menu_order: 9
 - name: Nuke
-  hotkey: n
+  hotkey: b
   menu_order: 10
 - name: Grasshopper
-  hotkey: q
+  hotkey: n
   menu_order: 11
 - name: Flame Barrel
-  hotkey: w
+  hotkey: m
   menu_order: 12
 - name: Cracker Barrel
-  hotkey: e
+  hotkey: comma
   menu_order: 13
 - name: Digger Bomb
-  hotkey: r
+  hotkey: period
   menu_order: 14
 - name: Bio Slime
-  hotkey: t
+  hotkey: minus
   menu_order: 15
 - name: Metal Plate
-  hotkey: y
+  hotkey: '7'
   menu_order: 16
 - name: Flamethrower
-  hotkey: i
+  hotkey: '8'
   menu_order: 17
 - name: Fire Extinguisher
-  hotkey: o
+  hotkey: '9'
   menu_order: 18
 - name: Clone
-  hotkey: p
+  hotkey: '0'
   menu_order: 19
 - name: Teleport
-  hotkey: a
+  hotkey: plus
   menu_order: 20
 - name: Grenade
-  hotkey: s
+  hotkey: apostrophe
   menu_order: 21

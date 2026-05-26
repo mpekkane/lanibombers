@@ -1,7 +1,8 @@
 """
 Test code for server-side
 """
-
+import sys
+import select
 import uuid
 from typing import Dict, List, Optional
 from argparse import ArgumentParser
@@ -39,6 +40,7 @@ from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.state_machine import ServerState, ServerStateMachine
 from game_engine.shop import Shop
+from game_engine.spawn_points import SpawnType
 
 
 class BomberServer:
@@ -74,10 +76,10 @@ class BomberServer:
         self.map_data = None
         self.game_on_countdown = False
 
+        self.max_round_time = 60
+
     def run_state(self) -> None:
         state = self.state_machine.get_state()
-
-        print(f"Run state {state}")
 
         if state == ServerState.STARTING:
             return
@@ -93,9 +95,7 @@ class BomberServer:
             raise ValueError("Invalid server state")
 
     def next_state(self) -> None:
-        print(f"Session complete {self.session.session_complete()}")
         self.state_machine.update(quit=self.session.session_complete())
-        print(f"Next state: {self.state}")
 
         if self.session.session_complete():
             info = SessionInfo(
@@ -117,18 +117,34 @@ class BomberServer:
     def render_callback(self, state: RenderState) -> None:
         self.server.broadcast(GameState.from_render(state), None)  # type: ignore
 
+    def timed_input(self, prompt: str, timeout: float) -> str | None:
+        print(prompt, end="", flush=True)
+
+        ready, _, _ = select.select([sys.stdin], [], [], timeout)
+
+        if ready:
+            return sys.stdin.readline().strip()
+
+        print("")
+        return None
+
     def run_lobby(self) -> None:
         ready = False
+
         while not ready:
             print("")
             print("Hosting a LAN server")
+
             if len(self.players) > 0:
                 print("Players in the lobby")
                 for i, player in enumerate(self.players):
-                    print(f"{i+1}: {player.name}")
-                inp = input("start game? y/n")
+                    print(f"{i + 1}: {player.name}")
+
+                inp = self.timed_input("start game? y/n ", timeout=1.0)
+
                 if inp == "y":
                     ready = True
+
             else:
                 print("No players in the lobby")
                 Clock.sleep(1)
@@ -177,7 +193,7 @@ class BomberServer:
             self.map_data.width,
             self.map_data.height,
             spawn_type=self.session.spawn_type,
-            max_round_time=-1
+            max_round_time=self.max_round_time,
         )
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(self.map_data)
@@ -193,9 +209,6 @@ class BomberServer:
             if not player.created:
                 self.create_game_player(player)
                 player.created = True
-                print(f"created player {player.name}:")
-                gp = self.engine.get_player_by_name(player.name)
-                print(f"{gp.x}, {gp.y}")
 
         # FIXME: temp to check logic
         # self.state = ServerState.GAME
@@ -233,6 +246,7 @@ class BomberServer:
 
             Clock.sleep(1)
 
+        self.engine.stop()
         # round has ended, clean up player object, award score
         points_by_name = self.score_players()
         for player in self.players:
@@ -245,6 +259,7 @@ class BomberServer:
             player.dig_power = gp.dig_power
 
             player.score += points_by_name[player.name]
+        self.engine = None
 
     def score_players(self):
         # round has ended, clean up player object, award score
@@ -288,11 +303,11 @@ class BomberServer:
         print("Game has ended.")
         start = Clock.now()
         dt = Clock.now() - start
-        while dt < 30.0:
+        while dt < 10.0:
             self.server.broadcast(Scoreboard(players=self.players), None)
             Clock.sleep(1)
             dt = Clock.now() - start
-        exit(0)
+        self.server.disconnect_all()
 
     ##################
     # game engine
@@ -395,6 +410,8 @@ class BomberServer:
     def _on_control_game(self, msg: ClientControl, ctx: ClientContext):
         """Handle player control input via the input queue."""
         if not self.state.running():
+            return
+        if self.engine is None:
             return
 
         if ctx.state.name is not None:

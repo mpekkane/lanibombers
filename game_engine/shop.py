@@ -204,7 +204,6 @@ class Shop:
 
         # Ready button is special
         if item == READY_ITEM:
-            self.send_ready()
             for i, (name, state) in enumerate(self.state):
                 if name == player_name:
                     self.state[i] = (name, True)
@@ -215,9 +214,7 @@ class Shop:
                     all_ready = False
                     break
             if all_ready:
-                print("*" * 40)
-                print("All ready!")
-                print("*" * 40)
+                print("INFO: All ready on shop.")
             return
 
         if client_player.money < price:
@@ -244,10 +241,6 @@ class Shop:
         dp = TOOL_DIG_POWER.get(ToolType.from_powerup(item))
         if dp is not None:
             player.dig_power += dp
-
-    def send_ready(self):
-        """Stub: send ready message to server."""
-        print("[STUB] Sending ready message to server")
 
     # ███╗   ███╗ ██████╗  ██████╗██╗  ██╗███████╗
     # ████╗ ████║██╔═══██╗██╔════╝██║ ██╔╝██╔════╝

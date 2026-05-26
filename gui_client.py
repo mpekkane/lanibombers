@@ -8,10 +8,12 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("--ip", "-i", type=str, default=None)
     parser.add_argument("--cfg", "-c", type=str, default=None)
+    parser.add_argument("--auto", "-a", action="store_true")
     args = parser.parse_args()
     ip = args.ip
     cfg = args.cfg
-    window = LanibombersWindow(ip, cfg)
+    auto = args.auto
+    window = LanibombersWindow(ip, cfg, auto)
     window.render_view()
     arcade.run()
 

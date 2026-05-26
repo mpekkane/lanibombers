@@ -11,3 +11,4 @@ dist/
 *.orig.worktrees/
 .worktrees/
 *.orig
+.vscode/

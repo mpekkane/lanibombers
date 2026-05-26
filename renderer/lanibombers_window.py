@@ -1,5 +1,6 @@
 # renderer/lanibombers_window.py
 from typing import List, Dict, Optional
+import threading
 
 import arcade
 
@@ -15,7 +16,7 @@ from network_stack.messages.messages import (
     ShopState,
     Scoreboard,
     SessionInfo,
-    Countdown
+    Countdown,
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -32,7 +33,8 @@ from renderer.shop_renderer import ShopView
 from game_engine.shop import Shop
 from game_engine.clock import Clock
 from renderer.player_colorizer import PLAYER_COLORS
-
+import random
+from game_engine.auto_client import ShopAI
 
 WINDOW_WIDTH = 1708
 WINDOW_HEIGHT = 960
@@ -54,7 +56,12 @@ def _parse_color(color_str) -> tuple:
 class LanibombersWindow(arcade.Window):
     """Single window for the entire client. Views handle all screens."""
 
-    def __init__(self, local_ip: Optional[str] = None, player_config_path: Optional[str] = None):
+    def __init__(
+        self,
+        local_ip: Optional[str] = None,
+        player_config_path: Optional[str] = None,
+        auto: bool = False,
+    ):
         super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, vsync=True)
         self.sound_engine: SoundEngine = SoundEngine(music_volume=0.5, fx_volume=1.0)
         self.player_config: dict | None = None
@@ -80,6 +87,12 @@ class LanibombersWindow(arcade.Window):
         self.local_ip = local_ip
         self.player_config_path = player_config_path
         self.next_rounds_left: Optional[int] = None
+        self.auto = auto
+
+        if self.auto:
+            self._auto_running = True
+            self.autothread = threading.Thread(target=self._run_auto)
+            self.autothread.start()
 
     def render_view(self) -> None:
         """Render the next view on screen"""
@@ -175,8 +188,7 @@ class LanibombersWindow(arcade.Window):
             return None
 
     def clean_view(self) -> None:
-        """This performs needed cleanup after view is done
-        """
+        """This performs needed cleanup after view is done"""
         state = self.state_machine.get_state()
         if state == ClientState.STARTING:
             return
@@ -195,6 +207,7 @@ class LanibombersWindow(arcade.Window):
             self.got_shop = False
             self.got_session = False
         elif state == ClientState.GAME:
+            print("destroy client simulation")
             self.client_simulation = None
             self.countdown = None
         elif state == ClientState.ENDING:
@@ -234,6 +247,7 @@ class LanibombersWindow(arcade.Window):
             self.setup_input()
 
     def create_game_simulation(self) -> None:
+        print("create client simulation")
         self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)
 
     def _on_disconnect(self, reason: str) -> None:
@@ -427,4 +441,71 @@ class LanibombersWindow(arcade.Window):
             if transport is not None and hasattr(transport, "stop"):
                 transport.stop()
             self.network_client = None
+        print("destroy client simulation")
         self.client_simulation = None
+        if self.auto:
+            self.autothread.join()
+
+    # ------------------------------------------------------------------
+    # Debugging auto client (very stupid ai)
+    # ------------------------------------------------------------------
+    def _run_auto(self):
+        shop_ai = None
+        got_shop = False
+        while self._auto_running:
+            state = self.state_machine.get_state()
+            if state == ClientState.STARTING:
+                pass
+            elif state == ClientState.MENU:
+                pass
+            elif state == ClientState.INFO:
+                pass
+            elif state == ClientState.SETUP:
+                pass
+            elif state == ClientState.CONNECT:
+                pass
+            elif state == ClientState.LOBBY:
+                pass
+            elif state == ClientState.SHOP:
+                if not got_shop:
+                    Clock.sleep(0.5)
+                if self.shop is not None:
+                    got_shop = True
+                    player_obj = self.shop.get_player(self.name)
+                    id, item = self.shop.get_player_cursor(player_obj.id)
+                    if shop_ai is None:
+                        shop_ai = ShopAI(
+                            id=id,
+                            name=self.name,
+                            shop=self.shop,
+                            cols=4,
+                            callback=self.on_press,
+                            left=self._left,
+                            right=self._right,
+                            up=self._up,
+                            down=self._down,
+                            fire=self._fire
+                        )
+
+                    if shop_ai is not None:
+                        shop_ai.tick(item)
+                Clock.sleep(0.05)
+            elif state == ClientState.GAME:
+                shop_ai = None
+                got_shop = False
+                actions = [
+                    self._fire,
+                    self._stop,
+                    self._up,
+                    self._down,
+                    self._left,
+                    self._right,
+                    self._choose,
+                ]
+                action = random.choice(actions)
+                self.on_press(action, 0)
+                Clock.sleep(random.random())
+            elif state == ClientState.ENDING:
+                pass
+            elif state == ClientState.QUIT:
+                pass

@@ -1,6 +1,6 @@
-player_name: player
+player_name: player2
 appearance_id: 2
-color: '#6B0091'
+color: '#DB0000'
 up: w
 down: s
 left: a

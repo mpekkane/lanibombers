@@ -280,9 +280,6 @@ class ShopView(arcade.View):
             self._build_other_player_cards(state.players)
 
         if full_state.completed:
-            print("*"*80)
-            print("VIEW COMPLETE")
-            print("*" * 80)
             self.window.view_complete()
 
     def on_draw(self):

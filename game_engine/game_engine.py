@@ -210,6 +210,7 @@ class GameEngine:
             controller.stop()
         self.monster_controllers.clear()
         self.event_resolver.stop()
+        self.event_resolver.clear()
 
     def create_player(self, session_player: SessionPlayer) -> None:
         assert session_player.name not in self.players, "Name already in use"

@@ -41,7 +41,7 @@ class ServerFinderView(arcade.View):
         self._scan_done: bool = False
         self._connecting: bool = False
         self._connect_elapsed: float = 0.0
-        self._connect_timeout: float = 5.0
+        self._connect_timeout: float = 20.0
         self._name_sent: bool = False
 
         # Rendering resources

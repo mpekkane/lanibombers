@@ -14,7 +14,7 @@ After this, the responsibility of receiving and sending logic is to the owning c
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, Callable, Dict, Type, TypeVar, cast
+from typing import Optional, Callable, Dict, Type, TypeVar, cast, List
 from network_stack.messages.messages import Message
 from network_stack.shared.factory import get_server
 from network_stack.servers.transport_server import (
@@ -68,6 +68,7 @@ class BomberNetworkServer:
             self.protocol, self.port, self._on_receive
         )  # private
         self._handlers: Dict[Type[Message], Handler] = {}
+        self._clients: List[ClientContext] = []
 
     def start(self) -> None:
         self._server.start()
@@ -110,6 +111,10 @@ class BomberNetworkServer:
     def disconnect(self, proto: TransportServerProtocol) -> None:
         self._server.disconnect(proto)
 
+    def disconnect_all(self) -> None:
+        for client in self._clients:
+            self.disconnect(client._proto)
+
     def _on_receive(
         self, msg: Message, state: PeerState, proto: TransportServerProtocol
     ) -> None:
@@ -117,6 +122,8 @@ class BomberNetworkServer:
             return
 
         ctx = ClientContext(server=self, state=state, _proto=proto)
+        if ctx not in self._clients:
+            self._clients.append(ctx)
         handler = self._handlers.get(type(msg))
         if handler is None:
             # unknown message type: ignore or log
