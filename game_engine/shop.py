@@ -70,6 +70,15 @@ class Shop:
 
         return all_done
 
+    def remove_player(self, name: str) -> None:
+        for p in self.players:
+            if p.name == name:
+                self.players.remove(p)
+
+        for (player, state) in self.state:
+            if player == name:
+                self.state.remove((player, state))
+
     def update_state(self, items, state, cursor_positions):
         self.items = items
         self.state = state

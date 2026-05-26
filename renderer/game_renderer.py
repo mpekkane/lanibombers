@@ -381,6 +381,10 @@ class GameView(arcade.View):
         if self.window.countdown is not None and self.window.countdown > 0:
             self.draw_countdown()
 
+        # round end
+        if self.closing:
+            self.draw_end()
+
     def draw_player_position_indicator(self, notify_len: int):
         elapsed = Clock.now() - self.start_time
         state = self.render_state_function()
@@ -396,7 +400,7 @@ class GameView(arcade.View):
             alpha,
         ]
 
-        if elapsed < notify_len/2:
+        if elapsed < notify_len / 2:
             radius = remaining**2
         else:
             radius = 25 + 5 * np.sin(5 * elapsed)
@@ -418,6 +422,15 @@ class GameView(arcade.View):
 
         color = GameView.countdown_color(countdown)
 
+        self.cool_draw(text, color)
+
+    def draw_end(self):
+        self.cool_draw("Round end", arcade.color.WHITE)
+
+    def cool_draw(self, text: str, color) -> None:
+        state = self.render_state_function()
+        x = state.width / 2 * 20
+        y = state.height / 2 * 20
         # Shadow
         arcade.draw_text(
             text,

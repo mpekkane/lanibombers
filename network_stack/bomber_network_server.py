@@ -65,10 +65,11 @@ class BomberNetworkServer:
         self.protocol = self.config.get_config_mandatory("protocol", str)
         self._running = False
         self._server: TransportServer = get_server(
-            self.protocol, self.port, self._on_receive
+            self.protocol, self.port, self._on_receive, self._on_disconnect
         )  # private
         self._handlers: Dict[Type[Message], Handler] = {}
         self._clients: List[ClientContext] = []
+        self._diconnect_handler: Callable[[ClientContext], None]
 
     def start(self) -> None:
         self._server.start()
@@ -85,6 +86,10 @@ class BomberNetworkServer:
             return False
         # erase type for storage; safe because dispatch uses msg_type key
         self._handlers[msg_type] = cast(Handler, handler)
+        return True
+
+    def set_disconnect_handler(self, handler: Callable[[ClientContext], None]) -> bool:
+        self._diconnect_handler = handler
         return True
 
     # ---- game-level send APIs ----
@@ -129,3 +134,18 @@ class BomberNetworkServer:
             # unknown message type: ignore or log
             return
         handler(msg, ctx)
+
+    def _on_disconnect(
+        self,
+        state: PeerState,
+        proto: TransportServerProtocol,
+        reason: Failure,
+    ) -> None:
+
+        self._clients = [
+            client for client in self._clients if client._proto is not proto
+        ]
+
+        ctx = ClientContext(server=self, state=state, _proto=proto)
+        self._diconnect_handler(ctx)
+        print("Client disconnected:", reason.getErrorMessage())

@@ -9,9 +9,10 @@ from abc import ABC, abstractmethod
 
 from network_stack.messages.messages import Message
 from network_stack.shared.types import PeerState
+from twisted.python.failure import Failure
 
 OnReceive = Callable[[Message, PeerState, "TransportServerProtocol"], None]
-
+OnDisconnect = Callable[[PeerState, "TransportServerProtocol", Failure], None]
 
 @runtime_checkable
 class TransportServerProtocol(Protocol):

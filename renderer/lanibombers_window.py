@@ -489,7 +489,7 @@ class LanibombersWindow(arcade.Window):
 
                     if shop_ai is not None:
                         shop_ai.tick(item)
-                Clock.sleep(0.05)
+                Clock.sleep(0.1)
             elif state == ClientState.GAME:
                 shop_ai = None
                 got_shop = False

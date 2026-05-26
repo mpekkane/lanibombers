@@ -34,14 +34,14 @@ def get_spawn_points(
         refined = refined[:num_players]
 
     # stats(refined)
-
+    # print(f"final {len(refined)}/{num_players}")
     return refined
 
 
 def _refine(initial: List[Tuple[int, int]], map_data: MapData) -> List[Tuple[int, int]]:
     fixed: List[Tuple[int, int]] = []
 
-    for point in initial:
+    for i, point in enumerate(initial):
         h = _clamp(point[0], map_data.height - 1)
         w = _clamp(point[1], map_data.width - 1)
 
@@ -56,8 +56,10 @@ def _refine(initial: List[Tuple[int, int]], map_data: MapData) -> List[Tuple[int
 
             for new_h in range(min_h, max_h + 1):
                 for new_w in range(min_w, max_w + 1):
+                    new_h = _clamp(new_h, map_data.height-1)
+                    new_w = _clamp(new_w, map_data.width-1)
                     pos = (new_h, new_w)
-                    tile = map_data.tiles[new_w][new_h]
+                    tile = map_data.tiles[new_h][new_w]
 
                     if tile.tile_type.spawnable() and pos not in fixed:
                         fixed.append(pos)
@@ -66,9 +68,12 @@ def _refine(initial: List[Tuple[int, int]], map_data: MapData) -> List[Tuple[int
 
                 if found:
                     break
-
+            if found:
+                # print(f"found {i}/{len(initial)}")
+                break
             offset += 1
 
+    # print(f"return {len(fixed)}/{len(initial)}")
     return fixed
 
 
@@ -96,17 +101,43 @@ def _initial_edge(num_players: int, map_data: MapData) -> List[Tuple[int, int]]:
         (height - offset, width - offset),
         (offset, width - offset),
         (height - offset, offset),
+
         # 5-8 midpoints
         (offset, width // 2),
         (height - offset, width // 2),
         (height // 2, offset),
         (height // 2, width - offset),
+
         # 9-12 more wide
         (offset, width // 4),
-        (height, 3 * width // 4),
-        (offset - offset, width // 4),
         (height - offset, 3 * width // 4),
+        (offset, 3 * width // 4),
+        (height - offset, width // 4),
+
+        # 13-16 more hi
+        (height // 4, offset),
+        (3 * height // 4, width - offset),
+        (height // 4, width - offset),
+        (3 * height // 4, offset),
     ]
+
+    # starting_poses = [
+    #     # 1-4 corners
+    #     (offset, offset),
+    #     (width - offset, height - offset),
+    #     (width - offset, offset),
+    #     (offset, height - offset),
+    #     # 5-8 midpoints
+    #     (width // 2, offset),
+    #     (width // 2, height - offset),
+    #     (offset, height // 2),
+    #     (width - offset, height // 2),
+    #     # 9-12 more wide
+    #     (width // 4, offset),
+    #     (3 * width // 4, height),
+    #     (width // 4, offset - offset),
+    #     (3 * width // 4, height - offset),
+    # ]
 
     return starting_poses
 

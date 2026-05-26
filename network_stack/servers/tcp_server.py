@@ -14,7 +14,8 @@ from twisted.protocols.basic import Int32StringReceiver
 from network_stack.servers.transport_server import (
     TransportServer,
     TransportServerProtocol,
-    OnReceive
+    OnReceive,
+    OnDisconnect,
 )
 from network_stack.messages.messages import Message, encode_message, decode_message
 from network_stack.shared.types import PeerState
@@ -22,18 +23,24 @@ from network_stack.shared.types import PeerState
 
 class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
     """This is the twisted per-connection protocol handler"""
+
     def __init__(
-        self, peers: Dict["TCPServerProtocol", PeerState], on_receive: OnReceive
+        self,
+        peers: Dict["TCPServerProtocol", PeerState],
+        on_receive: OnReceive,
+        on_disconnect: OnDisconnect,
     ) -> None:
         self._peers = peers
         self._state = PeerState()
         self._on_receive = on_receive
+        self._on_disconnect = on_disconnect
 
     def connectionMade(self) -> None:
         self._peers[self] = self._state
 
     def connectionLost(self, reason: Failure = Failure(error.ConnectionDone())) -> None:
         self._peers.pop(self, None)
+        self._on_disconnect(self._state, self, reason)
 
     def stringReceived(self, string: bytes) -> None:
         try:
@@ -49,12 +56,14 @@ class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
 
 class TCPServerFactory(Factory):
     """Creates protocol instance for each connection"""
-    def __init__(self, on_receive: OnReceive) -> None:
+
+    def __init__(self, on_receive: OnReceive, on_disconnect: OnDisconnect) -> None:
         self._peers: Dict[TCPServerProtocol, PeerState] = {}
         self._on_receive = on_receive
+        self._on_disconnect = on_disconnect
 
     def buildProtocol(self, addr: str):
-        return TCPServerProtocol(self._peers, self._on_receive)
+        return TCPServerProtocol(self._peers, self._on_receive, self._on_disconnect)
 
     @property
     def peers(self) -> Dict[TCPServerProtocol, PeerState]:
@@ -63,14 +72,20 @@ class TCPServerFactory(Factory):
 
 class TCPServer(TransportServer):
     """Wrapper for twisted"""
-    def __init__(self, port: int, on_receive: OnReceive) -> None:
+
+    def __init__(
+        self, port: int, on_receive: OnReceive, on_disconnect: OnDisconnect
+    ) -> None:
         self.port = port
-        self._factory = TCPServerFactory(on_receive=on_receive)
+        self._factory = TCPServerFactory(
+            on_receive=on_receive, on_disconnect=on_disconnect
+        )
         self._reactor_thread: Optional[threading.Thread] = None
         self._listening_port = None  # Twisted IListeningPort
 
     def start(self) -> None:
         """Start the server"""
+
         def _run():
             self._listening_port = reactor.listenTCP(  # type: ignore
                 self.port, self._factory, interface="0.0.0.0"
@@ -82,6 +97,7 @@ class TCPServer(TransportServer):
 
     def stop(self) -> None:
         """Stop the server"""
+
         # thread-safe stop
         def _do():
             try:
@@ -97,6 +113,7 @@ class TCPServer(TransportServer):
         self, msg: Message, exclude: Optional[TransportServerProtocol] = None
     ) -> None:
         """To fulfill the interface, this is TCP 'broadcast'"""
+
         def _do():
             payload = encode_message(msg)
             for proto in list(self._factory.peers.keys()):
@@ -108,6 +125,7 @@ class TCPServer(TransportServer):
 
     def send_to(self, proto: TransportServerProtocol, msg: Message) -> None:
         """Send message"""
+
         def _do():
             if proto.transport is not None:  # type: ignore
                 proto.send_message(msg)
@@ -116,6 +134,7 @@ class TCPServer(TransportServer):
 
     def disconnect(self, proto: TransportServerProtocol) -> None:
         """Disconnect"""
+
         def _do():
             if proto.transport is not None:  # type: ignore
                 proto.transport.loseConnection()  # type: ignore

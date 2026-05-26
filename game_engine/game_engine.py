@@ -166,7 +166,9 @@ class GameEngine:
         )
 
         for pos in self.starting_poses:
-            self.tiles[pos[1]][pos[0]] = Tile.create_empty()
+            print(f"h {self.height} w {self.width}")
+            print(f"p {pos[0]}, {pos[1]}")
+            self.tiles[pos[0]][pos[1]] = Tile.create_empty()
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -217,8 +219,8 @@ class GameEngine:
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(
-            x=start_pose[0] + 0.5,
-            y=start_pose[1] + 0.5,
+            x=start_pose[1] + 0.5,
+            y=start_pose[0] + 0.5,
             direction=Direction.RIGHT,
             name=session_player.name,
             sprite_id=num_players + 1,
@@ -232,6 +234,12 @@ class GameEngine:
             money=session_player.money,
         )
         return self._create_player(player)
+
+    def remove_player(self, name: str) -> None:
+        for p in self.players:
+            if p.name == name:
+                self.event_resolver.cancel_object_events(p.id)
+                self.players.remove(p)
 
     def _create_players(self, players: List[Player]) -> None:
         """Create players"""

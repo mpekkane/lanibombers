@@ -16,11 +16,11 @@ from network_stack.clients.tcp_scanner import TCPScanner
 from network_stack.clients.udp_scanner import UDPScanner
 
 
-def get_server(protocol: str, port: int, on_receive: OnReceive) -> TransportServer:
+def get_server(protocol: str, port: int, on_receive: OnReceive, on_disconnect: OnDisconnect) -> TransportServer:
     if protocol == "udp":
         return UDPServer(port, on_receive)
     if protocol == "tcp":
-        return TCPServer(port, on_receive)
+        return TCPServer(port, on_receive, on_disconnect)
     raise ValueError(protocol)
 
 

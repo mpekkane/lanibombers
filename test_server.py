@@ -1,6 +1,7 @@
 """
 Test code for server-side
 """
+
 import sys
 import select
 import uuid
@@ -20,7 +21,7 @@ from network_stack.messages.messages import (
     ShopState,
     Scoreboard,
     SessionInfo,
-    Countdown
+    Countdown,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -62,6 +63,7 @@ class BomberServer:
         self.server.set_callback(Pong, self.on_pong)
         self.server.set_callback(ClientControl, self.on_control)
         self.server.set_callback(ClientSelect, self.on_select)
+        self.server.set_disconnect_handler(self.on_disconnect)
         self.server.start()
 
         self.pings: Dict[str, Ping] = {}
@@ -230,7 +232,7 @@ class BomberServer:
         elapsed = Clock.now() - start
         while elapsed < countdown_length:
             elapsed = Clock.now() - start
-            new_count = countdown_length-int(elapsed)
+            new_count = countdown_length - int(elapsed)
             if new_count != count:
                 count = new_count
                 self.server.broadcast(Countdown(count=count))
@@ -253,10 +255,11 @@ class BomberServer:
             player.created = False
 
             gp = self.engine.get_player_by_name(player.name)
-            player.inventory = gp.inventory
-            player.money = gp.money
-            player.tools = gp.tools
-            player.dig_power = gp.dig_power
+            if gp is not None:
+                player.inventory = gp.inventory
+                player.money = gp.money
+                player.tools = gp.tools
+                player.dig_power = gp.dig_power
 
             player.score += points_by_name[player.name]
         self.engine = None
@@ -281,9 +284,7 @@ class BomberServer:
         dead_names = set(dead_names_in_order)
 
         survivor_names = [
-            player.name
-            for player in self.players
-            if player.name not in dead_names
+            player.name for player in self.players if player.name not in dead_names
         ]
 
         points_by_name = {}
@@ -571,6 +572,18 @@ class BomberServer:
             print(f"over pings  : {self.ping_count}")
             print(f"   & pongs  : {self.pong_count}")
 
+    def on_disconnect(self, ctx: ClientContext) -> None:
+        name = ctx.name
+
+        if self.state == ServerState.GAME and self.engine is not None:
+            self.engine.remove_player(name)
+        if self.state == ServerState.SHOP and self.shop is not None:
+            self.shop.remove_player(name)
+
+        for p in self.players:
+            if p.name == name:
+                self.players.remove(p)
+
 
 def ping(server: BomberServer) -> None:
     print("ping thread")
@@ -584,7 +597,7 @@ def ping(server: BomberServer) -> None:
 
 
 def main() -> None:
-    #assert Path("assets").exists(), "Assets missing"
+    # assert Path("assets").exists(), "Assets missing"
     parser = ArgumentParser()
     parser.add_argument("--cfg", "-c", type=str, default="cfg/server_config.yaml")
     parser.add_argument("--map", "-m", type=str, default="")
