@@ -12,12 +12,12 @@ import numpy as np
 from game_engine.entities.tool import TOOL_DIG_POWER, ToolType
 from uuid import UUID
 from game_engine.agent_state import Action
-
+from common.logger import get_logger
 
 class Shop:
     def __init__(self, players: List[SessionPlayer], dynamic_pricing: bool) -> None:
         self.players = players
-
+        self.log = get_logger()
         self.dynamic_pricing = dynamic_pricing
         self.items = [
             (BombType.SMALL_BOMB, 10),
@@ -217,13 +217,13 @@ class Shop:
                 if name == player_name:
                     self.state[i] = (name, True)
 
-            # all_ready = True
-            # for _, state in self.state:
-            #     if not state:
-            #         all_ready = False
-            #         break
-            # if all_ready:
-            #     print("INFO: All ready on shop.")
+            all_ready = True
+            for _, state in self.state:
+                if not state:
+                    all_ready = False
+                    break
+            if all_ready:
+                self.log.info("INFO: All ready on shop.")
             return
 
         if client_player.money < price:

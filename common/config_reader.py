@@ -31,7 +31,6 @@ class ConfigReader:
         if Path(cfg_path).exists():
             with open(cfg_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
-            # print(f"Load config: {config_file}")
         else:
             self.config = {}
 

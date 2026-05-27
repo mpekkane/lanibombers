@@ -60,6 +60,7 @@ from game_engine.session_parser import (
     SessionPlayer,
 )
 from game_engine.spawn_points import get_spawn_points, SpawnType
+from common.logger import get_logger
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -121,6 +122,7 @@ class GameEngine:
         self.spawn_type = spawn_type
         self.max_round_time = max_round_time
         self.round_start_time: Optional[float] = None
+        self.log = get_logger()
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self._external_state_callback = callback
@@ -450,10 +452,10 @@ class GameEngine:
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player, now)
 
-        # print("Centralize")
-        # print(player.x, player.y)
+        self.log.info("Centralize")
+        self.log.info(f"{player.x}, {player.y}")
         self.centralize_position(player)
-        # print(player.x, player.y)
+        self.log.info(f"{player.x}, {player.y}")
 
         # collision check
         in_bounds, next_tile = self.get_neighbor_tile(player)
@@ -1383,8 +1385,8 @@ class GameEngine:
         dir = Direction(event.direction)
         moved: float
 
-        # print("-" * 20)
-        # print(f"from: {target.x}, {target.y}")
+        self.log.info("-" * 20)
+        self.log.info(f"from: {target.x}, {target.y}")
         if dir == Direction.RIGHT:
             target.x += d
             moved = target.x
@@ -1411,13 +1413,13 @@ class GameEngine:
         if target.x > self.width - min_allowed:
             target.x = self.width - min_allowed
 
-        # print(f"to  : {target.x}, {target.y}")
+        self.log.info(f"to  : {target.x}, {target.y}")
         # self.round_position(target)
-        # print(f"cntr: {target.x}, {target.y}")
-        # print(f"ms: {self.width} {self.height}")
+        self.log.info(f"cntr: {target.x}, {target.y}")
+        self.log.info(f"ms: {self.width} {self.height}")
 
         # target.x, target.y = self.clamp_to_map_size(target.x, target.y)
-        # print(target.x, target.y)
+        self.log.info(f"{target.x}, {target.y}")
 
         tolerance = 0.05
         blocked = False
@@ -1427,18 +1429,18 @@ class GameEngine:
             abs(moved - int(moved)) < tolerance
             or abs(moved - int(moved) - 1) < tolerance
         ):
-            # print(f"enter tile   {px} {py}")
+            self.log.info(f"enter tile   {px} {py}")
             self.entity_enter_tile(target, now=current_time)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
-            # print(f"enter center {px} {py}")
+            self.log.info(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
             # check the neighboring tiles
             # wall
             # interact
             in_bounds, next_tile = self.get_neighbor_tile(target)
-            # print(next_tile)
+            self.log.info(next_tile)
             if not in_bounds:
                 blocked = True
                 target.state = "idle"
@@ -1472,8 +1474,8 @@ class GameEngine:
         dig_power = target.get_dig_power() if isinstance(target, Player) else 1
         target_tile.take_damage(dig_power)
         self.pending_sounds.append(SoundType.DIG)
-        # print("DIG!")
-        # print(target_tile)
+        self.log.info("DIG!")
+        self.log.info(target_tile)
 
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
@@ -1496,8 +1498,7 @@ class GameEngine:
         elif dir == Direction.DOWN:
             ny += range
         else:
-            print(entity)
-            raise ValueError("Invalid move direction")
+            raise ValueError(f"Invalid move direction for {entity}")
 
         tile = self.get_tile(nx, ny)
         if tile is None:
@@ -1572,11 +1573,11 @@ class GameEngine:
                 pass
                 # other.take_damage(agent.fight_power)
                 # agent.take_damage(other.fight_power)
-                # print("FIGHT!")
-                # print(f"Agent deals {agent.fight_power} damage")
-                # print(f"Enemy deals {other.fight_power} damage")
-                # print(f"Agent health {agent.health}")
-                # print(f"Enemy health {other.health}")
+                self.log.info("FIGHT!")
+                self.log.info(f"Agent deals {agent.fight_power} damage")
+                self.log.info(f"Enemy deals {other.fight_power} damage")
+                self.log.info(f"Agent health {agent.health}")
+                self.log.info(f"Enemy health {other.health}")
         if agent.state == "dead":
             self.pending_sounds.append(SoundType.DIE)
 

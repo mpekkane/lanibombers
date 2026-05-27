@@ -69,7 +69,6 @@ class Game:
             state="idle",
         )
         self.players[name] = deepcopy(player)
-        print(f"Created player {name}. Total {len(self.players)}")
 
     def _load_map(self, path: str) -> None:
         """Load map from ASCII file, sprite indices are ASCII values"""

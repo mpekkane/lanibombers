@@ -13,6 +13,7 @@ import socket
 from itertools import product
 from concurrent.futures import ThreadPoolExecutor
 from network_stack.clients.transport_scanner import TransportScanner
+from common.logger import get_logger
 
 
 class TCPScanner(TransportScanner):
@@ -20,18 +21,19 @@ class TCPScanner(TransportScanner):
         self.base_addr = base_addr
         self.scan_subnets = False
         self.scan_ports = False
+        self.log = get_logger()
         if subnet is not None:
             self.subnet = subnet
         else:
             self.subnet = -1
             self.scan_subnets = True
-            print("WARNING: missing subnet config")
+            self.log.warning("WARNING: missing subnet config")
         if port is not None:
             self.port = port
         else:
             self.port = -1
             self.scan_ports = True
-            print("WARNING: missing port config")
+            self.log.warning("WARNING: missing port config")
         if host:
             self.host = host
         else:
@@ -84,9 +86,9 @@ class TCPScanner(TransportScanner):
         return all_found
 
     def _scan_one(self, subnet: int, port: int, host: int) -> List[Tuple[str, int]]:
-        print(f"Subnet: {subnet}")
-        print(f"Port: {port}")
-        print("Looking for servers...")
+        self.log.info(f"Subnet: {subnet}")
+        self.log.info(f"Port: {port}")
+        self.log.info("Looking for servers...")
 
         if host > 0 and host < 256:
             ip_from = host

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from game_engine.clock import Clock
 from game_engine.events.event import Event
+from common.logger import get_logger
 
 
 class EventQueue:
@@ -12,21 +13,20 @@ class EventQueue:
     def __init__(self):
         self._events: list[Event] = []
         self._event_map: dict[UUID, Event] = {}  # For O(1) lookup by ID
+        self.log = get_logger()
 
     def add_event(self, event: Event) -> None:
         """Add an event to the queue."""
         # Check for duplicate move/push events targeting the same entity
         if event.event_type in ("move", "push"):
-            existing = self.get_events_by_target(event.target, "move") + \
-                       self.get_events_by_target(event.target, "push")
+            existing = self.get_events_by_target(
+                event.target, "move"
+            ) + self.get_events_by_target(event.target, "push")
             if existing:
-                print(f"[DUPLICATE MOVE] Adding {event.event_type} for entity {event.created_by} "
-                      f"but {len(existing)} already queued:")
+                self.log.warning(f"[DUPLICATE MOVE] Adding {event.event_type} for entity {event.created_by} but {len(existing)} already queued:")
                 for e in existing:
-                    print(f"  existing: type={e.event_type} dir={getattr(e, 'direction', '?')} "
-                          f"source={e.source} trigger_at={e.trigger_at:.4f} created_at={e.created_at:.4f} id={e.id}")
-                print(f"  new:      type={event.event_type} dir={getattr(event, 'direction', '?')} "
-                      f"source={event.source} trigger_at={event.trigger_at:.4f} created_at={event.created_at:.4f} id={event.id}")
+                    self.log.warning(f"  existing: type={e.event_type} dir={getattr(e, 'direction', '?')} source={e.source} trigger_at={e.trigger_at:.4f} created_at={e.created_at:.4f} id={e.id}")
+                self.log.warning(f"  new:      type={event.event_type} dir={getattr(event, 'direction', '?')} source={event.source} trigger_at={event.trigger_at:.4f} created_at={event.created_at:.4f} id={event.id}")
                 return  # Reject duplicate — the existing event (from user input) wins
         heapq.heappush(self._events, event)
         self._event_map[event.id] = event
@@ -78,7 +78,9 @@ class EventQueue:
                     found.append(event)
         return found
 
-    def reschedule_events_by_target(self, target, event_type: str, relative_time: float, base_time: float = 0.0) -> int:
+    def reschedule_events_by_target(
+        self, target, event_type: str, relative_time: float, base_time: float = 0.0
+    ) -> int:
         """
         Reschedule all events for a target to trigger at base_time + relative_time.
         If no existing event is found, schedules a new one.

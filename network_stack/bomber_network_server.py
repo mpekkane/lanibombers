@@ -23,6 +23,7 @@ from network_stack.servers.transport_server import (
 )
 from network_stack.shared.types import PeerState
 from common.config_reader import ConfigReader
+from common.logger import get_logger
 
 
 @dataclass
@@ -59,6 +60,7 @@ Handler = Callable[[Message, ClientContext], None]
 
 
 class BomberNetworkServer:
+
     def __init__(self, cfg_path: str) -> None:
         self.config = ConfigReader(cfg_path)
         self.port = self.config.get_config_mandatory("port", int)
@@ -70,6 +72,7 @@ class BomberNetworkServer:
         self._handlers: Dict[Type[Message], Handler] = {}
         self._clients: List[ClientContext] = []
         self._diconnect_handler: Callable[[ClientContext], None]
+        self.log = get_logger()
 
     def start(self) -> None:
         self._server.start()
@@ -148,4 +151,4 @@ class BomberNetworkServer:
 
         ctx = ClientContext(server=self, state=state, _proto=proto)
         self._diconnect_handler(ctx)
-        print("Client disconnected:", reason.getErrorMessage())
+        self.log.info(f"Client disconnected: {reason.getErrorMessage()}")

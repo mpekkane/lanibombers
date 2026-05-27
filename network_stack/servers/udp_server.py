@@ -23,6 +23,7 @@ from network_stack.servers.transport_server import (
     TransportServerProtocol,
     OnReceive,
 )
+from common.logger import get_logger
 
 
 Addr = Tuple[str, int]
@@ -49,6 +50,7 @@ class _UDPWire(DatagramProtocol):
 
     def __init__(self, server: "UDPServer") -> None:
         self._server = server
+        self.log = get_logger()
 
     def startProtocol(self) -> None:
         # Enable UDP broadcast
@@ -62,7 +64,7 @@ class _UDPWire(DatagramProtocol):
                     self._server.multicast_group, interface=self._server.interface
                 )
             except Exception as e:
-                print("UDP multicast join failed:", e)
+                self.log.error("UDP multicast join failed:", e)
 
     def datagramReceived(self, data: bytes, addr: Addr) -> None:
         self._server._datagram_received(data, addr)
@@ -89,6 +91,7 @@ class UDPServer(TransportServer):
         listen_multiple: bool = True,
     ) -> None:
         super().__init__(port, on_receive)
+        self.log = get_logger()
         self.interface = interface
         self.broadcast_addr = broadcast_addr
         self.multicast_group = multicast_group
@@ -153,7 +156,7 @@ class UDPServer(TransportServer):
         try:
             msg = decode_message(data)
         except Exception as e:
-            print("UDPServer decode error:", e)
+            self.log.error("UDPServer decode error:", e)
             return
 
         if isinstance(msg, Discover):

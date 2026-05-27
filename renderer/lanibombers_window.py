@@ -35,6 +35,7 @@ from game_engine.clock import Clock
 from renderer.player_colorizer import PLAYER_COLORS
 import random
 from game_engine.auto_client import ShopAI
+from common.logger import get_logger
 
 WINDOW_WIDTH = 1708
 WINDOW_HEIGHT = 960
@@ -96,6 +97,7 @@ class LanibombersWindow(arcade.Window):
         self.player_config_path = player_config_path
         self.next_rounds_left: Optional[int] = None
         self.auto = auto
+        self.log = get_logger()
 
         if self.auto:
             self._auto_running = True
@@ -257,7 +259,7 @@ class LanibombersWindow(arcade.Window):
         self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)
 
     def _on_disconnect(self, reason: str) -> None:
-        print(f"Disconnected from server: {reason}")
+        self.log.info(f"Disconnected from server: {reason}")
         self.disconnect()
 
     def _on_shop_state(self, msg: ShopState) -> None:
@@ -343,9 +345,10 @@ class LanibombersWindow(arcade.Window):
     # Render state
     # ------------------------------------------------------------------
 
-    def get_render_state(self) -> RenderState:
+    def get_render_state(self) -> Optional[RenderState]:
         """Returns extrapolated RenderState with client-side inventory reordering."""
-        assert self.client_simulation is not None
+        if self.client_simulation is None:
+            return None
         state = self.client_simulation.get_render_state_unsafe()
         if self.weapon_order:
             for player in state.players:

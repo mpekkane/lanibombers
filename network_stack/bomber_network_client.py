@@ -21,6 +21,7 @@ from common.config_reader import ConfigReader
 MsgType = TypeVar("MsgType", bound=Message)
 ClientHandler = Callable[[Message], None]
 DisconnectHandler = Callable[[str], None]
+from common.logger import get_logger
 
 
 class BomberNetworkClient:
@@ -41,6 +42,7 @@ class BomberNetworkClient:
         self.callbacks: Dict[Type[Message], Callable[[Message], None]] = {}
         self.on_disconnect_handler: Optional[DisconnectHandler] = None
         self.local_ip = local_ip
+        self.log = get_logger()
 
     def find_host(self) -> bool:
         scanner = get_scanner(
@@ -48,7 +50,7 @@ class BomberNetworkClient:
         )
         servers = scanner.scan()
         for i, s in enumerate(servers):
-            print(f"{i}: {s}")
+            self.log.info(f"{i}: {s}")
 
         selected = False
         while not selected:

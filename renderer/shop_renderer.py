@@ -185,7 +185,6 @@ class ShopView(arcade.View):
             self.empty_card_sprites.append(icon_panel_sprite)
 
     def on_update(self, delta_time: float):  # noqa: ARG002
-        # print("on update")
         full_state = self.get_state()
         state = full_state.renderState
         self.cursor_positions = full_state.cursor_positions

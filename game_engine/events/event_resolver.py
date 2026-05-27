@@ -5,6 +5,7 @@ from game_engine.clock import Clock
 from game_engine.events.event import Event, ResolveFlags
 from game_engine.events.event_queue import EventQueue
 from uuid import UUID
+from common.logger import get_logger
 
 
 class EventResolver:
@@ -24,6 +25,7 @@ class EventResolver:
         self._resolve = resolve
         self._thread: Optional[threading.Thread] = None
         self.pre_process: Optional[Callable[[], None]] = None
+        self.log = get_logger()
 
     def start(self) -> None:
         """Start the event resolver thread."""
@@ -105,7 +107,7 @@ class EventResolver:
             self._resolve(event.target, event, flags)
         except Exception as e:
             # Log but don't crash the resolver
-            print(f"Event resolve error: {e}")
+            self.log.error(f"Event resolve error: {e}")
 
     def _run(self) -> None:
         """Persistent thread: drain inputs, process due events, sleep until next."""

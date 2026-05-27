@@ -19,6 +19,7 @@ from network_stack.servers.transport_server import (
 )
 from network_stack.messages.messages import Message, encode_message, decode_message
 from network_stack.shared.types import PeerState
+from common.logger import get_logger
 
 
 class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
@@ -34,6 +35,7 @@ class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
         self._state = PeerState()
         self._on_receive = on_receive
         self._on_disconnect = on_disconnect
+        self.log = get_logger()
 
     def connectionMade(self) -> None:
         self._peers[self] = self._state
@@ -46,7 +48,7 @@ class TCPServerProtocol(TransportServerProtocol, Int32StringReceiver):
         try:
             msg = decode_message(string)
         except Exception as e:
-            print("TCPServerProto: Decode error:", e)
+            self.log.error("TCPServerProto: Decode error:", e)
             return
         self._on_receive(msg, self._state, self)
 

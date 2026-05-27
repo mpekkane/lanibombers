@@ -6,6 +6,7 @@ import random
 import pyglet.media as media
 from typing import List, Optional
 from game_engine.clock import Clock
+from common.logger import get_logger
 
 SOUND_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sounds")
 MUSIC_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "music")
@@ -13,6 +14,7 @@ MUSIC_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "music")
 
 class SoundEngine:
     def __init__(self, music_volume: float, fx_volume: float) -> None:
+        self.log = get_logger()
         self.music_volume = max(min(music_volume, 1.0), 0.0)
         self.fx_volume = max(min(fx_volume, 1.0), 0.0)
 
@@ -54,7 +56,7 @@ class SoundEngine:
             ]
             self._music_enabled = True
         except FileNotFoundError:
-            print("No music mp3s found. Music disabled")
+            self.log.warning("No music mp3s found. Music disabled")
             self._music_enabled = False
         self._shop_playback: Optional[media.Player] = None
         self._game_playback: Optional[media.Player] = None
@@ -134,7 +136,7 @@ class SoundEngine:
         self._play_fx(self._monster)
 
     def diagnostics(self) -> None:
-        print("Sound diagnostics")
+        print("DIAGNOSTICS: Sound diagnostics")
 
         sounds = [
             (self._treasure_sound,"_treasure_sound"),
@@ -158,7 +160,7 @@ class SoundEngine:
         ]
 
         for sound, name in sounds:
-            print(f"PLay: {name}")
+            print(f"DIAGNOSTICS: Play: {name}")
             playback = self._play(sound, loop=False, volume=1.0)
             Clock.sleep(1)
             self.stop_all()

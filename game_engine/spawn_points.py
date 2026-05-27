@@ -15,6 +15,7 @@ from game_engine.entities import (
 import numpy as np
 import random
 from scipy.stats import qmc
+from common.logger import get_logger
 
 
 class SpawnType(IntEnum):
@@ -26,6 +27,8 @@ class SpawnType(IntEnum):
 def get_spawn_points(
     num_players: int, map_data: MapData, type: SpawnType
 ) -> List[Tuple[int, int]]:
+    log = get_logger()
+    log.info(f"Get spawn points for {num_players} with type {type}")
 
     initial = _get_initial_points(num_players, map_data, type)
     refined = _refine(initial, map_data)
@@ -33,8 +36,7 @@ def get_spawn_points(
     if len(refined) > num_players:
         refined = refined[:num_players]
 
-    # stats(refined)
-    # print(f"final {len(refined)}/{num_players}")
+    stats(refined)
     return refined
 
 
@@ -69,11 +71,9 @@ def _refine(initial: List[Tuple[int, int]], map_data: MapData) -> List[Tuple[int
                 if found:
                     break
             if found:
-                # print(f"found {i}/{len(initial)}")
                 break
             offset += 1
 
-    # print(f"return {len(fixed)}/{len(initial)}")
     return fixed
 
 
@@ -174,6 +174,7 @@ def _poisson_disk_sampling(
 
 
 def stats(poses: List[Tuple[int, int]]):
+    log = get_logger()
     samples = np.array(poses)
     for i in range(samples.shape[0]):
         p = samples[i, :]
@@ -185,7 +186,7 @@ def stats(poses: List[Tuple[int, int]]):
             d = np.linalg.norm(np.array(p) - np.array(p2))
             dists.append(d)
         da = np.array(dists)
-        print(f"mean d: {da.mean()}")
+        log.info(f"mean d: {da.mean()}")
 
 
 def _clamp(val: int, mx: int) -> int:

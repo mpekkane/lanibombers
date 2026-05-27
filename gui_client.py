@@ -2,9 +2,11 @@
 import arcade
 from renderer.lanibombers_window import LanibombersWindow
 from argparse import ArgumentParser
+from common.logger import setup_logger
 
 
 def main():
+    setup_logger("logs/client.log")
     parser = ArgumentParser()
     parser.add_argument("--ip", "-i", type=str, default=None)
     parser.add_argument("--cfg", "-c", type=str, default=None)

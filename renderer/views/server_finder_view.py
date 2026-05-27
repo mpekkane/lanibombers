@@ -8,7 +8,8 @@ import arcade
 
 from network_stack.shared.factory import get_scanner
 from renderer.bitmap_text import BitmapText
-from game_engine.clock import Clock
+from common.logger import get_logger
+
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
@@ -27,7 +28,9 @@ LINE_HEIGHT = 10  # 8px char + 2px gap
 
 class ServerFinderView(arcade.View):
     """Scans the LAN via UDP broadcast and lets the player pick a server."""
-
+    def __init__(self, window: arcade.Window | None = None, background_color: Tuple[int, int, int] | Tuple[int, int, int, int] | None = None) -> None:
+        super().__init__(window, background_color)
+        self.log = get_logger()
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -98,7 +101,7 @@ class ServerFinderView(arcade.View):
             scanner = get_scanner(protocol, base_addr, subnet, port, host, timeout_s)
             results: List[Tuple[str, int]] = scanner.scan()
         except Exception as exc:
-            print(f"[ServerFinderView] scan error: {exc}")
+            self.log.error(f"[ServerFinderView] scan error: {exc}")
             results = []
 
         self._servers = results
@@ -132,7 +135,7 @@ class ServerFinderView(arcade.View):
                 self._connecting = False
                 self.window.view_complete()
             elif self._connect_elapsed >= self._connect_timeout:
-                print("[ServerFinderView] timed out waiting for first game state")
+                self.log.warning("[ServerFinderView] timed out waiting for first game state")
                 self._connecting = False
 
         self._rebuild_server_list()
@@ -227,7 +230,7 @@ class ServerFinderView(arcade.View):
     def _connect(self, server: Tuple[str, int]) -> None:
         from common.config_reader import ConfigReader
 
-        print(f"[ServerFinderView] connecting to {server[0]}:{server[1]}")
+        self.log.info(f"[ServerFinderView] connecting to {server[0]}:{server[1]}")
 
         player_cfg = ConfigReader("cfg/player.yaml").config
         self.window.connect(server[0], server[1], player_cfg)

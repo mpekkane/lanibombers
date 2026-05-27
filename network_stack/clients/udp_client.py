@@ -15,6 +15,7 @@ from twisted.internet import error
 from network_stack.messages.messages import Message, encode_message, decode_message
 from network_stack.shared.alias import OnMessage, OnConnect, OnDisconnect
 from network_stack.clients.transport_client import TransportClient
+from common.logger import get_logger
 
 
 class _UDPClientWire(DatagramProtocol):
@@ -31,6 +32,7 @@ class _UDPClientWire(DatagramProtocol):
         self._on_message = on_message
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
+        self.log = get_logger()
 
     def startProtocol(self) -> None:
         # Connect sets the default destination for write()
@@ -45,7 +47,7 @@ class _UDPClientWire(DatagramProtocol):
         try:
             msg = decode_message(data)
         except Exception as e:
-            print("UDPClient decode error:", e)
+            self.log.error("UDPClient decode error:", e)
             return
         self._on_message(msg)
 

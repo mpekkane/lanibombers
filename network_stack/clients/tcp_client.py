@@ -21,6 +21,7 @@ from network_stack.messages.messages import (
     decode_message,
 )
 from twisted.internet.endpoints import TCP4ClientEndpoint
+from common.logger import get_logger
 
 
 class TCPClientProtocol(TransportClientProtocol):
@@ -31,6 +32,7 @@ class TCPClientProtocol(TransportClientProtocol):
         on_connect: Optional[OnConnect],
         on_disconnect: Optional[OnDisconnect],
     ):
+        self.log = get_logger()
         self._on_message = on_message
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
@@ -48,7 +50,7 @@ class TCPClientProtocol(TransportClientProtocol):
             msg = decode_message(string)
         except Exception as e:
             # In real systems: log and maybe drop connection
-            print("TCPClientProtocol: Decode error:", e)
+            self.log.error("TCPClientProtocol: Decode error:", e)
             return
         self._on_message(msg)
 
@@ -61,6 +63,7 @@ class TCPClientFactory(protocol.ClientFactory):
     def __init__(self, build_proto: Callable[[], TCPClientProtocol]):
         self._build_proto = build_proto
         self.proto: Optional[TCPClientProtocol] = None
+        self.log = get_logger()
 
     def buildProtocol(self, addr: str):
         self.proto = self._build_proto()
@@ -69,13 +72,13 @@ class TCPClientFactory(protocol.ClientFactory):
     def clientConnectionFailed(
         self, connector: Any, reason: Failure = Failure(error.ConnectionDone())
     ):
-        print("TCPClientFactory: Connection failed:", reason.getErrorMessage())
+        self.log.error("TCPClientFactory: Connection failed:", reason.getErrorMessage())
         reactor.stop()  # type: ignore
 
     def clientConnectionLost(
         self, connector: Any, reason: Failure = Failure(error.ConnectionDone())
     ):
-        print("TCPClientFactory: Connection lost:", reason.getErrorMessage())
+        self.log.warning("TCPClientFactory: Connection lost:", reason.getErrorMessage())
         reactor.stop()  # type: ignore
 
 
@@ -103,8 +106,9 @@ class TCPClient(TransportClient):
         self._on_message = on_message
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
+        self.log = get_logger()
 
-        print(f"TCP client, local ip: {local_ip}")
+        self.log.info(f"TCP client, local ip: {local_ip}")
 
         self._factory = TCPClientFactory(
             build_proto=lambda: TCPClientProtocol(
@@ -135,7 +139,7 @@ class TCPClient(TransportClient):
         def _do_send():
             proto = self._factory.proto
             if proto is None or proto.transport is None:  # type: ignore
-                print("TCPClient: Not connected yet; dropping message:", msg)
+                self.log.warning("TCPClient: Not connected yet; dropping message:", msg)
                 return
             proto.send_message(msg)
 

@@ -7,7 +7,7 @@ from game_engine.entities import Tool, ToolType, Treasure
 from common.bomb_dictionary import BOMB_TYPES
 from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
-
+from common.logger import get_logger
 
 @dataclass
 class Player(DynamicEntity):
@@ -42,10 +42,6 @@ class Player(DynamicEntity):
         self.inventory.append((BombType.GRENADE, 15))
 
     def initialize_player(self, money: int) -> None:
-        # self.inventory = []
-        # self.money = money
-        # FIXME: debug
-        # self.test_inventory()
         pass
 
     def choose(self) -> None:
@@ -101,6 +97,7 @@ class Player(DynamicEntity):
         return bomb
 
     def pickup_tool(self, tool: Tool) -> None:
+        log = get_logger()
         if tool.tool_type not in self.tools:
             self.tools[tool.tool_type] = 1
         else:
@@ -118,16 +115,18 @@ class Player(DynamicEntity):
             got_type = random.choice(BOMB_TYPES)
             got_amount = random.randint(0, 10)
             self.inventory.append((got_type, got_amount))
-            # print(f"Picked up {got_amount} {got_type}")
+            log.info(f"Picked up {got_amount} {got_type}")
 
-        # print(f"Picked up {tool.tool_type}")
-        # print(f"Tools: {self.tools}")
-        # print(f"Health: {self.health}")
+        log.info(f"Picked up {tool.tool_type}")
+        log.info(f"Tools: {self.tools}")
+        log.info(f"Health: {self.health}")
 
     def pickup_treasure(self, treasure: Treasure) -> None:
         self.add_money(treasure.value)
-        # print(f"Picked up {treasure.treasure_type}")
-        # print(f"Money: {self.money}")
+
+        log = get_logger()
+        log.info(f"Picked up {treasure.treasure_type}")
+        log.info(f"Money: {self.money}")
 
     def get_dig_power(self) -> int:
         return self.dig_power

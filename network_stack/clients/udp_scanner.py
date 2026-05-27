@@ -11,6 +11,7 @@ from game_engine.clock import Clock
 from network_stack.messages.messages import encode_message, decode_message
 from network_stack.messages.messages import Message, Discover, Announce
 from network_stack.clients.transport_scanner import TransportScanner
+from common.logger import get_logger
 
 
 def _local_broadcast_addr(base_addr: str, subnet: int) -> str:
@@ -30,6 +31,7 @@ class UDPScanner(TransportScanner):
         self.subnet = subnet
         self.port = port
         self.timeout_s = timeout_s
+        self.log = get_logger()
 
     def scan(self) -> List[Tuple[str, int]]:
         """
@@ -53,7 +55,7 @@ class UDPScanner(TransportScanner):
             # send discovery
             discover_msg: Message = Discover()
             payload = encode_message(discover_msg)
-            print(f"send to {bcast}")
+            self.log.info(f"send to {bcast}")
             sock.sendto(payload, (bcast, self.port))
 
             found: dict[Tuple[str, int], None] = {}
