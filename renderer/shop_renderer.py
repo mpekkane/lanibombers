@@ -64,7 +64,7 @@ class ShopView(arcade.View):
         self.bg_sprite.scale = self.zoom
         self.bg_sprite.center_x = (640 / 2) * self.zoom
         self.bg_sprite.center_y = self.window.height - (480 / 2) * self.zoom
-        self.bg_sprite_list = arcade.SpriteList()
+        self.bg_sprite_list = arcade.SpriteList(self.window.atlas)
         self.bg_sprite_list.append(self.bg_sprite)
 
         # BitmapText for all text rendering
@@ -72,11 +72,11 @@ class ShopView(arcade.View):
         self.bitmap_text = BitmapText(font_path, zoom=self.zoom)
 
         # Player info text sprite lists
-        self.name_sprites = arcade.SpriteList()
-        self.dig_power_sprites = arcade.SpriteList()
-        self.money_sprites = arcade.SpriteList()
-        self.item_qty_sprites = arcade.SpriteList()
-        self.health_bar_sprites = arcade.SpriteList()
+        self.name_sprites = arcade.SpriteList(self.window.atlas)
+        self.dig_power_sprites = arcade.SpriteList(self.window.atlas)
+        self.money_sprites = arcade.SpriteList(self.window.atlas)
+        self.item_qty_sprites = arcade.SpriteList(self.window.atlas)
+        self.health_bar_sprites = arcade.SpriteList(self.window.atlas)
 
         # Cache for change detection
         self._cached_name = None
@@ -86,11 +86,11 @@ class ShopView(arcade.View):
         self._cached_health = None
 
         # Map preview
-        self.map_preview_sprite_list = arcade.SpriteList()
+        self.map_preview_sprite_list = arcade.SpriteList(self.window.atlas)
         self._build_map_preview()
 
         # Rounds left text
-        self.rounds_left_sprites = arcade.SpriteList()
+        self.rounds_left_sprites = arcade.SpriteList(self.window.atlas)
 
         # Load icon textures for all shop items
         self.icon_textures: dict[ItemType | str, arcade.Texture] = {}
@@ -113,13 +113,13 @@ class ShopView(arcade.View):
         self._selected_strip_cache: dict[tuple[tuple[int, int, int], int, int], arcade.Texture] = {}
 
         # Item card sprite lists
-        self.card_bg_sprites = arcade.SpriteList()
-        self.card_icon_sprites = arcade.SpriteList()
-        self.card_price_sprites = arcade.SpriteList()
+        self.card_bg_sprites = arcade.SpriteList(self.window.atlas)
+        self.card_icon_sprites = arcade.SpriteList(self.window.atlas)
+        self.card_price_sprites = arcade.SpriteList(self.window.atlas)
         self._build_item_cards()
 
         # Quantity bar sprite list (rebuilt in on_update)
-        self.quantity_bar_sprites = arcade.SpriteList()
+        self.quantity_bar_sprites = arcade.SpriteList(self.window.atlas)
         self._cached_inventory = None
 
         # Create a 1x1 white pixel texture for solid color bars
@@ -130,20 +130,20 @@ class ShopView(arcade.View):
         self.colorizer = PlayerColorizer(SPRITES_PATH)
 
         # Inventory overview bars (right side grid)
-        self.overview_bar_sprites = arcade.SpriteList()
+        self.overview_bar_sprites = arcade.SpriteList(self.window.atlas)
         self._cached_overview_key: object = None
 
         # Other players' card sprites
-        self.other_player_sprites = arcade.SpriteList()
-        self.other_player_name_sprites = arcade.SpriteList()
-        self.other_player_info_sprites = arcade.SpriteList()
+        self.other_player_sprites = arcade.SpriteList(self.window.atlas)
+        self.other_player_name_sprites = arcade.SpriteList(self.window.atlas)
+        self.other_player_info_sprites = arcade.SpriteList(self.window.atlas)
         self._cached_other_players = None
 
         # Panel builder for grey beveled panels
         self.panel_builder = PanelBuilder()
 
         # Build empty player card slots (up to 16 total, fill unused with panels)
-        self.empty_card_sprites = arcade.SpriteList()
+        self.empty_card_sprites = arcade.SpriteList(self.window.atlas)
         card_x = 640
         card_w = 110
         card_h = 30

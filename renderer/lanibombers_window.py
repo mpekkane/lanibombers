@@ -63,6 +63,14 @@ class LanibombersWindow(arcade.Window):
         auto: bool = False,
     ):
         super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, vsync=True)
+        # FIXME: for debugging multiple processes as once
+        self.atlas = arcade.DefaultTextureAtlas(
+            size=(4096, 4096),
+            ctx=self.ctx,
+        )
+        # this is the default behavior
+        # self.atlas = self.ctx.default_atlas
+
         self.sound_engine: SoundEngine = SoundEngine(music_volume=0.5, fx_volume=1.0)
         self.player_config: dict | None = None
         self.client_config: dict | None = None
@@ -207,7 +215,6 @@ class LanibombersWindow(arcade.Window):
             self.got_shop = False
             self.got_session = False
         elif state == ClientState.GAME:
-            print("destroy client simulation")
             self.client_simulation = None
             self.countdown = None
         elif state == ClientState.ENDING:
@@ -247,11 +254,11 @@ class LanibombersWindow(arcade.Window):
             self.setup_input()
 
     def create_game_simulation(self) -> None:
-        print("create client simulation")
         self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)
 
     def _on_disconnect(self, reason: str) -> None:
         print(f"Disconnected from server: {reason}")
+        self.disconnect()
 
     def _on_shop_state(self, msg: ShopState) -> None:
         shop = ShopState.to_shop(msg)
@@ -309,7 +316,6 @@ class LanibombersWindow(arcade.Window):
             self._remote,
         ) = map_keys(config)
         self.name = config.get_config("player_name") or ""
-        print(self.name)
         self.color = _parse_color(config.get_config("color"))
         self.appearance_id = int(config.get_config("appearance_id") or 1)
         self._hotkey_keys = {}
@@ -441,7 +447,6 @@ class LanibombersWindow(arcade.Window):
             if transport is not None and hasattr(transport, "stop"):
                 transport.stop()
             self.network_client = None
-        print("destroy client simulation")
         self.client_simulation = None
         if self.auto:
             self.autothread.join()

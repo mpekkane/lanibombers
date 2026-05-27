@@ -217,13 +217,13 @@ class Shop:
                 if name == player_name:
                     self.state[i] = (name, True)
 
-            all_ready = True
-            for _, state in self.state:
-                if not state:
-                    all_ready = False
-                    break
-            if all_ready:
-                print("INFO: All ready on shop.")
+            # all_ready = True
+            # for _, state in self.state:
+            #     if not state:
+            #         all_ready = False
+            #         break
+            # if all_ready:
+            #     print("INFO: All ready on shop.")
             return
 
         if client_player.money < price:

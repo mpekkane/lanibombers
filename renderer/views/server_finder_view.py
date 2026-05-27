@@ -8,6 +8,7 @@ import arcade
 
 from network_stack.shared.factory import get_scanner
 from renderer.bitmap_text import BitmapText
+from game_engine.clock import Clock
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
@@ -40,6 +41,7 @@ class ServerFinderView(arcade.View):
         self._scan_elapsed: float = 0.0
         self._scan_done: bool = False
         self._connecting: bool = False
+        self._connected: bool = False
         self._connect_elapsed: float = 0.0
         self._connect_timeout: float = 20.0
         self._name_sent: bool = False
@@ -126,6 +128,7 @@ class ServerFinderView(arcade.View):
             # if simulation is not None and simulation.has_state():
             #     self.window.view_complete()
             if self.window.got_shop:
+                self._connected = True
                 self._connecting = False
                 self.window.view_complete()
             elif self._connect_elapsed >= self._connect_timeout:
@@ -133,6 +136,14 @@ class ServerFinderView(arcade.View):
                 self._connecting = False
 
         self._rebuild_server_list()
+
+        if self.window.auto and not self._connected:
+            if self._servers:
+                if not self._connecting:
+                    self._connect(self._servers[self._selected])
+            else:
+                if not self._scanning:
+                    self._start_scan()
 
     def _rebuild_server_list(self) -> None:
         """Rebuild server list sprites only when state changes."""

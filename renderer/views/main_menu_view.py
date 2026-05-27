@@ -1,6 +1,7 @@
 import os
 import arcade
 from game_engine.state_machine import ClientStateAction
+from game_engine.clock import Clock
 
 _GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "graphics")
 _SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites")
@@ -48,6 +49,10 @@ class MainMenuView(arcade.View):
         sx, sy = self._selector_screen_pos(self._selected)
         arcade.draw_texture_rect(self._sel_texture, arcade.XYWH(sx, sy, _SEL_W * z, _SEL_H * z), pixelated=True)
 
+    def on_update(self, delta_time: float) -> bool | None:
+        if self.window.auto:
+            self.window.view_complete(ClientStateAction.CONNECT)
+
     def on_key_press(self, key, _modifiers):
         if key == arcade.key.UP:
             self._selected = (self._selected - 1) % len(MENU_ITEMS)
@@ -68,4 +73,3 @@ class MainMenuView(arcade.View):
         elif label == "Exit":
             action = ClientStateAction.QUIT
         self.window.view_complete(action)
-

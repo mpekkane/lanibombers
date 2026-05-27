@@ -79,6 +79,7 @@ class BomberServer:
         self.game_on_countdown = False
 
         self.max_round_time = 60
+        self.engine = None
 
     def run_state(self) -> None:
         state = self.state_machine.get_state()
@@ -264,6 +265,8 @@ class BomberServer:
             player.score += points_by_name[player.name]
         self.engine = None
 
+        self._print_scores()
+
     def score_players(self):
         # round has ended, clean up player object, award score
         # self.player_death_times: List[Tuple[UUID, str, float]]
@@ -299,6 +302,20 @@ class BomberServer:
             points_by_name[name] = death_rank + 1
 
         return points_by_name
+
+    def _print_scores(self) -> None:
+        datalist = []
+        for i, p in enumerate(self.players):
+            datalist.append((p.name, p.score))
+        data = np.array(datalist)
+        points = data[:, 1].astype(dtype=np.int32)
+        indices = np.argsort(points)
+        indices = indices[::-1]
+        scoreboard = data[indices]
+        print("Scoreboard")
+        print("="*20)
+        for i in range(len(self.players)):
+            print(f"{scoreboard[i, 0]} - {scoreboard[i, 1]}")
 
     def end_game(self) -> None:
         print("Game has ended.")
@@ -478,6 +495,8 @@ class BomberServer:
         if not self.state.running():
             return
 
+        if self.engine is None:
+            return
         if ctx.state.name is not None:
             player = self.engine.get_player_by_name(ctx.state.name)
         else:

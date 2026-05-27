@@ -166,8 +166,6 @@ class GameEngine:
         )
 
         for pos in self.starting_poses:
-            print(f"h {self.height} w {self.width}")
-            print(f"p {pos[0]}, {pos[1]}")
             self.tiles[pos[0]][pos[1]] = Tile.create_empty()
 
     def start(self) -> None:

@@ -57,7 +57,7 @@ class Player(DynamicEntity):
 
         # FIXME: debug print
         selected_bomb_type, bomb_count = self.inventory[self.selected]
-        print(selected_bomb_type, bomb_count)
+        # print(selected_bomb_type, bomb_count)
 
     def plant_bomb(self) -> Bomb | None:
         if not self.inventory:
@@ -109,16 +109,16 @@ class Player(DynamicEntity):
             got_type = random.choice(BOMB_TYPES)
             got_amount = random.randint(0, 10)
             self.inventory.append((got_type, got_amount))
-            print(f"Picked up {got_amount} {got_type}")
+            # print(f"Picked up {got_amount} {got_type}")
 
-        print(f"Picked up {tool.tool_type}")
-        print(f"Tools: {self.tools}")
-        print(f"Health: {self.health}")
+        # print(f"Picked up {tool.tool_type}")
+        # print(f"Tools: {self.tools}")
+        # print(f"Health: {self.health}")
 
     def pickup_treasure(self, treasure: Treasure) -> None:
         self.add_money(treasure.value)
-        print(f"Picked up {treasure.treasure_type}")
-        print(f"Money: {self.money}")
+        # print(f"Picked up {treasure.treasure_type}")
+        # print(f"Money: {self.money}")
 
     def get_dig_power(self) -> int:
         return self.dig_power

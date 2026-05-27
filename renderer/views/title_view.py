@@ -31,6 +31,9 @@ class TitleView(arcade.View):
             self._alpha = 255
             self._ready = True
 
+        if self._ready and self.window.auto:
+            self.window.view_complete()
+
     def on_draw(self):
         self.clear()
         arcade.draw_texture_rect(self._texture, self._rect, pixelated=True)
