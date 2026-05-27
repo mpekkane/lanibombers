@@ -18,6 +18,7 @@ class CursesBomberServer(BomberServerBase):
     Layout:
         - Top/main: server status + players
         - Bottom: wrapped tail of actual log file
+        - Footer: colored command row
     """
 
     def __init__(
@@ -55,6 +56,15 @@ class CursesBomberServer(BomberServerBase):
         curses.noecho()
         curses.cbreak()
         curses.curs_set(0)
+
+        if curses.has_colors():
+            curses.start_color()
+            curses.use_default_colors()
+
+            curses.init_pair(1, curses.COLOR_CYAN, -1)  # titles
+            curses.init_pair(2, curses.COLOR_YELLOW, -1)  # commands
+            curses.init_pair(3, curses.COLOR_GREEN, -1)  # status/good
+            curses.init_pair(4, curses.COLOR_RED, -1)  # quit/danger
 
         assert self.stdscr is not None
         self.stdscr.keypad(True)
@@ -134,7 +144,7 @@ class CursesBomberServer(BomberServerBase):
                 self._start_requested = True
 
     ##################
-    # drawing
+    # drawing helpers
     ##################
 
     def _safe_addstr(self, stdscr: Any, y: int, x: int, text: str) -> None:
@@ -152,6 +162,37 @@ class CursesBomberServer(BomberServerBase):
         except curses.error:
             pass
 
+    def _safe_addstr_attr(
+        self,
+        stdscr: Any,
+        y: int,
+        x: int,
+        text: str,
+        attr: int,
+    ) -> None:
+        try:
+            height, width = stdscr.getmaxyx()
+
+            if y < 0 or y >= height:
+                return
+
+            if x < 0 or x >= width:
+                return
+
+            stdscr.addstr(y, x, text[: max(0, width - x - 1)], attr)
+
+        except curses.error:
+            pass
+
+    def _color(self, pair: int) -> int:
+        if curses.has_colors():
+            return curses.color_pair(pair)
+        return curses.A_NORMAL
+
+    ##################
+    # drawing
+    ##################
+
     def _draw_screen(self) -> None:
         if self.stdscr is None:
             return
@@ -162,35 +203,74 @@ class CursesBomberServer(BomberServerBase):
         state = self.state_machine.get_state()
         height, width = stdscr.getmaxyx()
 
-        if height < 10 or width < 40:
+        if height < 12 or width < 40:
             self._safe_addstr(stdscr, 0, 0, "Terminal too small")
             stdscr.refresh()
             return
 
-        footer_height = 3
-        log_height = max(6, height // 3)
-        log_y = max(0, height - log_height - footer_height)
+        status_y = 3
+        players_y = 10
 
-        self._safe_addstr(stdscr, 0, 0, "LANIBOMBERS SERVER")
+        # Footer layout:
+        #   blank spacer row
+        #   separator row
+        #   command row
+        #   possible terminal bottom safety
+        footer_height = 4
+
+        # Max 16 players + title/separator = 18 rows.
+        # But avoid letting players push logs too far down on smaller terminals.
+        max_players_section_height = 18
+        desired_top_end = players_y + max_players_section_height
+        max_top_end = max(players_y + 4, height // 2)
+        top_end = min(desired_top_end, max_top_end)
+
+        # One empty row between players and log.
+        log_y = min(top_end + 1, height - footer_height - 6)
+        log_y = max(players_y + 4, log_y)
+
+        log_height = max(4, height - log_y - footer_height)
+
+        title_attr = self._color(1) | curses.A_BOLD
+        self._safe_addstr_attr(
+            stdscr,
+            0,
+            0,
+            "LANIBOMBERS SERVER",
+            title_attr,
+        )
         self._safe_addstr(stdscr, 1, 0, "=" * min(60, max(0, width - 1)))
 
-        self._safe_addstr(stdscr, 3, 0, f"State          : {state.name}")
-        self._safe_addstr(stdscr, 4, 0, f"Players        : {len(self.players)}")
-        self._safe_addstr(stdscr, 5, 0, f"Rounds left    : {self.rounds_left}")
-        self._safe_addstr(stdscr, 6, 0, f"Ping count     : {self.ping_count}")
-        self._safe_addstr(stdscr, 7, 0, f"Pong count     : {self.pong_count}")
+        state_attr = self._color(3) | curses.A_BOLD
+        self._safe_addstr(stdscr, status_y, 0, "State          : ")
+        self._safe_addstr_attr(stdscr, status_y, 17, state.name, state_attr)
+
+        self._safe_addstr(
+            stdscr, status_y + 1, 0, f"Players        : {len(self.players)}"
+        )
+        self._safe_addstr(
+            stdscr, status_y + 2, 0, f"Rounds left    : {self.rounds_left}"
+        )
+        self._safe_addstr(
+            stdscr, status_y + 3, 0, f"Ping count     : {self.ping_count}"
+        )
+        self._safe_addstr(
+            stdscr, status_y + 4, 0, f"Pong count     : {self.pong_count}"
+        )
 
         if self.average_ping >= 0:
             avg_ms = self.average_ping / 1e6
-            self._safe_addstr(stdscr, 8, 0, f"Average ping   : {avg_ms:.2f} ms")
+            self._safe_addstr(
+                stdscr, status_y + 5, 0, f"Average ping   : {avg_ms:.2f} ms"
+            )
         else:
-            self._safe_addstr(stdscr, 8, 0, "Average ping   : -")
+            self._safe_addstr(stdscr, status_y + 5, 0, "Average ping   : -")
 
         self._draw_players(
             stdscr=stdscr,
-            y=10,
+            y=players_y,
             x=0,
-            max_y=log_y - 1,
+            max_y=log_y - 2,
             width=width - 1,
         )
 
@@ -202,9 +282,7 @@ class CursesBomberServer(BomberServerBase):
             width=width - 1,
         )
 
-        footer_y = max(0, height - footer_height)
-        self._safe_addstr(stdscr, footer_y, 0, "-" * min(60, max(0, width - 1)))
-        self._safe_addstr(stdscr, footer_y + 1, 0, self._footer_text())
+        self._draw_footer(stdscr, height, width)
 
         stdscr.refresh()
 
@@ -216,7 +294,9 @@ class CursesBomberServer(BomberServerBase):
         max_y: int,
         width: int,
     ) -> None:
-        self._safe_addstr(stdscr, y, x, "Players")
+        title_attr = self._color(1) | curses.A_BOLD
+
+        self._safe_addstr_attr(stdscr, y, x, "Players", title_attr)
         self._safe_addstr(stdscr, y + 1, x, "-" * min(60, max(0, width - 1)))
 
         first_row = y + 2
@@ -229,6 +309,7 @@ class CursesBomberServer(BomberServerBase):
             return
 
         max_player_rows = max(0, max_y - first_row + 1)
+        max_player_rows = min(max_player_rows, 16)
 
         for i, player in enumerate(self.players[:max_player_rows]):
             line = (
@@ -288,7 +369,9 @@ class CursesBomberServer(BomberServerBase):
         if height <= 0 or width <= 0:
             return
 
-        self._safe_addstr(stdscr, y, x, title)
+        title_attr = self._color(1) | curses.A_BOLD
+
+        self._safe_addstr_attr(stdscr, y, x, title, title_attr)
         self._safe_addstr(stdscr, y + 1, x, "-" * max(0, width - 1))
 
         body_height = max(0, height - 2)
@@ -324,21 +407,49 @@ class CursesBomberServer(BomberServerBase):
             wrap=True,
         )
 
-    def _footer_text(self) -> str:
+    def _draw_footer(self, stdscr: Any, height: int, width: int) -> None:
+        footer_y = max(0, height - 3)
+
+        # Spacer row above the command separator.
+        self._safe_addstr(stdscr, footer_y - 1, 0, "")
+
+        self._safe_addstr(stdscr, footer_y, 0, "-" * min(60, max(0, width - 1)))
+
+        cmd_attr = self._color(2) | curses.A_BOLD
+        quit_attr = self._color(4) | curses.A_BOLD
+
         state = self.state_machine.get_state()
 
         if state.name == "LOBBY":
             if len(self.players) > 0:
-                return "S / Y / Enter: start game    Q: quit"
-            return "Waiting for players...       Q: quit"
+                self._safe_addstr_attr(
+                    stdscr, footer_y + 1, 0, "S / Y / Enter", cmd_attr
+                )
+                self._safe_addstr(stdscr, footer_y + 1, 13, ": start game    ")
+                self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
+                self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+            else:
+                self._safe_addstr(
+                    stdscr, footer_y + 1, 0, "Waiting for players...       "
+                )
+                self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
+                self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
 
-        if state.name == "SHOP":
-            return "Shop running...              Q: quit"
+        elif state.name == "SHOP":
+            self._safe_addstr(stdscr, footer_y + 1, 0, "Shop running...              ")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
 
-        if state.name == "GAME":
-            return "Game running...              Q: quit"
+        elif state.name == "GAME":
+            self._safe_addstr(stdscr, footer_y + 1, 0, "Game running...              ")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
 
-        if state.name == "END":
-            return "Session ending...            Q: quit"
+        elif state.name == "END":
+            self._safe_addstr(stdscr, footer_y + 1, 0, "Session ending...            ")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
 
-        return "Q: quit"
+        else:
+            self._safe_addstr_attr(stdscr, footer_y + 1, 0, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 1, ": quit")
