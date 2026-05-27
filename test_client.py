@@ -178,7 +178,7 @@ class BomberClient:
         # Adjust selected index to point to the same BombType
         for i, (bt, _c) in enumerate(player.inventory):
             if bt == selected_type:
-                player.selected = i
+                player.set_selected(i)
                 break
 
     def has_state(self) -> bool:

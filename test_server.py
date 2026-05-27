@@ -511,7 +511,7 @@ class BomberServer:
         target_type = all_types[msg.bomb_type]
         for i, (bomb_type, _count) in enumerate(player.inventory):
             if bomb_type == target_type:
-                player.selected = i
+                player.set_selected(i)
                 return
 
     def _ensure_timestamp(self, msg: Ping) -> None:

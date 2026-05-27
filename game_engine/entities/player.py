@@ -15,6 +15,7 @@ class Player(DynamicEntity):
     tools: Dict[ToolType, int] = field(default_factory=lambda: {})
     selected: int = 0
     dig_power: int = 10
+    selected_type: BombType = BombType.SMALL_BOMB
 
     def test_inventory(self) -> None:
         self.inventory.append((BombType.SMALL_BOMB, 50))
@@ -51,13 +52,21 @@ class Player(DynamicEntity):
         if not self.inventory:
             return
 
-        self.selected += 1
+        self.update_selected(1)
         if self.selected >= len(self.inventory):
-            self.selected = 0
+            self.set_selected(0)
 
-        # FIXME: debug print
+    def update_selected(self, change: int) -> None:
+        self.selected += change
+        self.set_selected_bomb_type()
+
+    def set_selected(self, val: int) -> None:
+        self.selected = val
+        self.set_selected_bomb_type()
+
+    def set_selected_bomb_type(self) -> None:
         selected_bomb_type, bomb_count = self.inventory[self.selected]
-        # print(selected_bomb_type, bomb_count)
+        self.selected_type = selected_bomb_type
 
     def plant_bomb(self) -> Bomb | None:
         if not self.inventory:
@@ -65,7 +74,7 @@ class Player(DynamicEntity):
 
         # Ensure selected index is valid
         if self.selected >= len(self.inventory):
-            self.selected = len(self.inventory) - 1
+            self.set_selected(len(self.inventory) - 1)
 
         selected_bomb_type, bomb_count = self.inventory[self.selected]
         vx, vy = xy_to_tile(self.x, self.y)
@@ -84,7 +93,7 @@ class Player(DynamicEntity):
             del self.inventory[self.selected]
             # Adjust selected index if it's now out of bounds
             if self.selected >= len(self.inventory) and self.inventory:
-                self.selected = len(self.inventory) - 1
+                self.set_selected(len(self.inventory) - 1)
 
         else:
             self.inventory[self.selected] = selected_bomb_type, new_count

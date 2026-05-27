@@ -371,7 +371,7 @@ class LanibombersWindow(arcade.Window):
         player.inventory = reordered
         for i, (bt, _c) in enumerate(player.inventory):
             if bt == selected_type:
-                player.selected = i
+                player.set_selected(i)
                 break
 
     # ------------------------------------------------------------------
@@ -449,7 +449,9 @@ class LanibombersWindow(arcade.Window):
             self.network_client = None
         self.client_simulation = None
         if self.auto:
+            self._auto_running = False
             self.autothread.join()
+        self.view_complete(ClientStateAction.QUIT)
 
     # ------------------------------------------------------------------
     # Debugging auto client (very stupid ai)

@@ -13,6 +13,8 @@ from renderer.bitmap_text import BitmapText
 from renderer.panel_builder import PanelBuilder
 from renderer.player_colorizer import PlayerColorizer
 from PIL import Image
+from common.item_dictionary import ItemType, get_item_icon
+from common.bomb_dictionary import BombType
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 
@@ -33,9 +35,7 @@ class MarginRenderer:
 
         # Utilities
         self.panel_builder = PanelBuilder()
-        self.bitmap_text = BitmapText(
-            os.path.join(SPRITES_PATH, "font.png"), zoom=zoom
-        )
+        self.bitmap_text = BitmapText(os.path.join(SPRITES_PATH, "font.png"), zoom=zoom)
         self.colorizer = PlayerColorizer(SPRITES_PATH)
 
         # Sprite lists
@@ -44,6 +44,7 @@ class MarginRenderer:
         self.text_sprites = arcade.SpriteList()
         self.damage_overlay_sprites = arcade.SpriteList()
         self.black_image = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
+        self.other_player_info_sprites = arcade.SpriteList()
 
         # Build static grey panel backgrounds for all 16 slots
         card_panel_texture = self.panel_builder.create_panel_texture(
@@ -65,12 +66,24 @@ class MarginRenderer:
             icon_panel = arcade.Sprite()
             icon_panel.texture = icon_panel_texture
             icon_panel.scale = zoom
-            icon_panel.center_x = (self.card_x + self.card_w + self.icon_size / 2) * zoom
+            icon_panel.center_x = (
+                self.card_x + self.card_w + self.icon_size / 2
+            ) * zoom
             icon_panel.center_y = screen_height - (slot_y + self.icon_size / 2) * zoom
             self.panel_sprites.append(icon_panel)
 
         # Change detection cache: list of per-player tuples
         self._cached_player_keys: list = []
+
+        # Load icon textures for all shop items
+        self.icon_textures: dict[BombType, arcade.Texture] = {}
+        bombs = [btype for btype in BombType]
+        for item in bombs:
+            icon_name = get_item_icon(item)
+            if icon_name:
+                path = os.path.join(SPRITES_PATH, f"{icon_name}_icon.png")
+                if os.path.exists(path):
+                    self.icon_textures[item] = arcade.load_texture(path)
 
     def on_update(self, players: List[Player]):
         """Update enemy cards if player data changed."""
@@ -78,7 +91,15 @@ class MarginRenderer:
 
         # Build cache key per player
         player_keys = [
-            (p.name, p.sprite_id, p.color, p.money, p.get_dig_power(), p.health)
+            (
+                p.name,
+                p.sprite_id,
+                p.color,
+                p.money,
+                p.get_dig_power(),
+                p.health,
+                p.selected,
+            )
             for p in others
         ]
         if player_keys == self._cached_player_keys:
@@ -87,9 +108,8 @@ class MarginRenderer:
 
         self.card_sprites = arcade.SpriteList()
         self.text_sprites = arcade.SpriteList()
-
-        # Damage overlay (black rectangle over health bar on player card)
         self.damage_overlay_sprites = arcade.SpriteList()
+        self.other_player_info_sprites = arcade.SpriteList()
 
         for i, player in enumerate(others):
             card_top = (i + 1) * self.card_h
@@ -103,7 +123,9 @@ class MarginRenderer:
                 card_sprite.texture = card_texture
                 card_sprite.scale = self.zoom
                 card_sprite.center_x = (self.card_x + self.card_w / 2) * self.zoom
-                card_sprite.center_y = self.screen_height - (card_top + self.card_h / 2) * self.zoom
+                card_sprite.center_y = (
+                    self.screen_height - (card_top + self.card_h / 2) * self.zoom
+                )
                 self.card_sprites.append(card_sprite)
 
             # Player name at card-relative (8, 1) — white
@@ -137,7 +159,9 @@ class MarginRenderer:
             damage_ratio = (100 - player.health) / 100
             if damage_ratio > 0:
                 damage_overlay = arcade.Sprite()
-                damage_overlay.texture = arcade.Texture(self.black_image, name="damage_overlay")
+                damage_overlay.texture = arcade.Texture(
+                    self.black_image, name="damage_overlay"
+                )
                 damage_overlay.visible = True
                 overlay_height = 26 * damage_ratio
                 damage_overlay.width = 8 * self.zoom
@@ -148,9 +172,24 @@ class MarginRenderer:
                 )
                 self.damage_overlay_sprites.append(damage_overlay)
 
+            # Selected weapon
+            icon_texture = self.icon_textures.get(player.selected_type)
+            if icon_texture:
+                icon_left = self.card_x + self.card_w
+                icon_top = card_top
+                icon_sprite = arcade.Sprite()
+                icon_sprite.texture = icon_texture
+                icon_sprite.scale = self.zoom
+                icon_sprite.center_x = (icon_left + 15) * self.zoom
+                icon_sprite.center_y = (
+                    self.screen_height - (card_top + 15) * self.zoom
+                )
+                self.other_player_info_sprites.append(icon_sprite)
+
     def on_draw(self):
         """Draw all margin sprite lists."""
         self.panel_sprites.draw(pixelated=True)
         self.card_sprites.draw(pixelated=True)
         self.text_sprites.draw(pixelated=True)
         self.damage_overlay_sprites.draw(pixelated=True)
+        self.other_player_info_sprites.draw(pixelated=True)
