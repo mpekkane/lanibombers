@@ -12,6 +12,7 @@ from game_engine.entities.player import Player
 from renderer.bitmap_text import BitmapText
 from renderer.panel_builder import PanelBuilder
 from renderer.player_colorizer import PlayerColorizer
+from PIL import Image
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 
@@ -41,6 +42,8 @@ class MarginRenderer:
         self.panel_sprites = arcade.SpriteList()
         self.card_sprites = arcade.SpriteList()
         self.text_sprites = arcade.SpriteList()
+        self.damage_overlay_sprites = arcade.SpriteList()
+        self.black_image = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
 
         # Build static grey panel backgrounds for all 16 slots
         card_panel_texture = self.panel_builder.create_panel_texture(
@@ -75,7 +78,7 @@ class MarginRenderer:
 
         # Build cache key per player
         player_keys = [
-            (p.name, p.sprite_id, p.color, p.money, p.get_dig_power())
+            (p.name, p.sprite_id, p.color, p.money, p.get_dig_power(), p.health)
             for p in others
         ]
         if player_keys == self._cached_player_keys:
@@ -84,6 +87,9 @@ class MarginRenderer:
 
         self.card_sprites = arcade.SpriteList()
         self.text_sprites = arcade.SpriteList()
+
+        # Damage overlay (black rectangle over health bar on player card)
+        self.damage_overlay_sprites = arcade.SpriteList()
 
         for i, player in enumerate(others):
             card_top = (i + 1) * self.card_h
@@ -127,8 +133,24 @@ class MarginRenderer:
             for sprite in money_sprites:
                 self.text_sprites.append(sprite)
 
+            # Update damage overlay on health bar (right edge of card)
+            damage_ratio = (100 - player.health) / 100
+            if damage_ratio > 0:
+                damage_overlay = arcade.Sprite()
+                damage_overlay.texture = arcade.Texture(self.black_image, name="damage_overlay")
+                damage_overlay.visible = True
+                overlay_height = 26 * damage_ratio
+                damage_overlay.width = 8 * self.zoom
+                damage_overlay.height = overlay_height * self.zoom
+                damage_overlay.center_x = (self.card_x + 104) * self.zoom
+                damage_overlay.center_y = (
+                    self.screen_height - (card_top + 2 + overlay_height / 2) * self.zoom
+                )
+                self.damage_overlay_sprites.append(damage_overlay)
+
     def on_draw(self):
         """Draw all margin sprite lists."""
         self.panel_sprites.draw(pixelated=True)
         self.card_sprites.draw(pixelated=True)
         self.text_sprites.draw(pixelated=True)
+        self.damage_overlay_sprites.draw(pixelated=True)
