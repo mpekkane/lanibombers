@@ -8,6 +8,7 @@ from tkinter import ttk
 from pathlib import Path
 from typing import Optional
 
+
 class TkBomberServer(BomberServerBase):
     """
     Simple cross-platform Tkinter GUI.
@@ -16,10 +17,10 @@ class TkBomberServer(BomberServerBase):
     Game/shop/lobby logic should stay in BomberServerBase.
 
     Layout:
-        - Top: server status
-        - Middle: players / scoreboard
+        - Top: header + controls
+        - Middle: status cards
+        - Lower middle: players / scoreboard
         - Bottom: actual log file tail
-        - Buttons: start game, quit
     """
 
     def __init__(
@@ -29,16 +30,41 @@ class TkBomberServer(BomberServerBase):
         headless: bool,
         map_path: Optional[str],
         log_path: str = "logs/server.log",
-        font_size: int = 12,
+        font_size: int = 24,
     ) -> None:
         self.log_path = Path(log_path)
         self.font_size = font_size
+
         self.root: Optional[tk.Tk] = None
 
         self.base_font: Optional[tkfont.Font] = None
         self.title_font: Optional[tkfont.Font] = None
-        self.mono_font: Optional[tkfont.Font] = None
+        self.large_font: Optional[tkfont.Font] = None
         self.small_font: Optional[tkfont.Font] = None
+        self.log_font: Optional[tkfont.Font] = None
+
+        # Palette. Change these if you want another flavor.
+        self.bg = "#eef2f7"
+        self.header_bg = "#1f4e79"
+        self.header_fg = "#ffffff"
+
+        self.panel_bg = "#ffffff"
+        self.panel_border = "#c7d1dd"
+
+        self.text_fg = "#1f2933"
+        self.muted_fg = "#5f6b7a"
+
+        self.accent = "#2563eb"
+        self.accent_hover = "#1d4ed8"
+
+        self.start_bg = "#15803d"
+        self.start_hover = "#166534"
+
+        self.quit_bg = "#b91c1c"
+        self.quit_hover = "#991b1b"
+
+        self.log_bg = "#f8fafc"
+        self.selection_bg = "#bfdbfe"
 
         self._quit_requested = False
         self._start_requested = False
@@ -69,10 +95,12 @@ class TkBomberServer(BomberServerBase):
 
     def ui_start(self) -> None:
         self.root = tk.Tk()
-        self._setup_fonts()
         self.root.title("Lanibombers Server")
         self.root.geometry("1920x1080")
-        self.root.minsize(640, 420)
+        self.root.minsize(960, 640)
+
+        self._setup_fonts()
+        self.root.configure(bg=self.bg)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
@@ -126,80 +154,237 @@ class TkBomberServer(BomberServerBase):
     ##################
 
     def _setup_fonts(self) -> None:
-        self.base_font = tkfont.Font(family="TkDefaultFont", size=self.font_size)
+        # Native-ish proportional Tk font.
+        font_family = "helvetica"
+        log_font_family = "courier"
+        self.base_font = tkfont.Font(family=font_family, size=self.font_size)
         self.title_font = tkfont.Font(
-            family="TkDefaultFont",
-            size=self.font_size + 4,
+            family=font_family,
+            size=self.font_size + 8,
             weight="bold",
         )
-        self.mono_font = tkfont.Font(family="TkFixedFont", size=self.font_size)
-        self.small_font = tkfont.Font(family="TkDefaultFont", size=max(8, self.font_size - 1))
+        self.large_font = tkfont.Font(
+            family=font_family,
+            size=self.font_size + 2,
+            weight="bold",
+        )
+        self.small_font = tkfont.Font(
+            family=font_family,
+            size=max(10, self.font_size - 4),
+        )
+        self.log_font = tkfont.Font(
+            family=log_font_family,
+            size=max(10, self.font_size - 6),
+        )
 
         style = ttk.Style()
 
-        style.configure(".", font=self.base_font)
-        style.configure("TLabel", font=self.base_font)
-        style.configure("TButton", font=self.base_font)
-        style.configure("TLabelframe.Label", font=self.base_font)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure(
+            ".",
+            font=self.base_font,
+            background=self.bg,
+            foreground=self.text_fg,
+        )
+
+        style.configure(
+            "TFrame",
+            background=self.bg,
+        )
+
+        style.configure(
+            "Header.TFrame",
+            background=self.header_bg,
+        )
+
+        style.configure(
+            "TLabel",
+            font=self.base_font,
+            background=self.bg,
+            foreground=self.text_fg,
+        )
+
+        style.configure(
+            "Title.TLabel",
+            font=self.title_font,
+            background=self.header_bg,
+            foreground=self.header_fg,
+        )
+
+        style.configure(
+            "Footer.TLabel",
+            font=self.small_font,
+            background=self.bg,
+            foreground=self.muted_fg,
+        )
+
+        style.configure(
+            "Card.TFrame",
+            background=self.panel_bg,
+            relief="solid",
+            borderwidth=1,
+        )
+
+        style.configure(
+            "CardTitle.TLabel",
+            font=self.small_font,
+            background=self.panel_bg,
+            foreground=self.muted_fg,
+        )
+
+        style.configure(
+            "CardValue.TLabel",
+            font=self.large_font,
+            background=self.panel_bg,
+            foreground=self.text_fg,
+        )
+
+        style.configure(
+            "Panel.TLabelframe",
+            background=self.bg,
+            foreground=self.text_fg,
+            borderwidth=1,
+            relief="solid",
+        )
+
+        style.configure(
+            "Panel.TLabelframe.Label",
+            font=self.large_font,
+            background=self.bg,
+            foreground=self.header_bg,
+        )
+
+        style.configure(
+            "TButton",
+            font=self.base_font,
+            padding=(18, 10),
+        )
+
+        style.configure(
+            "Start.TButton",
+            font=self.large_font,
+            padding=(22, 12),
+            background=self.start_bg,
+            foreground="#ffffff",
+            bordercolor=self.start_bg,
+            focusthickness=2,
+            focuscolor=self.start_bg,
+        )
+        style.map(
+            "Start.TButton",
+            background=[
+                ("disabled", "#9ca3af"),
+                ("active", self.start_hover),
+                ("pressed", self.start_hover),
+            ],
+            foreground=[
+                ("disabled", "#e5e7eb"),
+                ("active", "#ffffff"),
+                ("pressed", "#ffffff"),
+            ],
+        )
+
+        style.configure(
+            "Quit.TButton",
+            font=self.base_font,
+            padding=(18, 10),
+            background=self.quit_bg,
+            foreground="#ffffff",
+            bordercolor=self.quit_bg,
+            focusthickness=2,
+            focuscolor=self.quit_bg,
+        )
+        style.map(
+            "Quit.TButton",
+            background=[
+                ("active", self.quit_hover),
+                ("pressed", self.quit_hover),
+            ],
+            foreground=[
+                ("active", "#ffffff"),
+                ("pressed", "#ffffff"),
+            ],
+        )
 
     def _build_widgets(self) -> None:
         assert self.root is not None
 
-        self.state_var = tk.StringVar(value="State: -")
-        self.players_var = tk.StringVar(value="Players: 0")
-        self.rounds_var = tk.StringVar(value="Rounds left: 0")
-        self.ping_var = tk.StringVar(value="Ping/Pong: -")
+        self.state_var = tk.StringVar(value="-")
+        self.players_var = tk.StringVar(value="0")
+        self.rounds_var = tk.StringVar(value="0")
+        self.ping_var = tk.StringVar(value="-")
         self.footer_var = tk.StringVar(value="")
 
-        outer = ttk.Frame(self.root, padding=10)
+        outer = ttk.Frame(self.root, padding=24)
         outer.pack(fill=tk.BOTH, expand=True)
 
-        header = ttk.Frame(outer)
+        header = ttk.Frame(outer, style="Header.TFrame", padding=(20, 16))
         header.pack(fill=tk.X)
 
         title = ttk.Label(
             header,
             text="LANIBOMBERS SERVER",
-            font=self.title_font,
+            style="Title.TLabel",
         )
         title.pack(side=tk.LEFT)
 
-        button_row = ttk.Frame(header)
+        button_row = ttk.Frame(header, style="Header.TFrame")
         button_row.pack(side=tk.RIGHT)
 
         self.start_button = ttk.Button(
             button_row,
             text="Start game",
             command=self._on_start,
+            style="Start.TButton",
         )
-        self.start_button.pack(side=tk.LEFT, padx=(0, 8))
+        self.start_button.pack(side=tk.LEFT, padx=(0, 12))
 
         quit_button = ttk.Button(
             button_row,
             text="Quit",
             command=self._on_quit,
+            style="Quit.TButton",
         )
         quit_button.pack(side=tk.LEFT)
 
-        status = ttk.LabelFrame(outer, text="Status", padding=8)
-        status.pack(fill=tk.X, pady=(10, 8))
+        status = ttk.Frame(outer)
+        status.pack(fill=tk.X, pady=(20, 16))
 
-        ttk.Label(status, textvariable=self.state_var).grid(
-            row=0, column=0, sticky="w", padx=(0, 24)
+        self._make_status_card(status, "State", self.state_var).grid(
+            row=0, column=0, sticky="nsew", padx=(0, 12)
         )
-        ttk.Label(status, textvariable=self.players_var).grid(
-            row=0, column=1, sticky="w", padx=(0, 24)
+        self._make_status_card(status, "Players", self.players_var).grid(
+            row=0, column=1, sticky="nsew", padx=(0, 12)
         )
-        ttk.Label(status, textvariable=self.rounds_var).grid(
-            row=0, column=2, sticky="w", padx=(0, 24)
+        self._make_status_card(status, "Rounds left", self.rounds_var).grid(
+            row=0, column=2, sticky="nsew", padx=(0, 12)
         )
-        ttk.Label(status, textvariable=self.ping_var).grid(row=0, column=3, sticky="w")
+        self._make_status_card(status, "Ping / Pong", self.ping_var).grid(
+            row=0, column=3, sticky="nsew"
+        )
+
+        for col in range(4):
+            status.columnconfigure(col, weight=1)
 
         main = ttk.PanedWindow(outer, orient=tk.VERTICAL)
         main.pack(fill=tk.BOTH, expand=True)
 
-        players_frame = ttk.LabelFrame(main, text="Players / Scoreboard", padding=8)
-        log_frame = ttk.LabelFrame(main, text=f"Log file: {self.log_path}", padding=8)
+        players_frame = ttk.LabelFrame(
+            main,
+            text="Players / Scoreboard",
+            padding=14,
+            style="Panel.TLabelframe",
+        )
+        log_frame = ttk.LabelFrame(
+            main,
+            text=f"Log file: {self.log_path}",
+            padding=14,
+            style="Panel.TLabelframe",
+        )
 
         main.add(players_frame, weight=1)
         main.add(log_frame, weight=3)
@@ -207,8 +392,16 @@ class TkBomberServer(BomberServerBase):
         self.players_list = tk.Listbox(
             players_frame,
             height=8,
-            font=self.mono_font,
+            font=self.base_font,
             activestyle="none",
+            bg=self.panel_bg,
+            fg=self.text_fg,
+            selectbackground=self.selection_bg,
+            selectforeground="#000000",
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=self.panel_border,
+            borderwidth=0,
         )
         self.players_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -224,8 +417,16 @@ class TkBomberServer(BomberServerBase):
             log_frame,
             height=12,
             wrap=tk.WORD,
-            font=self.mono_font,
+            font=self.log_font,
             state=tk.DISABLED,
+            bg=self.log_bg,
+            fg=self.text_fg,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=self.panel_border,
+            borderwidth=0,
+            padx=12,
+            pady=10,
         )
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -241,9 +442,34 @@ class TkBomberServer(BomberServerBase):
             outer,
             textvariable=self.footer_var,
             anchor="w",
-            padding=(0, 8, 0, 0),
+            padding=(0, 14, 0, 0),
+            style="Footer.TLabel",
         )
         footer.pack(fill=tk.X)
+
+    def _make_status_card(
+        self,
+        parent: ttk.Frame,
+        title: str,
+        variable: tk.StringVar,
+    ) -> ttk.Frame:
+        card = ttk.Frame(parent, padding=(18, 12), style="Card.TFrame")
+
+        title_label = ttk.Label(
+            card,
+            text=title,
+            style="CardTitle.TLabel",
+        )
+        title_label.pack(anchor="w")
+
+        value_label = ttk.Label(
+            card,
+            textvariable=variable,
+            style="CardValue.TLabel",
+        )
+        value_label.pack(anchor="w", pady=(4, 0))
+
+        return card
 
     ##################
     # callbacks
@@ -271,17 +497,15 @@ class TkBomberServer(BomberServerBase):
 
         state = self.state_machine.get_state()
 
-        self.state_var.set(f"State: {state.name}")
-        self.players_var.set(f"Players: {len(self.players)}")
-        self.rounds_var.set(f"Rounds left: {self.rounds_left}")
+        self.state_var.set(state.name)
+        self.players_var.set(str(len(self.players)))
+        self.rounds_var.set(str(self.rounds_left))
 
         if self.average_ping >= 0:
             avg_ms = self.average_ping / 1e6
-            ping_text = (
-                f"Ping/Pong: {self.ping_count}/{self.pong_count}, avg={avg_ms:.2f} ms"
-            )
+            ping_text = f"{self.ping_count}/{self.pong_count}, {avg_ms:.2f} ms"
         else:
-            ping_text = f"Ping/Pong: {self.ping_count}/{self.pong_count}, avg=-"
+            ping_text = f"{self.ping_count}/{self.pong_count}, avg -"
 
         self.ping_var.set(ping_text)
         self.footer_var.set(self._footer_text())
