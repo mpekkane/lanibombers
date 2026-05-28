@@ -15,8 +15,8 @@ def main() -> None:
     parser.add_argument("--display", "-d", action="store_true", default=False)
     parser.add_argument(
         "--ui",
-        choices=("console", "curses", "gui"),
-        default="curses",
+        choices=("legacy", "cli", "gui"),
+        default="gui",
     )
     parser.add_argument(
         "--font-size",

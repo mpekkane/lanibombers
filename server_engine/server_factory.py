@@ -14,10 +14,10 @@ def build_server(
     map_path: Optional[str],
     font_size: int = 12,
 ) -> BomberServerBase:
-    if ui == "console":
+    if ui == "legacy":
         return ConsoleBomberServer(cfg, session, headless, map_path)
 
-    if ui == "curses":
+    if ui == "cli":
         return CursesBomberServer(cfg, session, headless, map_path)
 
     if ui == "gui":

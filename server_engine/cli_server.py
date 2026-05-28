@@ -12,13 +12,20 @@ class CursesBomberServer(BomberServerBase):
     """
     ncurses UI.
 
-    This class should only handle presentation and admin input.
-    Game/shop/lobby logic should stay in BomberServerBase.
+    This class only handles presentation and admin input.
+    Game/shop/lobby logic stays in BomberServerBase.
 
-    Layout:
-        - Top/main: server status + players
-        - Bottom: wrapped tail of actual log file
-        - Footer: colored command row
+    Controls:
+        STOPPED:
+            S / Y / Enter : start server
+            Q             : quit app
+
+        LOBBY:
+            S / Y / Enter : start game, if players exist
+            Q             : stop server
+
+        SHOP/GAME/END:
+            Q             : stop server
     """
 
     def __init__(
@@ -34,6 +41,7 @@ class CursesBomberServer(BomberServerBase):
         self.stdscr: Optional[Any] = None
         self._quit_requested = False
         self._start_requested = False
+        self._stop_server_requested = False
 
         # No curses printout buffer. UI-visible text comes from the actual log file.
         # If BomberServerBase still expects a text callback, swallow it here.
@@ -64,7 +72,7 @@ class CursesBomberServer(BomberServerBase):
             curses.init_pair(1, curses.COLOR_CYAN, -1)  # titles
             curses.init_pair(2, curses.COLOR_YELLOW, -1)  # commands
             curses.init_pair(3, curses.COLOR_GREEN, -1)  # status/good
-            curses.init_pair(4, curses.COLOR_RED, -1)  # quit/danger
+            curses.init_pair(4, curses.COLOR_RED, -1)  # stop/quit/danger
 
         assert self.stdscr is not None
         self.stdscr.keypad(True)
@@ -95,6 +103,13 @@ class CursesBomberServer(BomberServerBase):
             return False
 
         self._start_requested = False
+        return True
+
+    def ui_stop_server_requested(self) -> bool:
+        if not self._stop_server_requested:
+            return False
+
+        self._stop_server_requested = False
         return True
 
     def ui_show_scores(self) -> None:
@@ -136,12 +151,18 @@ class CursesBomberServer(BomberServerBase):
             if key == -1:
                 break
 
+            state = self.state_machine.get_state()
+
             if key in (ord("q"), ord("Q")):
-                self._quit_requested = True
+                if state.name == "STOPPED":
+                    self._quit_requested = True
+                else:
+                    self._stop_server_requested = True
                 return
 
             if key in (ord("s"), ord("S"), ord("y"), ord("Y"), 10, 13):
-                self._start_requested = True
+                if state.name in ("STOPPED", "LOBBY"):
+                    self._start_requested = True
 
     ##################
     # drawing helpers
@@ -210,22 +231,13 @@ class CursesBomberServer(BomberServerBase):
 
         status_y = 3
         players_y = 10
-
-        # Footer layout:
-        #   blank spacer row
-        #   separator row
-        #   command row
-        #   possible terminal bottom safety
         footer_height = 4
 
-        # Max 16 players + title/separator = 18 rows.
-        # But avoid letting players push logs too far down on smaller terminals.
         max_players_section_height = 18
         desired_top_end = players_y + max_players_section_height
         max_top_end = max(players_y + 4, height // 2)
         top_end = min(desired_top_end, max_top_end)
 
-        # One empty row between players and log.
         log_y = min(top_end + 1, height - footer_height - 6)
         log_y = max(players_y + 4, log_y)
 
@@ -392,7 +404,6 @@ class CursesBomberServer(BomberServerBase):
         height: int,
         width: int,
     ) -> None:
-        # Read more physical lines than visible rows because wrapping expands them.
         max_lines = max(20, height * 2)
         lines = self._read_log_tail(max_lines)
 
@@ -410,9 +421,7 @@ class CursesBomberServer(BomberServerBase):
     def _draw_footer(self, stdscr: Any, height: int, width: int) -> None:
         footer_y = max(0, height - 3)
 
-        # Spacer row above the command separator.
         self._safe_addstr(stdscr, footer_y - 1, 0, "")
-
         self._safe_addstr(stdscr, footer_y, 0, "-" * min(60, max(0, width - 1)))
 
         cmd_attr = self._color(2) | curses.A_BOLD
@@ -420,35 +429,41 @@ class CursesBomberServer(BomberServerBase):
 
         state = self.state_machine.get_state()
 
-        if state.name == "LOBBY":
+        if state.name == "STOPPED":
+            self._safe_addstr_attr(stdscr, footer_y + 1, 0, "S / Y / Enter", cmd_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 13, ": start server    ")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 33, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 34, ": quit")
+
+        elif state.name == "LOBBY":
             if len(self.players) > 0:
                 self._safe_addstr_attr(
                     stdscr, footer_y + 1, 0, "S / Y / Enter", cmd_attr
                 )
                 self._safe_addstr(stdscr, footer_y + 1, 13, ": start game    ")
-                self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
-                self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+                self._safe_addstr_attr(stdscr, footer_y + 1, 32, "Q", quit_attr)
+                self._safe_addstr(stdscr, footer_y + 1, 33, ": stop server")
             else:
                 self._safe_addstr(
                     stdscr, footer_y + 1, 0, "Waiting for players...       "
                 )
-                self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
-                self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+                self._safe_addstr_attr(stdscr, footer_y + 1, 32, "Q", quit_attr)
+                self._safe_addstr(stdscr, footer_y + 1, 33, ": stop server")
 
         elif state.name == "SHOP":
             self._safe_addstr(stdscr, footer_y + 1, 0, "Shop running...              ")
-            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
-            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 32, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 33, ": stop server")
 
         elif state.name == "GAME":
             self._safe_addstr(stdscr, footer_y + 1, 0, "Game running...              ")
-            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
-            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 32, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 33, ": stop server")
 
         elif state.name == "END":
             self._safe_addstr(stdscr, footer_y + 1, 0, "Session ending...            ")
-            self._safe_addstr_attr(stdscr, footer_y + 1, 30, "Q", quit_attr)
-            self._safe_addstr(stdscr, footer_y + 1, 31, ": quit")
+            self._safe_addstr_attr(stdscr, footer_y + 1, 32, "Q", quit_attr)
+            self._safe_addstr(stdscr, footer_y + 1, 33, ": stop server")
 
         else:
             self._safe_addstr_attr(stdscr, footer_y + 1, 0, "Q", quit_attr)
