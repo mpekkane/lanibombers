@@ -8,9 +8,10 @@ class ServerState(IntEnum):
     SHOP = 3
     GAME = 4
     END = 5
+    STOPPED = 6
 
     def running(self) -> bool:
-        return int(self) > 3
+        return self in (ServerState.LOBBY, ServerState.SHOP, ServerState.GAME)
 
 
 class ServerStateMachine:
@@ -20,6 +21,8 @@ class ServerStateMachine:
     # TODO: ending condition, now just test control flow
     def update(self, quit: bool = False) -> ServerState:
         if self.state == ServerState.STARTING:
+            self.state = ServerState.STOPPED
+        elif self.state == ServerState.STOPPED:
             self.state = ServerState.LOBBY
         elif self.state == ServerState.LOBBY:
             self.state = ServerState.SHOP
@@ -30,9 +33,15 @@ class ServerStateMachine:
                 self.state = ServerState.END
             else:
                 self.state = ServerState.SHOP
+        elif self.state == ServerState.END:
+            self.state = ServerState.STOPPED
         return self.state
 
     def get_state(self) -> ServerState:
+        return self.state
+
+    def stop(self) -> ServerState:
+        self.state = ServerState.STOPPED
         return self.state
 
 

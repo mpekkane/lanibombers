@@ -27,7 +27,7 @@ from network_stack.messages.messages import (
     SessionInfo,
     Countdown,
     ClientConnectionStateMessage,
-    ClientConnectionState
+    ClientConnectionState,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -89,7 +89,9 @@ class BomberServerBase:
         self.server.set_callback(ClientControl, self.on_control)
         self.server.set_callback(ClientSelect, self.on_select)
         self.server.set_disconnect_handler(self.on_disconnect)
-        self.server.start()
+
+        # Network listener is opened only when entering LOBBY from STOPPED.
+        self._networking_started = False
 
         self.pings: Dict[str, Ping] = {}
         self.average_ping: int = -1
@@ -107,10 +109,101 @@ class BomberServerBase:
         self.engine: Optional[GameEngine] = None
         self.sound_engine: Optional[SoundEngine] = None
 
-        self.rounds_left: int = 0
+        self.rounds_left: int = self.session.rounds_left()
 
         # Keep False for curses UI, otherwise prints corrupt the screen.
         self.debug_prints = False
+        self.end_screen_wait_time = 5
+
+    ##################
+    # Networking lifecycle
+    ##################
+
+    def _start_networking(self) -> None:
+        """
+        Start accepting client connections.
+
+        Called when progressing from STOPPED -> LOBBY.
+        """
+        if self._networking_started:
+            return
+
+        self.server.start()
+        self._networking_started = True
+        self.log("Server networking started.")
+
+    def _stop_networking(self) -> None:
+        """
+        Stop accepting client connections.
+
+        Called when entering STOPPED / after session END.
+        """
+        if not self._networking_started:
+            return
+
+        # First disconnect existing clients.
+        self.server.disconnect_all()
+
+        # Then close the listener if the transport implementation supports it.
+        stop_fn = getattr(self.server, "stop", None)
+
+        if callable(stop_fn):
+            stop_fn()
+            self._networking_started = False
+            self.log("Server networking stopped.")
+        else:
+            # Fallback: clients are disconnected, but the listening socket may remain open.
+            # Add BomberNetworkServer.stop() for true STOPPED behavior.
+            self._networking_started = False
+            self.log(
+                "Server networking marked stopped, but BomberNetworkServer has no stop()."
+            )
+
+    def stop_server(self) -> None:
+        """
+        Force the server back to STOPPED from any state.
+
+        This is not app quit. It closes the current game/session runtime,
+        disconnects clients, stops networking, clears transient state, and
+        moves the state machine to STOPPED.
+        """
+        if self.engine is not None:
+            try:
+                self.engine.stop()
+            except Exception:
+                pass
+
+        self.engine = None
+        self.sound_engine = None
+        self.shop = None
+        self.shop_complete = False
+        self.map_data = None
+        self.game_on_countdown = False
+
+        for player in self.players:
+            player.created = False
+
+        self.players.clear()
+        self.pings.clear()
+        self.average_ping = -1
+        self.ping_count = 0
+        self.pong_count = 0
+
+        self.server.disconnect_all()
+        self._stop_networking()
+
+        self.session.reset()
+        self.state_machine.stop()
+
+    def _handle_stop_server_request(self) -> bool:
+        if self.state == ServerState.STOPPED:
+            return False
+
+        if not self.ui_stop_server_requested():
+            return False
+
+        self.stop_server()
+        return True
 
     ##################
     # Main loop
@@ -119,10 +212,12 @@ class BomberServerBase:
     def run_forever(self) -> None:
         self.ui_start()
         try:
-            running = True
-            while running and not self.ui_should_quit():
+            while not self.ui_should_quit():
                 self.ui_tick()
-                self.next_state()
+
+                if self._handle_stop_server_request():
+                    continue
+
                 self.run_state()
         finally:
             self.ui_stop()
@@ -131,30 +226,25 @@ class BomberServerBase:
         state = self.state_machine.get_state()
 
         if state == ServerState.STARTING:
-            return
+            self.state_machine.update()
+
+        elif state == ServerState.STOPPED:
+            self.run_stopped()
+
         elif state == ServerState.LOBBY:
             self.run_lobby()
+
         elif state == ServerState.SHOP:
             self.run_shop()
+
         elif state == ServerState.GAME:
             self.start_game()
+
         elif state == ServerState.END:
             self.end_game()
+
         else:
             raise ValueError("Invalid server state")
-
-    def next_state(self) -> None:
-        self.state_machine.update(quit=self.session.session_complete())
-
-        if self.session.session_complete():
-            info = SessionInfo(
-                rounds_left=0,
-                width=0,
-                height=0,
-                tilemap=np.array([]),
-                pickups=[],
-            )
-            self.server.broadcast(info, None)
 
     @property
     def state(self) -> ServerState:
@@ -187,6 +277,9 @@ class BomberServerBase:
 
     def ui_show_end_message(self) -> None:
         pass
+
+    def ui_stop_server_requested(self) -> bool:
+        return False
 
     ##################
     # Rendering
@@ -234,6 +327,31 @@ class BomberServerBase:
             se.die()
 
     ##################
+    # Stopped
+    ##################
+
+    def run_stopped(self) -> None:
+        self._stop_networking()
+
+        while self.state == ServerState.STOPPED and not self.ui_should_quit():
+            self.ui_tick()
+
+            if self.ui_start_requested():
+                self.players.clear()
+                self.shop = None
+                self.shop_complete = False
+                self.map_data = None
+                self.game_on_countdown = False
+                self.engine = None
+                self.sound_engine = None
+
+                self._start_networking()
+                self.state_machine.update()
+                return
+
+            Clock.sleep(0.1)
+
+    ##################
     # Lobby
     ##################
 
@@ -243,19 +361,25 @@ class BomberServerBase:
         while not ready and not self.ui_should_quit():
             self.ui_tick()
 
+            if self._handle_stop_server_request():
+                return
+
             if len(self.players) > 0:
                 if self.ui_start_requested():
                     ready = True
             else:
                 Clock.sleep(0.1)
 
+        if ready:
+            self.state_machine.update()
+
     ##################
     # Map/session
     ##################
 
     def generate_next_map(self) -> None:
-        next_map = self.session.get_next_map()
         self.rounds_left = self.session.rounds_left()
+        next_map = self.session.get_next_map()
 
         if next_map.type == SessionMapType.LOAD:
             self.map_data = load_map(next_map.map_path)
@@ -295,7 +419,14 @@ class BomberServerBase:
 
         while not self.shop_complete and not self.ui_should_quit():
             self.ui_tick()
+
+            if self._handle_stop_server_request():
+                return
+
             Clock.sleep(1)
+
+        if self.shop_complete:
+            self.state_machine.update()
 
     def _update_shop(self) -> None:
         if self.shop is None:
@@ -353,6 +484,9 @@ class BomberServerBase:
         while elapsed < countdown_length and not self.ui_should_quit():
             self.ui_tick()
 
+            if self._handle_stop_server_request():
+                return
+
             elapsed = Clock.now() - start
             new_count = countdown_length - int(elapsed)
 
@@ -367,6 +501,9 @@ class BomberServerBase:
 
         while self.engine.running and not self.ui_should_quit():
             self.ui_tick()
+
+            if self._handle_stop_server_request():
+                return
 
             render_state = self.engine.get_render_state()
             self.server.broadcast(GameState.from_render(render_state), None)
@@ -391,6 +528,19 @@ class BomberServerBase:
 
         self.engine = None
         self.ui_show_scores()
+
+        quit_session = self.session.session_complete()
+        self.state_machine.update(quit=quit_session)
+
+        if quit_session:
+            info = SessionInfo(
+                rounds_left=0,
+                width=0,
+                height=0,
+                tilemap=np.array([]),
+                pickups=[],
+            )
+            self.server.broadcast(info, None)
 
     def score_players(self) -> Dict[str, int]:
         """
@@ -439,8 +589,11 @@ class BomberServerBase:
         start = Clock.now()
         dt = Clock.now() - start
 
-        while dt < 10.0 and not self.ui_should_quit():
+        while dt < self.end_screen_wait_time and not self.ui_should_quit():
             self.ui_tick()
+
+            if self._handle_stop_server_request():
+                return
 
             self.server.broadcast(Scoreboard(players=self.players), None)
 
@@ -448,6 +601,9 @@ class BomberServerBase:
             dt = Clock.now() - start
 
         self.server.disconnect_all()
+        self._stop_networking()
+        self.session.reset()
+        self.state_machine.update()
 
     def update_state(self) -> None:
         if not self.state.running():
@@ -638,7 +794,9 @@ class BomberServerBase:
             )
         )  # type: ignore
 
-        self.server.send_to_client(ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED))
+        self.server.send_to_client(
+            ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED)
+        )
 
     def create_game_player(self, session_player: SessionPlayer) -> None:
         assert self.engine is not None

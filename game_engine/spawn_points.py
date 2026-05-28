@@ -185,8 +185,9 @@ def stats(poses: List[Tuple[int, int]]):
             p2 = samples[j, :]
             d = np.linalg.norm(np.array(p) - np.array(p2))
             dists.append(d)
-        da = np.array(dists)
-        log.info(f"mean d: {da.mean()}")
+        if len(dists) > 0:
+            da = np.array(dists)
+            log.info(f"mean d: {da.mean()}")
 
 
 def _clamp(val: int, mx: int) -> int:

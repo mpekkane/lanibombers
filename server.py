@@ -4,7 +4,8 @@ from common.logger import setup_logger
 
 
 def main() -> None:
-    setup_logger("logs/server.log")
+    logger = setup_logger("logs/server.log")
+    logger.info("Server started")
 
     parser = ArgumentParser()
 

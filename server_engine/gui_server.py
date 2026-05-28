@@ -38,6 +38,10 @@ class TkBomberServer(BomberServerBase):
         font_size: int = 24,
         ui_scale: float = 2.0,
     ) -> None:
+        self._quit_requested = False
+        self._start_requested = False
+        self._stop_server_requested = False
+
         self.log_path = Path(log_path)
         self.font_size = font_size
         self.ui_scale = ui_scale
@@ -188,6 +192,13 @@ class TkBomberServer(BomberServerBase):
 
     def ui_show_end_message(self) -> None:
         return
+
+    def ui_stop_server_requested(self) -> bool:
+        if not self._stop_server_requested:
+            return False
+
+        self._stop_server_requested = False
+        return True
 
     ##################
     # widget construction
@@ -600,14 +611,14 @@ class TkBomberServer(BomberServerBase):
         )
         self.session_button.pack(side=tk.LEFT, padx=(0, 12))
 
-        quit_button = ttk.Button(
+        self.quit_button = ttk.Button(
             button_row,
             text="Quit",
-            command=self._on_quit,
+            command=self._on_stop_or_quit,
             style="Quit.TButton",
             width=self.header_button_width,
         )
-        quit_button.pack(side=tk.LEFT, padx=(0, 12))
+        self.quit_button.pack(side=tk.LEFT, padx=(0, 12))
 
         status = ttk.Frame(outer)
         status.pack(fill=tk.X, pady=(20, 16))
@@ -788,13 +799,7 @@ class TkBomberServer(BomberServerBase):
             return
 
         state = self.state_machine.get_state()
-        if state.name not in ("STARTING", "LOBBY"):
-            messagebox.showwarning(
-                "Session editor",
-                "Editing the session is safest before the game has started.\n\n"
-                "Return to lobby before applying session changes.",
-                parent=self.root,
-            )
+        if state.name != "STOPPED":
             return
 
         win = tk.Toplevel(self.root)
@@ -968,15 +973,13 @@ class TkBomberServer(BomberServerBase):
             if config is None:
                 return
 
-            filename = filedialog.asksaveasfilename(
-                parent=win,
+            filename = self._ask_filename_big(
                 title="Save session YAML",
+                mode="save",
+                initialdir=self.session_path.parent,
                 initialfile="session.yaml",
-                defaultextension=".yaml",
-                filetypes=[
-                    ("YAML files", "*.yaml *.yml"),
-                    ("All files", "*.*"),
-                ],
+                patterns=("*.yaml", "*.yml"),
+                default_extension=".yaml",
             )
             if not filename:
                 return
@@ -990,13 +993,11 @@ class TkBomberServer(BomberServerBase):
             status_var.set(f"Saved to {filename}")
 
         def load_clicked() -> None:
-            filename = filedialog.askopenfilename(
-                parent=win,
+            filename = self._ask_filename_big(
                 title="Load session YAML",
-                filetypes=[
-                    ("YAML files", "*.yaml *.yml"),
-                    ("All files", "*.*"),
-                ],
+                mode="open",
+                initialdir=self.session_path.parent,
+                patterns=("*.yaml", "*.yml"),
             )
             if not filename:
                 return
@@ -1170,6 +1171,14 @@ class TkBomberServer(BomberServerBase):
     def _on_quit(self) -> None:
         self._quit_requested = True
 
+    def _on_stop_or_quit(self) -> None:
+        state = self.state_machine.get_state()
+
+        if state.name == "STOPPED":
+            self._quit_requested = True
+        else:
+            self._stop_server_requested = True
+
     ##################
     # updates
     ##################
@@ -1268,33 +1277,281 @@ class TkBomberServer(BomberServerBase):
         return [line.rstrip("\n") for line in lines[-max_lines:]]
 
     def _update_controls(self) -> None:
-        if self.start_button is None or self.session_button is None:
+        if (
+            self.start_button is None
+            or self.session_button is None
+            or self.quit_button is None
+        ):
             return
 
         state = self.state_machine.get_state()
 
-        if state.name == "LOBBY" and len(self.players) > 0:
-            self.start_button.config(state=tk.NORMAL)
-            self.session_button.config(state=tk.DISABLED)
-        else:
-            self.start_button.config(state=tk.DISABLED)
+        if state.name == "STOPPED":
+            self.start_button.config(
+                text="Start server",
+                state=tk.NORMAL,
+                style="Start.TButton",
+            )
             self.session_button.config(state=tk.NORMAL)
+            self.quit_button.config(
+                text="Quit",
+                state=tk.NORMAL,
+                style="Quit.TButton",
+            )
+
+        elif state.name == "LOBBY":
+            self.start_button.config(
+                text="Start game",
+                state=tk.NORMAL if len(self.players) > 0 else tk.DISABLED,
+                style="Start.TButton",
+            )
+            self.session_button.config(state=tk.DISABLED)
+            self.quit_button.config(
+                text="Stop",
+                state=tk.NORMAL,
+                style="Quit.TButton",
+            )
+
+        else:
+            self.start_button.config(
+                text="Start game",
+                state=tk.DISABLED,
+                style="Start.TButton",
+            )
+            self.session_button.config(state=tk.DISABLED)
+            self.quit_button.config(
+                text="Stop",
+                state=tk.NORMAL,
+                style="Quit.TButton",
+            )
 
     def _footer_text(self) -> str:
         state = self.state_machine.get_state()
 
+        if state.name == "STOPPED":
+            return "Server stopped. Edit the session or click Start server."
+
         if state.name == "LOBBY":
             if len(self.players) > 0:
-                return "Ready. Click Start game to begin."
-            return "Waiting for players..."
+                return "Ready. Click Start game to begin, or Stop to close the server."
+            return "Server running. Waiting for players..."
 
         if state.name == "SHOP":
-            return "Shop running..."
+            return "Shop running... Click Stop to return to stopped state."
 
         if state.name == "GAME":
-            return "Game running..."
+            return "Game running... Click Stop to return to stopped state."
 
         if state.name == "END":
             return "Session ending..."
 
         return ""
+
+    def _ask_filename_big(
+        self,
+        *,
+        title: str,
+        mode: str,
+        initialdir: Optional[Path] = None,
+        initialfile: str = "",
+        patterns: tuple[str, ...] = ("*.yaml", "*.yml"),
+        default_extension: str = ".yaml",
+    ) -> Optional[str]:
+        """
+        Big Tk file picker.
+
+        mode:
+            "open" -> user selects existing file
+            "save" -> user chooses/enters output filename
+        """
+        if self.root is None:
+            return None
+
+        if mode not in ("open", "save"):
+            raise ValueError("mode must be 'open' or 'save'")
+
+        current_dir = Path(initialdir or Path.cwd()).expanduser().resolve()
+        selected: dict[str, Optional[str]] = {"path": None}
+
+        win = tk.Toplevel(self.root)
+        win.title(title)
+        win.geometry("1400x1200")
+        win.minsize(1000, 900)
+        win.transient(self.root)
+        win.grab_set()
+        win.configure(bg=self.bg)
+
+        container = ttk.Frame(win, padding=24, style="Dialog.TFrame")
+        container.pack(fill=tk.BOTH, expand=True)
+
+        path_var = tk.StringVar(value=str(current_dir))
+        filename_var = tk.StringVar(value=initialfile)
+
+        ttk.Label(
+            container,
+            text=title,
+            style="DialogTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 16))
+
+        ttk.Label(
+            container,
+            textvariable=path_var,
+            style="Footer.TLabel",
+        ).pack(anchor="w", pady=(0, 12))
+
+        list_frame = ttk.Frame(container)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        files_list = tk.Listbox(
+            list_frame,
+            font=self.base_font,
+            bg=self.panel_bg,
+            fg=self.text_fg,
+            selectbackground=self.selection_bg,
+            selectforeground="#000000",
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=self.panel_border,
+            borderwidth=0,
+        )
+        files_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scroll = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=files_list.yview)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        files_list.config(yscrollcommand=scroll.set)
+
+        filename_row = ttk.Frame(container)
+        filename_row.pack(fill=tk.X, pady=(16, 0))
+
+        ttk.Label(filename_row, text="Filename").pack(side=tk.LEFT, padx=(0, 12))
+
+        filename_entry = ttk.Entry(
+            filename_row,
+            textvariable=filename_var,
+            font=self.base_font,
+        )
+        filename_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        entries: list[Path] = []
+
+        def refresh() -> None:
+            nonlocal current_dir, entries
+
+            path_var.set(str(current_dir))
+            files_list.delete(0, tk.END)
+
+            try:
+                dirs = sorted(
+                    [p for p in current_dir.iterdir() if p.is_dir()],
+                    key=lambda p: p.name.lower(),
+                )
+
+                file_candidates: list[Path] = []
+                for pattern in patterns:
+                    file_candidates.extend(current_dir.glob(pattern))
+
+                files = sorted(set(file_candidates), key=lambda p: p.name.lower())
+
+            except OSError:
+                dirs = []
+                files = []
+
+            entries = dirs + files
+
+            for p in entries:
+                prefix = "[DIR] " if p.is_dir() else "      "
+                files_list.insert(tk.END, prefix + p.name)
+
+        def go_up() -> None:
+            nonlocal current_dir
+
+            parent = current_dir.parent
+            if parent != current_dir:
+                current_dir = parent
+                refresh()
+
+        def use_selected() -> None:
+            nonlocal current_dir
+
+            selection = files_list.curselection()
+            if not selection:
+                return
+
+            p = entries[selection[0]]
+
+            if p.is_dir():
+                current_dir = p
+                refresh()
+                return
+
+            filename_var.set(p.name)
+
+            if mode == "open":
+                selected["path"] = str(p)
+                win.destroy()
+
+        def confirm() -> None:
+            name = filename_var.get().strip()
+
+            if not name:
+                return
+
+            path = Path(name)
+
+            if not path.is_absolute():
+                path = current_dir / path
+
+            if mode == "open":
+                if not path.exists() or not path.is_file():
+                    return
+
+            if mode == "save":
+                if path.suffix == "" and default_extension:
+                    path = path.with_suffix(default_extension)
+
+            selected["path"] = str(path)
+            win.destroy()
+
+        def cancel() -> None:
+            selected["path"] = None
+            win.destroy()
+
+        files_list.bind("<Double-Button-1>", lambda _event: use_selected())
+        files_list.bind("<Return>", lambda _event: use_selected())
+        filename_entry.bind("<Return>", lambda _event: confirm())
+
+        button_row = ttk.Frame(container)
+        button_row.pack(fill=tk.X, pady=(16, 0))
+
+        ttk.Button(
+            button_row,
+            text="Up",
+            command=go_up,
+            style="Dialog.TButton",
+            width=self.dialog_button_width,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        ttk.Button(
+            button_row,
+            text="Open" if mode == "open" else "Save",
+            command=confirm,
+            style="Start.TButton",
+            width=self.dialog_button_width,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        ttk.Button(
+            button_row,
+            text="Cancel",
+            command=cancel,
+            style="Dialog.TButton",
+            width=self.dialog_button_width,
+        ).pack(side=tk.RIGHT)
+
+        refresh()
+
+        if mode == "save":
+            filename_entry.focus_set()
+            filename_entry.selection_range(0, tk.END)
+
+        win.wait_window()
+        return selected["path"]

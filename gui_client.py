@@ -6,7 +6,9 @@ from common.logger import setup_logger
 
 
 def main():
-    setup_logger("logs/client.log")
+    logger = setup_logger("logs/client.log")
+    logger.info("Client started")
+
     parser = ArgumentParser()
     parser.add_argument("--ip", "-i", type=str, default=None)
     parser.add_argument("--cfg", "-c", type=str, default=None)
