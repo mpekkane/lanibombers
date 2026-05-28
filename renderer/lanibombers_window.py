@@ -17,6 +17,9 @@ from network_stack.messages.messages import (
     Scoreboard,
     SessionInfo,
     Countdown,
+    ClientConnectionStateMessage,
+    ClientConnectionState,
+    ChatText,
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -98,6 +101,8 @@ class LanibombersWindow(arcade.Window):
         self.next_rounds_left: Optional[int] = None
         self.auto = auto
         self.log = get_logger()
+        self.connection_state = ClientConnectionState.NONE
+        self.chat_log = []
 
         if self.auto:
             self._auto_running = True
@@ -245,6 +250,8 @@ class LanibombersWindow(arcade.Window):
         client.set_callback(Scoreboard, self._on_scoreboard)
         client.set_callback(SessionInfo, self._on_session_info)
         client.set_callback(Countdown, self._on_countdown)
+        client.set_callback(ClientConnectionStateMessage, self._on_client_state)
+        client.set_callback(ChatText, self._on_chat)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -254,6 +261,16 @@ class LanibombersWindow(arcade.Window):
             self.setup_input(self.player_config_path)
         else:
             self.setup_input()
+
+    def _on_client_state(self, msg: ClientConnectionStateMessage) -> None:
+        self.connection_state = msg.state
+
+    def _on_chat(self, msg: ChatText) -> None:
+        self.chat_log.append(f"{msg.text}")
+
+    def send_chat(self, msg: str) -> None:
+        if self.network_client is not None:
+            self.network_client.send(ChatText(text=msg))
 
     def create_game_simulation(self) -> None:
         self.client_simulation = ClientSimulation(sound_engine=self.sound_engine)

@@ -5,6 +5,39 @@ from common.config_reader import ConfigReader
 from pynput import keyboard
 
 
+def key_to_char(key: int, modifiers: int, is_text: bool = False) -> Optional[str]:
+    """Convert arcade key code to character."""
+    if is_text:
+        if arcade.key.A <= key <= arcade.key.Z:
+            char = chr(ord("a") + (key - arcade.key.A))
+            if modifiers & arcade.key.MOD_SHIFT:
+                char = char.upper()
+            return char
+        if arcade.key.KEY_0 <= key <= arcade.key.KEY_9:
+            return chr(ord("0") + (key - arcade.key.KEY_0))
+        if key == arcade.key.SPACE:
+            return " "
+        punctuation = {
+            arcade.key.MINUS: "-",
+            arcade.key.EQUAL: "=",
+            arcade.key.BRACKETLEFT: "[",
+            arcade.key.BRACKETRIGHT: "]",
+            arcade.key.SEMICOLON: ";",
+            arcade.key.APOSTROPHE: "'",
+            arcade.key.COMMA: ",",
+            arcade.key.PERIOD: ".",
+            arcade.key.SLASH: "/",
+        }
+        if key in punctuation:
+            return punctuation[key]
+        return None
+
+    parsed_key = arcade_key_to_string(key)
+    if parsed_key:
+        return parsed_key
+    return None
+
+
 def map_keys(config: ConfigReader) -> Tuple[
     int,
     int,

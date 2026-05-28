@@ -26,6 +26,8 @@ from network_stack.messages.messages import (
     Scoreboard,
     SessionInfo,
     Countdown,
+    ClientConnectionStateMessage,
+    ClientConnectionState
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -637,6 +639,8 @@ class BomberServerBase:
             )
         )  # type: ignore
 
+        self.server.send_to_client(ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED))
+
     def create_game_player(self, session_player: SessionPlayer) -> None:
         assert self.engine is not None
 
@@ -659,7 +663,7 @@ class BomberServerBase:
         sender = ctx.name or "?"
         ctx.broadcast(
             ChatText(text=f"<{sender}> {msg.text}"),
-            exclude_self=True,
+            exclude_self=False,
         )  # type: ignore
 
     def on_pong(self, msg: Pong, ctx: ClientContext) -> None:

@@ -16,7 +16,7 @@ from PIL import Image
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Any
-from common.keymapper import arcade_key_to_string
+from common.keymapper import key_to_char
 from game_engine.entities import Direction
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import (
@@ -940,7 +940,7 @@ class PlayerSetupView(arcade.View):
                     current_field.value = current_field.value[:-1]
                     self.player_name = current_field.value
             else:
-                char = self._key_to_char(symbol, modifiers, is_text=True)
+                char = key_to_char(symbol, modifiers, is_text=True)
                 if char and len(current_field.value) < 20:
                     current_field.value += char
                     self.player_name = current_field.value
@@ -951,7 +951,7 @@ class PlayerSetupView(arcade.View):
             if symbol == arcade.key.ESCAPE:
                 self.editing_hotkey = False
             else:
-                char = self._key_to_char(symbol, modifiers)
+                char = key_to_char(symbol, modifiers)
                 if char:
                     current_field.value = char
                     # Update the right data depending on tab
@@ -1219,36 +1219,4 @@ class PlayerSetupView(arcade.View):
     # Key-to-char helper
     # ------------------------------------------------------------------
 
-    def _key_to_char(
-        self, key: int, modifiers: int, is_text: bool = False
-    ) -> Optional[str]:
-        """Convert arcade key code to character."""
-        if is_text:
-            if arcade.key.A <= key <= arcade.key.Z:
-                char = chr(ord("a") + (key - arcade.key.A))
-                if modifiers & arcade.key.MOD_SHIFT:
-                    char = char.upper()
-                return char
-            if arcade.key.KEY_0 <= key <= arcade.key.KEY_9:
-                return chr(ord("0") + (key - arcade.key.KEY_0))
-            if key == arcade.key.SPACE:
-                return " "
-            punctuation = {
-                arcade.key.MINUS: "-",
-                arcade.key.EQUAL: "=",
-                arcade.key.BRACKETLEFT: "[",
-                arcade.key.BRACKETRIGHT: "]",
-                arcade.key.SEMICOLON: ";",
-                arcade.key.APOSTROPHE: "'",
-                arcade.key.COMMA: ",",
-                arcade.key.PERIOD: ".",
-                arcade.key.SLASH: "/",
-            }
-            if key in punctuation:
-                return punctuation[key]
-            return None
 
-        parsed_key = arcade_key_to_string(key)
-        if parsed_key:
-            return parsed_key
-        return None

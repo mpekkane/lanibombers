@@ -19,6 +19,14 @@ from game_engine.shop import Shop
 from game_engine.session_parser import SessionPlayer
 from common.item_dictionary import ItemType
 from uuid import UUID
+from enum import IntEnum
+
+
+class ClientConnectionState(IntEnum):
+    NONE = 0
+    CONNECTED = 1
+    DISCONNECTED = 2
+
 
 class Message:
     """Abstract class for message objects"""
@@ -651,9 +659,29 @@ class Countdown(Message):
         )
 
     @classmethod
-    def from_bytes(cls, payload: bytes) -> GameState:
+    def from_bytes(cls, payload: bytes) -> Countdown:
         count = int(payload[0])
 
         return cls(
             count=count
         )
+
+
+@register_message
+@dataclass(frozen=True)
+class ClientConnectionStateMessage(Message):
+
+    TYPE: ClassVar[int] = 15
+    state: ClientConnectionState
+
+    def to_bytes(self) -> bytes:
+        # main data
+        b_state = int(self.state).to_bytes(1, "big")
+
+        return b_state
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> ClientConnectionStateMessage:
+        state = ClientConnectionState(int(payload[0]))
+
+        return cls(state=state)

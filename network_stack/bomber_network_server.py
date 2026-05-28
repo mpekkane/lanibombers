@@ -113,6 +113,9 @@ class BomberNetworkServer:
         prefix = sender if sender else "?"
         self.broadcast(ChatText(text=f"<{prefix}> {text}"), exclude=exclude)
 
+    def send_to_client(self, context: ClientContext, msg: Message) -> None:
+        self._send_to_proto(context._proto, msg)
+
     def _send_to_proto(self, proto: TransportServerProtocol, msg: Message) -> None:
         self._server.send_to(proto, msg)
 
