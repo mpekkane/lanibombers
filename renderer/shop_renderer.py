@@ -19,6 +19,8 @@ from renderer.bitmap_text import BitmapText
 from renderer.panel_builder import PanelBuilder
 from renderer.player_colorizer import PlayerColorizer
 from game_engine.entities import Pickup
+from game_engine.state_machine import ClientStateAction
+from network_stack.messages.messages import ClientConnectionState
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites")
 GRAPHICS_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "graphics")
@@ -185,6 +187,10 @@ class ShopView(arcade.View):
             self.empty_card_sprites.append(icon_panel_sprite)
 
     def on_update(self, delta_time: float):  # noqa: ARG002
+        if self.window.connection_state == ClientConnectionState.DISCONNECTED:
+            self.window.connection_state = ClientConnectionState.NONE
+            self.window.view_complete(ClientStateAction.RESTART)
+
         full_state = self.get_state()
         state = full_state.renderState
         self.cursor_positions = full_state.cursor_positions

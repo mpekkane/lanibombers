@@ -277,7 +277,7 @@ class LanibombersWindow(arcade.Window):
 
     def _on_disconnect(self, reason: str) -> None:
         self.log.info(f"Disconnected from server: {reason}")
-        self.disconnect()
+        self.connection_state = ClientConnectionState.DISCONNECTED
 
     def _on_shop_state(self, msg: ShopState) -> None:
         shop = ShopState.to_shop(msg)
@@ -471,7 +471,7 @@ class LanibombersWindow(arcade.Window):
         if self.auto:
             self._auto_running = False
             self.autothread.join()
-        self.view_complete(ClientStateAction.QUIT)
+        self.view_complete(ClientStateAction.RESTART)
 
     # ------------------------------------------------------------------
     # Debugging auto client (very stupid ai)

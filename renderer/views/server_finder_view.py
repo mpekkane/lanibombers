@@ -128,6 +128,14 @@ class ServerFinderView(arcade.View):
     # ------------------------------------------------------------------
 
     def on_update(self, delta_time: float) -> None:
+        # graceful disconnect handling
+        if self.window.connection_state == ClientConnectionState.DISCONNECTED:
+            self.window.connection_state = ClientConnectionState.NONE
+            self._connected = False
+            self.chat_sprites = arcade.SpriteList()
+            if not self._scanning:
+                self._start_scan()
+
         if self._connected:
             if self.window.shop is not None:
                 self.window.view_complete()
@@ -209,6 +217,8 @@ class ServerFinderView(arcade.View):
         """Rebuild server list sprites only when state changes."""
         if self._connecting:
             key = ("connecting",)
+        elif self._connected:
+            key = ("connected",)
         elif self._scanning:
             key = ("scanning", round(self._scan_elapsed, 1))
         elif self._scan_done and not self._servers:

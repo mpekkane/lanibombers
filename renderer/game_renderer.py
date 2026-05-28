@@ -19,6 +19,8 @@ from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
 from common.bomb_dictionary import BombType
 from game_engine.clock import Clock
+from game_engine.state_machine import ClientStateAction
+from network_stack.messages.messages import ClientConnectionState
 
 # ============================================================================
 # Configuration
@@ -175,6 +177,11 @@ class GameView(arcade.View):
 
     def on_update(self, delta_time: float):
         """Poll server and update tilemap"""
+        if self.window.connection_state == ClientConnectionState.DISCONNECTED:
+            self.window.connection_state = ClientConnectionState.NONE
+            self.window.view_complete(ClientStateAction.RESTART)
+            return
+
         state = self.render_state_function()
         if not state.running:
             if not self.closing:

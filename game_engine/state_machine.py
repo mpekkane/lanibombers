@@ -43,6 +43,7 @@ class ClientStateAction(IntEnum):
     CONNECT = 3
     END = 4
     QUIT = 100
+    RESTART = 200
 
 
 class ClientState(IntEnum):
@@ -71,6 +72,10 @@ class ClientStateMachine:
         action: ClientStateAction = ClientStateAction.NONE,
         rounds_left: Optional[int] = None,
     ) -> ClientState:
+        if action == ClientStateAction.RESTART:
+            self.state = ClientState.MENU
+            return self.state
+
         if self.state == ClientState.STARTING:
             self.state = ClientState.MENU
         elif self.state == ClientState.MENU:
