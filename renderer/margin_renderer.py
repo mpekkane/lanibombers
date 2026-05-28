@@ -85,8 +85,29 @@ class MarginRenderer:
                 if os.path.exists(path):
                     self.icon_textures[item] = arcade.load_texture(path)
 
-    def on_update(self, players: List[Player]):
+        # time bar
+        self.time_bar_sprites = arcade.SpriteList()
+        yellow_image = Image.new("RGBA", (1, 1), (255, 255, 0, 255))
+        self.time_bar = arcade.Sprite()
+        self.time_bar.texture = arcade.Texture(yellow_image, name="time_bar")
+        self.time_bar.visible = True
+        self.time_bar_sprites.append(self.time_bar)
+        self.max_time = None
+
+    def on_update(self, players: List[Player], round_time_left: float):
         """Update enemy cards if player data changed."""
+        # time bar
+        if self.max_time is None:
+            self.max_time = round_time_left
+
+        time_ratio = round_time_left / self.max_time
+        self.time_bar.width = 5 * self.zoom
+        self.time_bar.height = 450 * time_ratio * self.zoom
+        self.time_bar.center_x = (
+            (self.card_x + self.card_w + 30) * self.zoom + self.time_bar.width // 2
+        )
+        self.time_bar.center_y = self.time_bar.height / 2
+
         others = [p for p in players if p.name != self.client_player_name]
 
         # Build cache key per player
@@ -181,9 +202,7 @@ class MarginRenderer:
                 icon_sprite.texture = icon_texture
                 icon_sprite.scale = self.zoom
                 icon_sprite.center_x = (icon_left + 15) * self.zoom
-                icon_sprite.center_y = (
-                    self.screen_height - (card_top + 15) * self.zoom
-                )
+                icon_sprite.center_y = self.screen_height - (card_top + 15) * self.zoom
                 self.other_player_info_sprites.append(icon_sprite)
 
     def on_draw(self):
@@ -193,3 +212,4 @@ class MarginRenderer:
         self.text_sprites.draw(pixelated=True)
         self.damage_overlay_sprites.draw(pixelated=True)
         self.other_player_info_sprites.draw(pixelated=True)
+        self.time_bar_sprites.draw(pixelated=True)

@@ -452,10 +452,7 @@ class GameEngine:
         # When changing dir, all previous movement events are cleared
         self.clear_entity_move_events(player, now)
 
-        self.log.info("Centralize")
-        self.log.info(f"{player.x}, {player.y}")
         self.centralize_position(player)
-        self.log.info(f"{player.x}, {player.y}")
 
         # collision check
         in_bounds, next_tile = self.get_neighbor_tile(player)
@@ -1385,8 +1382,6 @@ class GameEngine:
         dir = Direction(event.direction)
         moved: float
 
-        self.log.info("-" * 20)
-        self.log.info(f"from: {target.x}, {target.y}")
         if dir == Direction.RIGHT:
             target.x += d
             moved = target.x
@@ -1413,14 +1408,6 @@ class GameEngine:
         if target.x > self.width - min_allowed:
             target.x = self.width - min_allowed
 
-        self.log.info(f"to  : {target.x}, {target.y}")
-        # self.round_position(target)
-        self.log.info(f"cntr: {target.x}, {target.y}")
-        self.log.info(f"ms: {self.width} {self.height}")
-
-        # target.x, target.y = self.clamp_to_map_size(target.x, target.y)
-        self.log.info(f"{target.x}, {target.y}")
-
         tolerance = 0.05
         blocked = False
         px, py = xy_to_tile(target.x, target.y)
@@ -1429,18 +1416,15 @@ class GameEngine:
             abs(moved - int(moved)) < tolerance
             or abs(moved - int(moved) - 1) < tolerance
         ):
-            self.log.info(f"enter tile   {px} {py}")
             self.entity_enter_tile(target, now=current_time)
         # middle
         if abs(moved - int(moved) - 0.5) < tolerance:
-            self.log.info(f"enter center {px} {py}")
             self.entity_reach_tile_center(target)
 
             # check the neighboring tiles
             # wall
             # interact
             in_bounds, next_tile = self.get_neighbor_tile(target)
-            self.log.info(next_tile)
             if not in_bounds:
                 blocked = True
                 target.state = "idle"
@@ -1474,8 +1458,6 @@ class GameEngine:
         dig_power = target.get_dig_power() if isinstance(target, Player) else 1
         target_tile.take_damage(dig_power)
         self.pending_sounds.append(SoundType.DIG)
-        self.log.info("DIG!")
-        self.log.info(target_tile)
 
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
@@ -1652,10 +1634,16 @@ class GameEngine:
     def get_render_state(self, now: Optional[float] = None) -> RenderState:
         """Build and return a RenderState for the renderer."""
         # round time limit
-        if self.round_start_time is not None:
-            if self.max_round_time > 0:
-                if Clock.now() - self.round_start_time > self.max_round_time:
+        round_time_left = -1
+        if self.max_round_time > 0:
+            if self.round_start_time is not None:
+                elapsed = Clock.now() - self.round_start_time
+                round_time_left = self.max_round_time - elapsed
+                if elapsed > self.max_round_time:
                     self.running = False
+            else:
+                round_time_left = self.max_round_time
+
 
         # Build tilemap as 2D numpy array
         tilemap = GameEngine.tilemap_to_numpy(self.tiles)
@@ -1692,6 +1680,7 @@ class GameEngine:
             server_time=now,
             sounds=sounds,
             running=self.running,
+            round_time_left=round_time_left
         )
 
     def cleanup_render_state(self):

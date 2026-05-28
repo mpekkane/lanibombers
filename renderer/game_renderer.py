@@ -245,7 +245,7 @@ class GameView(arcade.View):
             view_end_y,
         )
         self.header_renderer.on_update(state.players, self.client_player_name)
-        self.margin_renderer.on_update(state.players)
+        self.margin_renderer.on_update(state.players, state.round_time_left)
 
     # ██╗  ██╗███████╗██╗     ██████╗ ███████╗██████╗ ███████╗
     # ██║  ██║██╔════╝██║     ██╔══██╗██╔════╝██╔══██╗██╔════╝

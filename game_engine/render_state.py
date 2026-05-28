@@ -39,6 +39,7 @@ class RenderState:
     server_time: float = 0.0  # Server clock at interpolation time
     sounds: List[int] = field(default_factory=list)
     running: bool = True
+    round_time_left: float = 0.0
 
 
 @dataclass
