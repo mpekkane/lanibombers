@@ -3,6 +3,7 @@ import arcade
 from dataclasses import dataclass
 from typing import List, Tuple
 from PIL import Image
+from network_stack.messages.messages import ClientConnectionState
 
 from renderer.player_colorizer import (
     PLAYER_COLORS, KEL_LIGHT, KEL_DARK, brighten, darken,
@@ -218,5 +219,5 @@ class ScoreboardView(arcade.View):
             self._disconnect_and_return()
 
     def _disconnect_and_return(self):
-        self.window.disconnect()
+        self.window.connection_state = ClientConnectionState.NONE
         self.window.view_complete()
