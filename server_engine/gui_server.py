@@ -13,6 +13,19 @@ import yaml
 
 from game_engine.session_parser import Session
 
+DEFAULT_RANDOM_PARAMS = {
+    "width": 64,
+    "height": 45,
+    "feature_sizes": [20, 5],
+    "threshold": 0.1,
+    "min_treasure": 10,
+    "max_treasure": 40,
+    "min_tools": 5,
+    "max_tools": 20,
+    "max_rooms": 5,
+    "room_chance": 0.1,
+}
+
 
 class TkBomberServer(BomberServerBase):
     """
@@ -41,6 +54,9 @@ class TkBomberServer(BomberServerBase):
         self._quit_requested = False
         self._start_requested = False
         self._stop_server_requested = False
+
+        self.icon_dir = Path("assets/server")
+        self.icons: dict[str, tk.PhotoImage] = {}
 
         self.log_path = Path(log_path)
         self.font_size = font_size
@@ -130,6 +146,7 @@ class TkBomberServer(BomberServerBase):
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
+        self._load_icons()
         self._build_widgets()
 
     def _maximize_root_window(self) -> None:
@@ -568,6 +585,72 @@ class TkBomberServer(BomberServerBase):
             padding=(18, 10),
         )
 
+        style.configure(
+            "Icon.TButton",
+            padding=(8, 8),
+            background="#374151",
+            foreground="#ffffff",
+            bordercolor="#374151",
+            lightcolor="#374151",
+            darkcolor="#374151",
+        )
+        style.map(
+            "Icon.TButton",
+            background=[
+                ("pressed", "#111827"),
+                ("active", "#1f2937"),
+                ("!disabled", "#374151"),
+            ],
+            bordercolor=[
+                ("pressed", "#111827"),
+                ("active", "#1f2937"),
+                ("!disabled", "#374151"),
+            ],
+            lightcolor=[
+                ("pressed", "#111827"),
+                ("active", "#1f2937"),
+                ("!disabled", "#374151"),
+            ],
+            darkcolor=[
+                ("pressed", "#111827"),
+                ("active", "#1f2937"),
+                ("!disabled", "#374151"),
+            ],
+        )
+
+        style.configure(
+            "IconDanger.TButton",
+            padding=(8, 8),
+            background=self.quit_bg,
+            foreground="#ffffff",
+            bordercolor=self.quit_bg,
+            lightcolor=self.quit_bg,
+            darkcolor=self.quit_bg,
+        )
+        style.map(
+            "IconDanger.TButton",
+            background=[
+                ("pressed", self.quit_hover),
+                ("active", self.quit_hover),
+                ("!disabled", self.quit_bg),
+            ],
+            bordercolor=[
+                ("pressed", self.quit_hover),
+                ("active", self.quit_hover),
+                ("!disabled", self.quit_bg),
+            ],
+            lightcolor=[
+                ("pressed", self.quit_hover),
+                ("active", self.quit_hover),
+                ("!disabled", self.quit_bg),
+            ],
+            darkcolor=[
+                ("pressed", self.quit_hover),
+                ("active", self.quit_hover),
+                ("!disabled", self.quit_bg),
+            ],
+        )
+
     def _build_widgets(self) -> None:
         assert self.root is not None
 
@@ -804,7 +887,7 @@ class TkBomberServer(BomberServerBase):
 
         win = tk.Toplevel(self.root)
         win.title("Session Setup")
-        win.geometry("1900x1440")
+        win.geometry("2500x2000")
         win.minsize(1500, 1200)
         win.transient(self.root)
         win.grab_set()
@@ -877,46 +960,9 @@ class TkBomberServer(BomberServerBase):
 
         form.columnconfigure(1, weight=1)
 
-        maps_frame = ttk.LabelFrame(
-            container,
-            text="Maps YAML",
-            padding=12,
-            style="Panel.TLabelframe",
-        )
-        maps_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 12))
-
-        maps_text = tk.Text(
-            maps_frame,
-            height=12,
-            wrap=tk.NONE,
-            font=self.log_font,
-            bg=self.log_bg,
-            fg=self.text_fg,
-            relief=tk.FLAT,
-            highlightthickness=1,
-            highlightbackground=self.panel_border,
-            borderwidth=0,
-            padx=12,
-            pady=10,
-            insertbackground=self.text_fg,
-        )
-        maps_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        maps_scroll = ttk.Scrollbar(
-            maps_frame,
-            orient=tk.VERTICAL,
-            command=maps_text.yview,
-        )
-        maps_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        maps_text.config(yscrollcommand=maps_scroll.set)
-
-        maps_text.insert(
-            "1.0",
-            yaml.dump(
-                {"maps": self.session_config.get("maps", [])},
-                default_flow_style=False,
-                sort_keys=False,
-            ).strip(),
+        maps_getter, maps_setter = self._build_maps_editor(
+            parent=container,
+            initial_maps=self.session_config.get("maps", []),
         )
 
         button_row = ttk.Frame(container)
@@ -933,12 +979,7 @@ class TkBomberServer(BomberServerBase):
 
         def collect_config() -> Optional[dict[str, Any]]:
             try:
-                maps_part = yaml.safe_load(maps_text.get("1.0", tk.END)) or {}
-                if not isinstance(maps_part, dict):
-                    raise ValueError("Maps YAML must be a mapping with key 'maps'.")
-                maps = maps_part.get("maps", [])
-                if not isinstance(maps, list):
-                    raise ValueError("'maps' must be a list.")
+                maps = maps_getter()
 
                 config = {
                     "starting_money": int(starting_money_var.get()),
@@ -951,12 +992,8 @@ class TkBomberServer(BomberServerBase):
                 }
                 return self._normalize_session_config_dict(config)
 
-            except Exception as exc:
-                messagebox.showerror(
-                    "Invalid session setup",
-                    str(exc),
-                    parent=win,
-                )
+            except Exception:
+                status_var.set("Invalid session setup.")
                 return None
 
         def apply_clicked() -> None:
@@ -1013,15 +1050,7 @@ class TkBomberServer(BomberServerBase):
             spawn_type_var.set(str(config["spawn_type"]))
             round_time_var.set(str(config["round_time"]))
 
-            maps_text.delete("1.0", tk.END)
-            maps_text.insert(
-                "1.0",
-                yaml.dump(
-                    {"maps": config.get("maps", [])},
-                    default_flow_style=False,
-                    sort_keys=False,
-                ).strip(),
-            )
+            maps_setter(config.get("maps", []))
 
             if self._apply_session_config(config):
                 status_var.set(f"Loaded and applied {filename}")
@@ -1033,7 +1062,7 @@ class TkBomberServer(BomberServerBase):
 
         apply_button = ttk.Button(
             button_row,
-            text="Apply / OK",
+            text="Apply",
             command=apply_ok_clicked,
             style="Start.TButton",
             width=self.dialog_button_width,
@@ -1113,6 +1142,597 @@ class TkBomberServer(BomberServerBase):
             font=self.base_font,
         )
         combo.grid(row=row, column=1, sticky="ew", pady=8)
+
+    def _discover_map_files_for_editor(self) -> list[str]:
+        """
+        Discover available map files for the Tk session editor.
+
+        Mirrors session_setup.py:
+            - assets/maps/*.MNE
+            - assets/maps/*.MNL
+            - plus RANDOM
+        """
+        project_root = Path(__file__).resolve().parent.parent
+        maps_dir = project_root / "assets" / "maps"
+
+        if not maps_dir.exists():
+            maps_dir = Path.cwd() / "assets" / "maps"
+
+        files = sorted(p.name for p in maps_dir.glob("*.MNE"))
+        files.extend(sorted(p.name for p in maps_dir.glob("*.MNL")))
+
+        if "RANDOM" not in files:
+            files.append("RANDOM")
+
+        return files
+
+    def _map_display_name(self, file_name: str) -> str:
+        if file_name == "RANDOM":
+            return "Random Map"
+        return file_name
+
+    def _normalize_random_params(self, data: dict[str, Any]) -> dict[str, Any]:
+        params = copy.deepcopy(DEFAULT_RANDOM_PARAMS)
+
+        for key in params:
+            if key in data:
+                params[key] = data[key]
+
+        if "feature_size" in data and "feature_sizes" not in data:
+            params["feature_sizes"] = [data["feature_size"]]
+
+        feature_sizes = params.get("feature_sizes", [20, 5])
+        if not isinstance(feature_sizes, list):
+            feature_sizes = [int(feature_sizes)]
+
+        if len(feature_sizes) == 0:
+            feature_sizes = [20]
+
+        params["feature_sizes"] = [int(v) for v in feature_sizes]
+
+        params["width"] = int(params["width"])
+        params["height"] = int(params["height"])
+        params["threshold"] = float(params["threshold"])
+        params["min_treasure"] = int(params["min_treasure"])
+        params["max_treasure"] = int(params["max_treasure"])
+        params["min_tools"] = int(params["min_tools"])
+        params["max_tools"] = int(params["max_tools"])
+        params["max_rooms"] = int(params["max_rooms"])
+        params["room_chance"] = float(params["room_chance"])
+
+        return params
+
+    def _normalize_map_entry_for_editor(self, entry: Any) -> dict[str, Any]:
+        """
+        Internal editor representation:
+            {"file": "foo.MNE"}
+            {"file": "RANDOM", "random_params": {...}}
+        """
+        if isinstance(entry, str):
+            return {"file": entry}
+
+        if isinstance(entry, dict):
+            file_name = str(entry.get("file", "RANDOM"))
+
+            if file_name == "RANDOM":
+                return {
+                    "file": "RANDOM",
+                    "random_params": self._normalize_random_params(entry),
+                }
+
+            return {"file": file_name}
+
+        return {"file": "RANDOM", "random_params": copy.deepcopy(DEFAULT_RANDOM_PARAMS)}
+
+    def _map_entry_to_yaml_value(self, entry: dict[str, Any]) -> Any:
+        """
+        Convert editor map entry back to session.yaml format.
+
+        Normal map:
+            "foo.MNE"
+
+        Random map:
+            {"file": "RANDOM", ...random params...}
+        """
+        file_name = entry.get("file", "RANDOM")
+
+        if file_name == "RANDOM":
+            params = self._normalize_random_params(entry.get("random_params", {}))
+            return {"file": "RANDOM", **params}
+
+        return file_name
+
+    def _map_entry_summary(self, entry: dict[str, Any]) -> str:
+        file_name = entry.get("file", "RANDOM")
+
+        if file_name != "RANDOM":
+            return ""
+
+        params = self._normalize_random_params(entry.get("random_params", {}))
+        feature_sizes = params.get("feature_sizes", [])
+
+        if len(feature_sizes) >= 2:
+            feature_text = f"{feature_sizes[0]}, {feature_sizes[1]}"
+        elif len(feature_sizes) == 1:
+            feature_text = str(feature_sizes[0])
+        else:
+            feature_text = "-"
+
+        return (
+            f"{params['width']}x{params['height']}  "
+            f"features={feature_text}  "
+            f"threshold={params['threshold']:.2f}  "
+            f"rooms={params['max_rooms']}"
+        )
+
+    def _open_map_entry_editor(
+        self,
+        entry: dict[str, Any],
+    ) -> Optional[dict[str, Any]]:
+        if self.root is None:
+            return None
+
+        map_files = self._discover_map_files_for_editor()
+        if "RANDOM" not in map_files:
+            map_files.append("RANDOM")
+
+        result: dict[str, Optional[dict[str, Any]]] = {"entry": None}
+
+        win = tk.Toplevel(self.root)
+        win.title("Edit map")
+        win.geometry("1100x1850")
+        win.minsize(900, 960)
+        win.transient(self.root)
+        win.grab_set()
+        win.configure(bg=self.bg)
+
+        container = ttk.Frame(win, padding=24, style="Dialog.TFrame")
+        container.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            container,
+            text="Edit Map",
+            style="DialogTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 16))
+
+        form = ttk.Frame(container)
+        form.pack(fill=tk.X)
+
+        current_file = str(entry.get("file", "RANDOM"))
+        if current_file not in map_files:
+            current_file = "RANDOM"
+
+        map_name_to_file = {self._map_display_name(name): name for name in map_files}
+        file_to_map_name = {name: self._map_display_name(name) for name in map_files}
+
+        map_var = tk.StringVar(value=file_to_map_name[current_file])
+
+        ttk.Label(form, text="Map").grid(
+            row=0,
+            column=0,
+            sticky="w",
+            pady=8,
+            padx=(0, 16),
+        )
+
+        map_combo = ttk.Combobox(
+            form,
+            textvariable=map_var,
+            values=[file_to_map_name[name] for name in map_files],
+            state="readonly",
+            width=30,
+            font=self.base_font,
+        )
+        map_combo.grid(row=0, column=1, sticky="ew", pady=8)
+
+        params = self._normalize_random_params(entry.get("random_params", {}))
+
+        width_var = tk.StringVar(value=str(params["width"]))
+        height_var = tk.StringVar(value=str(params["height"]))
+
+        feature_sizes = params.get("feature_sizes", [20, 5])
+        feature_1_var = tk.StringVar(value=str(feature_sizes[0] if len(feature_sizes) > 0 else 20))
+        feature_2_var = tk.StringVar(value=str(feature_sizes[1] if len(feature_sizes) > 1 else 0))
+
+        threshold_var = tk.StringVar(value=str(params["threshold"]))
+        min_treasure_var = tk.StringVar(value=str(params["min_treasure"]))
+        max_treasure_var = tk.StringVar(value=str(params["max_treasure"]))
+        min_tools_var = tk.StringVar(value=str(params["min_tools"]))
+        max_tools_var = tk.StringVar(value=str(params["max_tools"]))
+        max_rooms_var = tk.StringVar(value=str(params["max_rooms"]))
+        room_chance_var = tk.StringVar(value=str(params["room_chance"]))
+
+        random_frame = ttk.LabelFrame(
+            container,
+            text="Random Map Options",
+            padding=12,
+            style="Panel.TLabelframe",
+        )
+
+        self._session_editor_row(random_frame, 0, "Width", width_var)
+        self._session_editor_row(random_frame, 1, "Height", height_var)
+        self._session_editor_row(random_frame, 2, "Feature Size 1", feature_1_var)
+        self._session_editor_row(random_frame, 3, "Feature Size 2", feature_2_var)
+        self._session_editor_row(random_frame, 4, "Threshold", threshold_var)
+        self._session_editor_row(random_frame, 5, "Min Treasure", min_treasure_var)
+        self._session_editor_row(random_frame, 6, "Max Treasure", max_treasure_var)
+        self._session_editor_row(random_frame, 7, "Min Tools", min_tools_var)
+        self._session_editor_row(random_frame, 8, "Max Tools", max_tools_var)
+        self._session_editor_row(random_frame, 9, "Max Rooms", max_rooms_var)
+        self._session_editor_row(random_frame, 10, "Room Chance", room_chance_var)
+
+        random_frame.columnconfigure(1, weight=1)
+        form.columnconfigure(1, weight=1)
+
+        def update_random_options_visibility(*_args: object) -> None:
+            selected_file = map_name_to_file.get(map_var.get(), "RANDOM")
+
+            if selected_file == "RANDOM":
+                if not random_frame.winfo_ismapped():
+                    random_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 12))
+            else:
+                if random_frame.winfo_ismapped():
+                    random_frame.pack_forget()
+
+        map_combo.bind("<<ComboboxSelected>>", update_random_options_visibility)
+        update_random_options_visibility()
+
+        status_var = tk.StringVar(value="")
+        status_label = ttk.Label(
+            container,
+            textvariable=status_var,
+            style="Footer.TLabel",
+            anchor="w",
+        )
+        status_label.pack(fill=tk.X, pady=(8, 0))
+
+        def collect_entry() -> Optional[dict[str, Any]]:
+            selected_file = map_name_to_file.get(map_var.get(), "RANDOM")
+
+            if selected_file != "RANDOM":
+                return {"file": selected_file}
+
+            try:
+                feature_1 = int(feature_1_var.get())
+                feature_2 = int(feature_2_var.get())
+
+                feature_sizes = [feature_1]
+                if feature_2 > 0:
+                    feature_sizes.append(feature_2)
+
+                random_params = {
+                    "width": int(width_var.get()),
+                    "height": int(height_var.get()),
+                    "feature_sizes": feature_sizes,
+                    "threshold": float(threshold_var.get()),
+                    "min_treasure": int(min_treasure_var.get()),
+                    "max_treasure": int(max_treasure_var.get()),
+                    "min_tools": int(min_tools_var.get()),
+                    "max_tools": int(max_tools_var.get()),
+                    "max_rooms": int(max_rooms_var.get()),
+                    "room_chance": float(room_chance_var.get()),
+                }
+
+                return {
+                    "file": "RANDOM",
+                    "random_params": self._normalize_random_params(random_params),
+                }
+
+            except Exception:
+                status_var.set("Invalid random map values.")
+                return None
+
+        def save_and_close() -> None:
+            edited = collect_entry()
+            if edited is None:
+                return
+
+            result["entry"] = edited
+            win.destroy()
+
+        def cancel() -> None:
+            result["entry"] = None
+            win.destroy()
+
+        button_row = ttk.Frame(container)
+        button_row.pack(fill=tk.X, pady=(16, 0))
+
+        ttk.Button(
+            button_row,
+            text="Save",
+            command=save_and_close,
+            style="Start.TButton",
+            width=self.dialog_button_width,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        ttk.Button(
+            button_row,
+            text="Cancel",
+            command=cancel,
+            style="Dialog.TButton",
+            width=self.dialog_button_width,
+        ).pack(side=tk.RIGHT)
+
+        # Closing the edit-map window should save the map edit.
+        win.protocol("WM_DELETE_WINDOW", save_and_close)
+
+        win.wait_window()
+
+        return result["entry"]
+
+    def _load_icons(self) -> None:
+        self._load_icon("add", "add.png")
+        self._load_icon("copy", "copy.png")
+        self._load_icon("down", "down.png")
+        self._load_icon("edit", "edit.png")
+        self._load_icon("remove", "remove.png")
+        self._load_icon("up", "up.png")
+
+    def _load_icon(self, name: str, filename: str) -> None:
+        if self.root is None:
+            return
+
+        path = self.icon_dir / filename
+
+        try:
+            self.icons[name] = tk.PhotoImage(file=str(path))
+        except tk.TclError:
+            # Missing/bad icon: fall back to text button.
+            return
+
+    def _icon_button(
+        self,
+        parent: ttk.Frame,
+        icon_name: str,
+        fallback_text: str,
+        command,
+        *,
+        style: str = "Dialog.TButton",
+        width: int = 8,
+    ) -> ttk.Button:
+        icon = self.icons.get(icon_name)
+
+        if icon is not None:
+            return ttk.Button(
+                parent,
+                image=icon,
+                command=command,
+                style=style,
+            )
+
+        return ttk.Button(
+            parent,
+            text=fallback_text,
+            command=command,
+            style=style,
+            width=width,
+        )
+
+    def _build_maps_editor(
+        self,
+        parent: ttk.Frame,
+        initial_maps: list[Any],
+    ):
+        map_entries: list[dict[str, Any]] = [
+            self._normalize_map_entry_for_editor(entry) for entry in initial_maps
+        ]
+
+        if not map_entries:
+            map_files = self._discover_map_files_for_editor()
+            first = map_files[0] if map_files else "RANDOM"
+            map_entries.append(self._normalize_map_entry_for_editor(first))
+
+        maps_frame = ttk.LabelFrame(
+            parent,
+            text="Maps",
+            padding=12,
+            style="Panel.TLabelframe",
+        )
+        maps_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 12))
+
+        top_row = ttk.Frame(maps_frame)
+        top_row.pack(fill=tk.X, pady=(0, 12))
+
+        add_button = self._icon_button(
+            top_row,
+            "add",
+            "Add map",
+            command=lambda: None,
+            style="Icon.TButton",
+            width=self.dialog_button_width,
+        )
+        add_button.pack(side=tk.LEFT)
+
+        canvas = tk.Canvas(
+            maps_frame,
+            bg=self.panel_bg,
+            highlightthickness=1,
+            highlightbackground=self.panel_border,
+            borderwidth=0,
+        )
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(
+            maps_frame,
+            orient=tk.VERTICAL,
+            command=canvas.yview,
+        )
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        rows_frame = ttk.Frame(canvas)
+        rows_window = canvas.create_window((0, 0), window=rows_frame, anchor="nw")
+
+        def update_scroll_region(_event: object | None = None) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def update_window_width(event: tk.Event) -> None:
+            canvas.itemconfigure(rows_window, width=event.width)
+
+        rows_frame.bind("<Configure>", update_scroll_region)
+        canvas.bind("<Configure>", update_window_width)
+
+        def refresh_rows() -> None:
+            for child in rows_frame.winfo_children():
+                child.destroy()
+
+            for index, entry in enumerate(map_entries):
+                row = ttk.Frame(rows_frame, padding=(10, 8))
+                row.pack(fill=tk.X, pady=(0, 6))
+
+                number = ttk.Label(
+                    row,
+                    text=f"{index + 1:>2}.",
+                    width=4,
+                )
+                number.pack(side=tk.LEFT, padx=(0, 8))
+
+                name = ttk.Label(
+                    row,
+                    text=self._map_display_name(entry.get("file", "RANDOM")),
+                    font=self.large_font,
+                    width=22,
+                )
+                name.pack(side=tk.LEFT, padx=(0, 12))
+
+                summary = ttk.Label(
+                    row,
+                    text=self._map_entry_summary(entry),
+                    style="Footer.TLabel",
+                )
+                summary.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
+
+                edit_button = self._icon_button(
+                    row,
+                    "edit",
+                    "Edit",
+                    command=lambda i=index: edit_map(i),
+                    style="Icon.TButton",
+                    width=8,
+                )
+                edit_button.pack(side=tk.LEFT, padx=(0, 6))
+
+                duplicate_button = self._icon_button(
+                    row,
+                    "copy",
+                    "Copy",
+                    command=lambda i=index: duplicate_map(i),
+                    style="Icon.TButton",
+                    width=8,
+                )
+                duplicate_button.pack(side=tk.LEFT, padx=(0, 6))
+
+                up_button = self._icon_button(
+                    row,
+                    "up",
+                    "Up",
+                    command=lambda i=index: move_map(i, -1),
+                    style="Icon.TButton",
+                    width=6,
+                )
+                up_button.pack(side=tk.LEFT, padx=(0, 6))
+
+                down_button = self._icon_button(
+                    row,
+                    "down",
+                    "Down",
+                    command=lambda i=index: move_map(i, 1),
+                    style="Icon.TButton",
+                    width=6,
+                )
+                down_button.pack(side=tk.LEFT, padx=(0, 6))
+
+                remove_button = self._icon_button(
+                    row,
+                    "remove",
+                    "Remove",
+                    command=lambda i=index: remove_map(i),
+                    style="IconDanger.TButton",
+                    width=10,
+                )
+                remove_button.pack(side=tk.LEFT)
+
+            update_scroll_region()
+
+        def add_map() -> None:
+            if map_entries:
+                new_entry = copy.deepcopy(map_entries[-1])
+            else:
+                map_files = self._discover_map_files_for_editor()
+                first = map_files[0] if map_files else "RANDOM"
+                new_entry = self._normalize_map_entry_for_editor(first)
+
+            map_entries.append(new_entry)
+            refresh_rows()
+            edit_map(len(map_entries) - 1)
+
+        def duplicate_map(index: int) -> None:
+            if index < 0 or index >= len(map_entries):
+                return
+
+            map_entries.insert(index + 1, copy.deepcopy(map_entries[index]))
+            refresh_rows()
+
+        def remove_map(index: int) -> None:
+            if index < 0 or index >= len(map_entries):
+                return
+
+            map_entries.pop(index)
+
+            if not map_entries:
+                map_files = self._discover_map_files_for_editor()
+                first = map_files[0] if map_files else "RANDOM"
+                map_entries.append(self._normalize_map_entry_for_editor(first))
+
+            refresh_rows()
+
+        def move_map(index: int, direction: int) -> None:
+            new_index = index + direction
+
+            if index < 0 or index >= len(map_entries):
+                return
+
+            if new_index < 0 or new_index >= len(map_entries):
+                return
+
+            map_entries[index], map_entries[new_index] = (
+                map_entries[new_index],
+                map_entries[index],
+            )
+            refresh_rows()
+
+        def edit_map(index: int) -> None:
+            if index < 0 or index >= len(map_entries):
+                return
+
+            edited = self._open_map_entry_editor(map_entries[index])
+            if edited is None:
+                return
+
+            map_entries[index] = edited
+            refresh_rows()
+
+        def get_maps() -> list[Any]:
+            return [self._map_entry_to_yaml_value(entry) for entry in map_entries]
+
+        def set_maps(new_maps: list[Any]) -> None:
+            map_entries.clear()
+            map_entries.extend(
+                self._normalize_map_entry_for_editor(entry) for entry in new_maps
+            )
+
+            if not map_entries:
+                map_files = self._discover_map_files_for_editor()
+                first = map_files[0] if map_files else "RANDOM"
+                map_entries.append(self._normalize_map_entry_for_editor(first))
+
+            refresh_rows()
+
+        add_button.config(command=add_map)
+
+        refresh_rows()
+
+        return get_maps, set_maps
 
     def _apply_session_config(self, config: dict[str, Any]) -> bool:
         """
