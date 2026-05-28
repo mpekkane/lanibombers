@@ -101,6 +101,7 @@ class SessionSetup(arcade.Window):
         self.editing_map_entry = False
         self.edit_original_map_index = 0
         self.spawn_type = SpawnType.EDGES
+        self.round_time = 60
 
         # Load saved config if it exists
         self._load_config()
@@ -283,6 +284,14 @@ class SessionSetup(arcade.Window):
                 options=spawn_type_list,
                 option_names=["Edges", "Random", "Uniform distance"],
                 selected_option_index=spawn_index,
+            ),
+            MenuField(
+                name="Round time",
+                field_type=FieldType.NUMERIC,
+                value=self.round_time,
+                step=10,
+                min_value=-10,
+                max_value=600,
             ),
         ]
 
@@ -742,6 +751,8 @@ class SessionSetup(arcade.Window):
             self.speed_multiplier = changed_field.value
         elif name == "Spawn type":
             self.spawn_type = changed_field.value
+        elif name == "Round time":
+            self.round_time = changed_field.value
         else:
             # Random map sub-fields — route to the owning entry's random_params
             idx = changed_field.map_entry_index
@@ -808,6 +819,9 @@ class SessionSetup(arcade.Window):
         if "spawn_type" in config:
             self.spawn_type = SpawnType(int(config["spawn_type"]))
 
+        if "round_time" in config:
+            self.round_time = int(config["round_time"])
+
         # Load maps list (new format) or single map (old format)
         if "maps" in config:
             self.map_list = []
@@ -865,6 +879,7 @@ class SessionSetup(arcade.Window):
             "damage_multiplier": self.damage_multiplier,
             "speed_multiplier": self.speed_multiplier,
             "spawn_type": int(self.spawn_type),
+            "round_time": int(self.round_time),
             "maps": maps_out,
         }
 

@@ -104,7 +104,6 @@ class BomberServerBase:
         self.map_data = None
         self.game_on_countdown = False
 
-        self.max_round_time = 60
         self.engine: Optional[GameEngine] = None
         self.sound_engine: Optional[SoundEngine] = None
 
@@ -324,7 +323,7 @@ class BomberServerBase:
             self.map_data.width,
             self.map_data.height,
             spawn_type=self.session.spawn_type,
-            max_round_time=self.max_round_time,
+            max_round_time=self.session.round_time,
         )
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(self.map_data)

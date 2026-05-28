@@ -86,6 +86,7 @@ class Session:
         speed_multiplier: float,
         spawn_type: SpawnType,
         maps: List[SessionMap],
+        round_time: int
     ) -> None:
         self.valid = True
         self.starting_money = starting_money
@@ -93,6 +94,7 @@ class Session:
         self.damage_multiplier = damage_multiplier
         self.speed_multiplier = speed_multiplier
         self.spawn_type = spawn_type
+        self.round_time = round_time
         self.maps = maps
         self._current_map = 0
 
@@ -123,6 +125,7 @@ class Session:
         damage_multiplier = config.get_config_mandatory("damage_multiplier", float)
         speed_multiplier = config.get_config_mandatory("speed_multiplier", float)
         spawn_type = config.get_config_mandatory("spawn_type", int)
+        round_time = config.get_config_mandatory("round_time", int)
 
         maps = []
         raw_maps = config.get_config_mandatory("maps", list)
@@ -167,6 +170,7 @@ class Session:
             speed_multiplier,
             SpawnType(spawn_type),
             maps,
+            round_time,
         )
 
     @staticmethod
@@ -183,5 +187,6 @@ class Session:
             speed_multiplier=1.0,
             spawn_type=SpawnType.EDGES,
             maps=maps,
+            round_time=60,
         )
         return session

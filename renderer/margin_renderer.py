@@ -97,10 +97,13 @@ class MarginRenderer:
     def on_update(self, players: List[Player], round_time_left: float):
         """Update enemy cards if player data changed."""
         # time bar
-        if self.max_time is None:
-            self.max_time = round_time_left
+        if round_time_left < 0:
+            time_ratio = 1
+        else:
+            if self.max_time is None:
+                self.max_time = round_time_left
 
-        time_ratio = round_time_left / self.max_time
+            time_ratio = round_time_left / self.max_time
         self.time_bar.width = 5 * self.zoom
         self.time_bar.height = 450 * time_ratio * self.zoom
         self.time_bar.center_x = (

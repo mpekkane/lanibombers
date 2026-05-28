@@ -3,6 +3,7 @@ floating_market: false
 damage_multiplier: 1.0
 speed_multiplier: 1.0
 spawn_type: 2
+round_time: 60
 maps:
 - file: RANDOM
   width: 64
