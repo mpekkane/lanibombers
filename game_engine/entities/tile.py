@@ -147,6 +147,39 @@ class Tile(GameObject):
         else:
             return Tile.create_empty()
 
+    @staticmethod
+    def visual_id_to_type(tile_id: int) -> TileType:
+        if tile_id == ROCK1_TILE_ID:
+            return TileType.BEDROCK
+        elif tile_id == ROCK2_TILE_ID:
+            return TileType.BEDROCK
+        elif tile_id in BEDROCK_TILES:
+            return TileType.BEDROCK
+        elif tile_id in BEDROCK_CORNER_TILES:
+            return TileType.BEDROCK
+        elif tile_id in DIRT_TILES:
+            return TileType.DIRT
+        elif tile_id in CONCRETE_TILES:
+            return TileType.CONCRETE
+        elif tile_id in URETHANE_TILES:
+            return TileType.URETHANE
+        elif tile_id in BIOSLIME_TILES:
+            return TileType.BIOSLIME
+        elif tile_id in BOULDER_TILES:
+            return TileType.BOULDER
+        elif tile_id in BRICKS_TILES:
+            return TileType.BRICKS
+        elif tile_id in SWITCH_TILES:
+            return TileType.SWITCH
+        elif tile_id in SECURITY_DOOR_TILES:
+            return TileType.SECURITY_DOOR
+        elif tile_id in TUNNEL_TILES:
+            return TileType.TUNNEL
+        elif tile_id in C4_TILES:
+            return TileType.C4
+        else:
+            return TileType.EMPTY
+
     # constructors
     @staticmethod
     def create_empty() -> Tile:

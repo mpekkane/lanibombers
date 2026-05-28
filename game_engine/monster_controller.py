@@ -80,7 +80,7 @@ class MonsterController:
             if state is None:
                 continue
 
-            action = self.ai.think(state, updated)
+            action = self.ai.think(state, updated, self.monster)
             if action is not None:
                 self._execute_action(action)
 
