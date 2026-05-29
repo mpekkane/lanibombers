@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Callable
 import random
 
 import numpy as np
@@ -11,6 +11,12 @@ from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
 from game_engine.entities.tile import Tile, TileType
+from enum import Enum
+
+
+class MonsterSense(Enum):
+    SMELL = "smell"
+    VISION = "vision"
 
 
 class MonsterAI(ABC):
@@ -54,7 +60,11 @@ class MonsterAI(ABC):
             return None
 
     def target_seeking_behavior(
-        self, state: RenderState, own_entity: DynamicEntity, target: DynamicEntity
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity,
+        target: DynamicEntity,
+        dominant_sense: MonsterSense = MonsterSense.VISION,
     ) -> Optional[Action]:
         """Move greedily toward target, avoiding blocking cells.
 
@@ -66,7 +76,8 @@ class MonsterAI(ABC):
             entity.x -> x
             entity.y -> y
         """
-        occupancy = self.get_occupancy(state)
+        discriminator = MonsterAI.get_discriminator_function(dominant_sense)
+        occupancy = self.get_occupancy(state, discriminator)
         height, width = occupancy.shape
 
         x = int(own_entity.x)
@@ -128,7 +139,7 @@ class MonsterAI(ABC):
         """
         visible: List[Tuple[Player, float]] = []
 
-        occupancy = self.get_occupancy(state)
+        occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
 
         origin_x = int(own_entity.x)
         origin_y = int(own_entity.y)
@@ -175,6 +186,15 @@ class MonsterAI(ABC):
     # HELPERS
     ################
 
+    @staticmethod
+    def get_discriminator_function(sense: MonsterSense) -> Callable[[TileType], bool]:
+        if sense == MonsterSense.VISION:
+            return MonsterAI.can_see_through
+        elif sense == MonsterSense.SMELL:
+            return MonsterAI.can_smell_through
+        else:
+            raise ValueError("Unknown monster sense")
+
     def _print_occupancy(self, occupancy: np.ndarray) -> None:
         rows = []
 
@@ -188,7 +208,9 @@ class MonsterAI(ABC):
 
         print("\n".join(rows))
 
-    def get_occupancy(self, state: RenderState) -> np.ndarray:
+    def get_occupancy(
+        self, state: RenderState, discriminator_function: Callable[[TileType], bool]
+    ) -> np.ndarray:
         """Get full-map occupancy.
 
         The returned occupancy has the same shape as state.tilemap:
@@ -206,7 +228,7 @@ class MonsterAI(ABC):
         return np.array(
             [
                 [
-                    MonsterAI.can_smell_through(Tile.visual_id_to_type(int(cell)))
+                    discriminator_function(Tile.visual_id_to_type(int(cell)))
                     for cell in row
                 ]
                 for row in state.tilemap
@@ -401,6 +423,35 @@ class MonsterAI(ABC):
             return False
         elif tiletype == TileType.BOULDER:
             return True
+        elif tiletype == TileType.BRICKS:
+            return False
+        elif tiletype == TileType.SWITCH:
+            return False
+        elif tiletype == TileType.SECURITY_DOOR:
+            return False
+        elif tiletype == TileType.TUNNEL:
+            return True
+        else:
+            raise ValueError("Invalid tile type")
+
+    @staticmethod
+    def can_see_through(tiletype: TileType) -> bool:
+        if tiletype == TileType.EMPTY:
+            return True
+        elif tiletype == TileType.BEDROCK:
+            return False
+        elif tiletype == TileType.DIRT:
+            return False
+        elif tiletype == TileType.CONCRETE:
+            return False
+        elif tiletype == TileType.URETHANE:
+            return False
+        elif tiletype == TileType.BIOSLIME:
+            return False
+        elif tiletype == TileType.C4:
+            return False
+        elif tiletype == TileType.BOULDER:
+            return False
         elif tiletype == TileType.BRICKS:
             return False
         elif tiletype == TileType.SWITCH:

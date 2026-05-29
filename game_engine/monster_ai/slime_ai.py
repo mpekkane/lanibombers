@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from game_engine.agent_state import Action
-from game_engine.monster_ai.monster_ai_base import MonsterAI
+from game_engine.monster_ai.monster_ai_base import MonsterAI, MonsterSense
 from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import DynamicEntity
 
@@ -29,4 +29,6 @@ class SlimeAI(MonsterAI):
             return self.random_behavior(0.25)
 
         target, distance = targets[0]
-        return self.target_seeking_behavior(state, own_entity, target)
+        return self.target_seeking_behavior(
+            state, own_entity, target, MonsterSense.SMELL
+        )
