@@ -2,7 +2,7 @@ starting_money: 2000
 floating_market: false
 damage_multiplier: 1.0
 speed_multiplier: 1.0
-spawn_type: 2
+spawn_type: 0
 round_time: 120
 maps:
-- ANZULABY.MNE
+- TEST.MNE
