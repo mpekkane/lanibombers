@@ -14,20 +14,20 @@ class AlienAI(MonsterAI):
         super().__init__()
         self.smell_radius = 10
         self.view_radius = 100
+        self.hunt_time = 30
 
     def think(
         self, state: RenderState, state_updated: bool, own_entity: DynamicEntity
     ) -> Optional[Action]:
         smell_targets = self.smell(state, own_entity)
         see_targets = self.see(state, own_entity)
-        # print("-" * 40)
-        # print("I'm AN ALIEN")
-        # print(f"Smell: {smell_targets}")
-        # print(f"See  : {see_targets}")
+
         targets = self.fuse_senses([smell_targets, see_targets])
 
+        # if no players are seen - hunt player
         if len(targets) <= 0:
-            return Action.STOP
+            return self.hunting_behavior(state, own_entity)
 
         target, distance = targets[0]
+        self.hunt(target)
         return self.target_seeking_behavior(state, own_entity, target)

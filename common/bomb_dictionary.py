@@ -234,6 +234,6 @@ FIRE_EXTINGUISHER_CONFIG = {
 
 # Grenade configuration
 GRENADE_CONFIG = {
-    'speed': 4.0,                      # Projectile travel speed
+    'speed': 30.0,                      # Projectile travel speed
 }
 

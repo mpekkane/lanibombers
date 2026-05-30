@@ -8,13 +8,21 @@ import numpy as np
 
 from game_engine.agent_state import Action
 from game_engine.render_state import RenderState
-from game_engine.entities.dynamic_entity import DynamicEntity
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 from game_engine.entities.player import Player
 from game_engine.entities.tile import Tile, TileType
 from enum import Enum
 from dataclasses import dataclass
+from game_engine.clock import Clock
 
 GridPos = tuple[int, int]
+
+_DIRECTION_TO_ACTION = {
+    Direction.UP: Action.UP,
+    Direction.DOWN: Action.DOWN,
+    Direction.LEFT: Action.LEFT,
+    Direction.RIGHT: Action.RIGHT,
+}
 
 
 @dataclass
@@ -54,6 +62,12 @@ class MonsterAI(ABC):
     fov_cache_key: Optional[Tuple[int, int]] = None
     path_map: Optional[PathMap] = None
     path_cache_key: Optional[Tuple[int, int]] = None
+    fire_delay: float = -1
+    last_fire: float = -1
+    hunt_time: float
+    last_seen_time: float = -1
+    hunt_target: Optional[DynamicEntity] = None
+    hunting: bool = False
 
     @abstractmethod
     def think(
@@ -110,6 +124,24 @@ class MonsterAI(ABC):
             return self.follow_path(target, own_entity)
 
         # If we don't, we have to go visually
+        return self.visual_path(state, own_entity, target)
+
+    def shooting_behavior(
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity,
+        target: DynamicEntity,
+    ) -> Optional[Action]:
+        """Move greedily toward target, avoiding blocking cells.
+
+        Uses full-map occupancy, so all coordinates are global map coordinates.
+
+        Coordinate convention:
+            occupancy[y, x]
+            state.tilemap[y, x]
+            entity.x -> x
+            entity.y -> y
+        """
         occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
         height, width = occupancy.shape
 
@@ -121,6 +153,26 @@ class MonsterAI(ABC):
 
         dx = target_x - x
         dy = target_y - y
+
+        if dx == 0 or dy == 0:
+            if dx == 0:
+                if target_y < y:
+                    desired = Direction.UP
+                else:
+                    desired = Direction.DOWN
+            else:
+                if target_x < x:
+                    desired = Direction.LEFT
+                else:
+                    desired = Direction.RIGHT
+
+            if own_entity.direction == desired and (
+                self.last_fire < 0 or Clock.now() - self.last_fire > self.fire_delay
+            ):
+                self.last_fire = Clock.now()
+                return Action.FIRE
+            else:
+                return _DIRECTION_TO_ACTION[desired]
 
         candidates: list[tuple[int, Action, int, int]] = []
 
@@ -134,13 +186,28 @@ class MonsterAI(ABC):
         elif dy < 0:
             candidates.append((abs(dy), Action.UP, x, y - 1))
 
-        candidates.sort(reverse=True, key=lambda item: item[0])
+        candidates.sort(reverse=False, key=lambda item: item[0])
 
         for _, action, nx, ny in candidates:
             if 0 <= nx < width and 0 <= ny < height and occupancy[ny, nx]:
                 return action
 
-        return None
+    def hunting_behavior(
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity
+    ) -> Optional[Action]:
+        if self.hunt_target is None:
+            self.hunting = False
+            return Action.STOP
+
+        if Clock.now() - self.last_seen_time > self.hunt_time:
+            self.hunting = False
+            self.hunt_target = None
+            return Action.STOP
+
+        else:
+            return self.target_seeking_behavior(state, own_entity, self.hunt_target)
 
     ################
     # SENSES
@@ -267,6 +334,11 @@ class MonsterAI(ABC):
     # HELPERS
     ################
 
+    def hunt(self, target: DynamicEntity) -> None:
+        self.last_seen_time = Clock.now()
+        self.hunt_target = target
+        self.hunting = True
+
     def follow_path(self, target: DynamicEntity, own_entity: DynamicEntity):
         assert self.path_map is not None
         path = self.path_map.path_to(
@@ -289,6 +361,41 @@ class MonsterAI(ABC):
             return Action.UP
         if next_y > y:
             return Action.DOWN
+
+        return None
+
+    def visual_path(
+        self, state: RenderState, own_entity: DynamicEntity, target: DynamicEntity
+    ) -> Optional[Action]:
+        occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
+        height, width = occupancy.shape
+
+        x = int(own_entity.x)
+        y = int(own_entity.y)
+
+        target_x = int(target.x)
+        target_y = int(target.y)
+
+        dx = target_x - x
+        dy = target_y - y
+
+        candidates: list[tuple[int, Action, int, int]] = []
+
+        if dx < 0:
+            candidates.append((abs(dx), Action.LEFT, x - 1, y))
+        elif dx > 0:
+            candidates.append((abs(dx), Action.RIGHT, x + 1, y))
+
+        if dy > 0:
+            candidates.append((abs(dy), Action.DOWN, x, y + 1))
+        elif dy < 0:
+            candidates.append((abs(dy), Action.UP, x, y - 1))
+
+        candidates.sort(reverse=True, key=lambda item: item[0])
+
+        for _, action, nx, ny in candidates:
+            if 0 <= nx < width and 0 <= ny < height and occupancy[ny, nx]:
+                return action
 
         return None
 

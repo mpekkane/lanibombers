@@ -20,12 +20,9 @@ class FurrymanAI(MonsterAI):
     ) -> Optional[Action]:
         smell_targets = self.smell(state, own_entity)
         see_targets = self.see(state, own_entity)
-        # print("-" * 40)
-        # print("I'm a furry man")
-        # print(f"Smell: {smell_targets}")
-        # print(f"See  : {see_targets}")
+
         targets = self.fuse_senses([smell_targets, see_targets])
-        # random action if no players are seen
+        # stop if no players are seen or smelled
         if len(targets) <= 0:
             return Action.STOP
 

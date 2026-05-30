@@ -19,10 +19,7 @@ class SlimeAI(MonsterAI):
     ) -> Optional[Action]:
         smell_targets = self.smell(state, own_entity)
         see_targets = self.see(state, own_entity)
-        # print("-" * 40)
-        # print(f"I'm a slime at {own_entity.x}, {own_entity.y}")
-        # print(f"Smell: {smell_targets}")
-        # print(f"See  : {see_targets}")
+
         targets = self.fuse_senses([smell_targets, see_targets])
         # random action if no players are seen
         if len(targets) <= 0:

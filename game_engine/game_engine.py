@@ -1553,8 +1553,8 @@ class GameEngine:
             ox, oy = (int)(other.x), (int)(other.y)
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
                 pass
-                # other.take_damage(agent.fight_power)
-                # agent.take_damage(other.fight_power)
+                other.take_damage(agent.fight_power)
+                agent.take_damage(other.fight_power)
                 self.log.info("FIGHT!")
                 self.log.info(f"Agent deals {agent.fight_power} damage")
                 self.log.info(f"Enemy deals {other.fight_power} damage")
