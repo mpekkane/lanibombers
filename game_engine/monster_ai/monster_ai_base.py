@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, List, Tuple, Callable
 import random
-
+from collections import deque
 import numpy as np
 
 from game_engine.agent_state import Action
@@ -12,6 +12,31 @@ from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
 from game_engine.entities.tile import Tile, TileType
 from enum import Enum
+from dataclasses import dataclass
+
+GridPos = tuple[int, int]
+
+
+@dataclass
+class PathMap:
+    reachable: np.ndarray
+    distance: np.ndarray
+    parent: dict[GridPos, GridPos]
+    start: GridPos
+
+    def path_to(self, goal_x: int, goal_y: int) -> Optional[list[GridPos]]:
+        goal = (goal_x, goal_y)
+
+        if not self.reachable[goal_y, goal_x]:
+            return None
+
+        path = [goal]
+
+        while path[-1] != self.start:
+            path.append(self.parent[path[-1]])
+
+        path.reverse()
+        return path
 
 
 class MonsterSense(Enum):
@@ -24,6 +49,11 @@ class MonsterAI(ABC):
 
     smell_radius: float
     view_radius: float
+    occupancy: Optional[np.ndarray] = None
+    fov: Optional[np.ndarray] = None
+    fov_cache_key: Optional[Tuple[int, int]] = None
+    path_map: Optional[PathMap] = None
+    path_cache_key: Optional[Tuple[int, int]] = None
 
     @abstractmethod
     def think(
@@ -64,7 +94,6 @@ class MonsterAI(ABC):
         state: RenderState,
         own_entity: DynamicEntity,
         target: DynamicEntity,
-        dominant_sense: MonsterSense = MonsterSense.VISION,
     ) -> Optional[Action]:
         """Move greedily toward target, avoiding blocking cells.
 
@@ -76,8 +105,12 @@ class MonsterAI(ABC):
             entity.x -> x
             entity.y -> y
         """
-        discriminator = MonsterAI.get_discriminator_function(dominant_sense)
-        occupancy = self.get_occupancy(state, discriminator)
+        # If we have a smell trail
+        if self.path_map is not None:
+            return self.follow_path(target, own_entity)
+
+        # If we don't, we have to go visually
+        occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
         height, width = occupancy.shape
 
         x = int(own_entity.x)
@@ -122,9 +155,14 @@ class MonsterAI(ABC):
         """
         in_range: List[Tuple[Player, float]] = []
 
+        path_map = self._get_path_sense(state, own_entity, MonsterSense.SMELL)
+
         for player in state.players:
             distance = self.manhattan(player, own_entity)
-            if distance <= self.smell_radius:
+            if (
+                distance <= self.smell_radius
+                and path_map.reachable[int(player.y), int(player.x)]
+            ):
                 in_range.append((player, distance))
 
         return MonsterAI._sort(in_range)
@@ -139,22 +177,7 @@ class MonsterAI(ABC):
         """
         visible: List[Tuple[Player, float]] = []
 
-        occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
-
-        origin_x = int(own_entity.x)
-        origin_y = int(own_entity.y)
-
-        fov = self.compute_fov(
-            occupancy=occupancy,
-            origin_x=origin_x,
-            origin_y=origin_y,
-            radius=int(self.view_radius),
-        )
-
-        # print("occupancy")
-        # self._print_occupancy(occupancy)
-        # print("fov")
-        # self._print_occupancy(fov)
+        fov = self._get_los_sense(state, own_entity, MonsterSense.VISION)
 
         height, width = fov.shape
 
@@ -167,6 +190,64 @@ class MonsterAI(ABC):
                 visible.append((player, distance))
 
         return MonsterAI._sort(visible)
+
+    def _get_los_sense(
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity,
+        dominant_sense: MonsterSense,
+    ) -> np.ndarray:
+        discriminator = MonsterAI.get_discriminator_function(dominant_sense)
+        occupancy = self.get_occupancy(state, discriminator)
+
+        origin_x = int(own_entity.x)
+        origin_y = int(own_entity.y)
+
+        fov = self.compute_fov(
+            occupancy=occupancy,
+            origin_x=origin_x,
+            origin_y=origin_y,
+            radius=int(self.view_radius),
+        )
+
+        # print("=" * 80)
+        # print("Get LOS sense")
+        # print("occupancy")
+        # self._print_occupancy(occupancy, own_entity)
+        # print("-" * 40)
+        # print("fov")
+        # self._print_occupancy(fov, own_entity)
+
+        return fov
+
+    def _get_path_sense(
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity,
+        dominant_sense: MonsterSense,
+    ) -> PathMap:
+        discriminator = MonsterAI.get_discriminator_function(dominant_sense)
+        occupancy = self.get_occupancy(state, discriminator)
+
+        origin_x = int(own_entity.x)
+        origin_y = int(own_entity.y)
+
+        path_map = self.compute_path_map(
+            occupancy=occupancy,
+            origin_x=origin_x,
+            origin_y=origin_y,
+            radius=int(self.view_radius),
+        )
+
+        # print("=" * 80)
+        # print("Get path sense")
+        # print("occupancy")
+        # self._print_occupancy(occupancy, own_entity)
+        # print("-" * 40)
+        # print("reachable")
+        # self._print_occupancy(path_map.reachable, own_entity)
+
+        return path_map
 
     def fuse_senses(
         self, measurements: List[List[Tuple[Player, float]]]
@@ -186,6 +267,31 @@ class MonsterAI(ABC):
     # HELPERS
     ################
 
+    def follow_path(self, target: DynamicEntity, own_entity: DynamicEntity):
+        assert self.path_map is not None
+        path = self.path_map.path_to(
+            goal_x=int(target.x),
+            goal_y=int(target.y),
+        )
+        if path is None or len(path) < 2:
+            return None
+
+        x = int(own_entity.x)
+        y = int(own_entity.y)
+
+        next_x, next_y = path[1]
+
+        if next_x < x:
+            return Action.LEFT
+        if next_x > x:
+            return Action.RIGHT
+        if next_y < y:
+            return Action.UP
+        if next_y > y:
+            return Action.DOWN
+
+        return None
+
     @staticmethod
     def get_discriminator_function(sense: MonsterSense) -> Callable[[TileType], bool]:
         if sense == MonsterSense.VISION:
@@ -195,14 +301,18 @@ class MonsterAI(ABC):
         else:
             raise ValueError("Unknown monster sense")
 
-    def _print_occupancy(self, occupancy: np.ndarray) -> None:
+    def _print_occupancy(self, occupancy: np.ndarray, entity: DynamicEntity) -> None:
         rows = []
 
         for y in range(occupancy.shape[0]):
             row = ""
 
             for x in range(occupancy.shape[1]):
-                row += "1" if occupancy[y, x] else "0"
+
+                if int(entity.x) == x and int(entity.y) == y:
+                    row += "X"
+                else:
+                    row += "1" if occupancy[y, x] else "0"
 
             rows.append(row)
 
@@ -225,16 +335,98 @@ class MonsterAI(ABC):
         This intentionally does not crop around the monster. Keeping this full-map
         shaped avoids local/global coordinate confusion in smell/visibility code.
         """
-        return np.array(
-            [
+        if self.occupancy is None:
+            self.occupancy = np.array(
                 [
-                    discriminator_function(Tile.visual_id_to_type(int(cell)))
-                    for cell in row
-                ]
-                for row in state.tilemap
-            ],
-            dtype=bool,
-        )
+                    [
+                        discriminator_function(Tile.visual_id_to_type(int(cell)))
+                        for cell in row
+                    ]
+                    for row in state.tilemap
+                ],
+                dtype=bool,
+            )
+        return self.occupancy
+
+    @staticmethod
+    def get_neighbors(
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> list[tuple[int, int]]:
+        candidates = [
+            (x - 1, y),  # left
+            (x + 1, y),  # right
+            (x, y - 1),  # up
+            (x, y + 1),  # down
+        ]
+
+        return [
+            (nx, ny) for nx, ny in candidates if 0 <= nx < width and 0 <= ny < height
+        ]
+
+    def compute_path_map(
+        self,
+        occupancy: np.ndarray,
+        origin_x: int,
+        origin_y: int,
+        radius: int,
+        *,
+        reveal_blocking_tiles: bool = False,
+    ) -> PathMap:
+        key = (origin_x, origin_y)
+        if self.path_cache_key is not None and self.path_cache_key == key:
+            assert self.path_map is not None
+            return self.path_map
+
+        height, width = occupancy.shape
+
+        reachable = np.zeros_like(occupancy, dtype=bool)
+        distance = np.full(occupancy.shape, fill_value=-1, dtype=int)
+        parent: dict[GridPos, GridPos] = {}
+
+        start = (origin_x, origin_y)
+
+        if not (0 <= origin_x < width and 0 <= origin_y < height):
+            return PathMap(reachable, distance, parent, start)
+
+        if not occupancy[origin_y, origin_x]:
+            return PathMap(reachable, distance, parent, start)
+
+        radius = max(0, int(radius))
+
+        queue: deque[GridPos] = deque([start])
+
+        reachable[origin_y, origin_x] = True
+        distance[origin_y, origin_x] = 0
+
+        while queue:
+            x, y = queue.popleft()
+            d = distance[y, x]
+
+            if d >= radius:
+                continue
+
+            for nx, ny in MonsterAI.get_neighbors(x, y, width, height):
+                if distance[ny, nx] != -1:
+                    continue
+
+                if not occupancy[ny, nx]:
+                    if reveal_blocking_tiles:
+                        reachable[ny, nx] = True
+                    continue
+
+                reachable[ny, nx] = True
+                distance[ny, nx] = d + 1
+                parent[(nx, ny)] = (x, y)
+                queue.append((nx, ny))
+
+        path_map = PathMap(reachable, distance, parent, start)
+
+        self.path_cache_key = key
+        self.path_map = path_map
+        return path_map
 
     def compute_fov(
         self,
@@ -272,6 +464,11 @@ class MonsterAI(ABC):
 
             visible[y, x] == True means cell is visible.
         """
+        key = (origin_x, origin_y)
+        if self.fov_cache_key is not None and self.fov_cache_key == key:
+            assert self.fov is not None
+            return self.fov
+
         height, width = occupancy.shape
         visible = np.zeros_like(occupancy, dtype=bool)
 
@@ -395,6 +592,8 @@ class MonsterAI(ABC):
                 yy=yy,
             )
 
+        self.fov_cache_key = key
+        self.fov = visible
         return visible
 
     ################

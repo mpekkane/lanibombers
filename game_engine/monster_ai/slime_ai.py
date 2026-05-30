@@ -11,7 +11,7 @@ from game_engine.entities.dynamic_entity import DynamicEntity
 class SlimeAI(MonsterAI):
     def __init__(self) -> None:
         super().__init__()
-        self.smell_radius = 5
+        self.smell_radius = 10
         self.view_radius = 10
 
     def think(
@@ -20,7 +20,7 @@ class SlimeAI(MonsterAI):
         smell_targets = self.smell(state, own_entity)
         see_targets = self.see(state, own_entity)
         # print("-" * 40)
-        # print("I'm a slime")
+        # print(f"I'm a slime at {own_entity.x}, {own_entity.y}")
         # print(f"Smell: {smell_targets}")
         # print(f"See  : {see_targets}")
         targets = self.fuse_senses([smell_targets, see_targets])
@@ -30,5 +30,5 @@ class SlimeAI(MonsterAI):
 
         target, distance = targets[0]
         return self.target_seeking_behavior(
-            state, own_entity, target, MonsterSense.SMELL
+            state, own_entity, target
         )
