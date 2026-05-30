@@ -86,7 +86,13 @@ class SwitchState(Enum):
 class GameEngine:
     """Main game engine containing the tile grid and event system."""
 
-    def __init__(self, width: int = 64, height: int = 45, spawn_type: SpawnType = SpawnType.EDGES, max_round_time: int = -1):
+    def __init__(
+        self,
+        width: int = 64,
+        height: int = 45,
+        spawn_type: SpawnType = SpawnType.EDGES,
+        max_round_time: int = -1,
+    ):
         self.running = True
         self.width = width
         self.height = height
@@ -163,9 +169,7 @@ class GameEngine:
             n = num_players
         else:
             n = len(self.players)
-        self.starting_poses = get_spawn_points(
-            n, self.map_data, self.spawn_type
-        )
+        self.starting_poses = get_spawn_points(n, self.map_data, self.spawn_type)
 
         for pos in self.starting_poses:
             self.tiles[pos[0]][pos[1]] = Tile.create_empty()
@@ -1452,12 +1456,15 @@ class GameEngine:
         if target.state == "dead":
             return
 
+        is_player = target.entity_type == EntityType.PLAYER
+
         in_bounds, target_tile = self.get_neighbor_tile(target)
         if not in_bounds:
             return
         dig_power = target.get_dig_power() if isinstance(target, Player) else 1
         target_tile.take_damage(dig_power)
-        self.pending_sounds.append(SoundType.DIG)
+        if is_player:
+            self.pending_sounds.append(SoundType.DIG)
 
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
@@ -1552,14 +1559,18 @@ class GameEngine:
         for other in entities:
             ox, oy = (int)(other.x), (int)(other.y)
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
-                pass
-                other.take_damage(agent.fight_power)
-                agent.take_damage(other.fight_power)
-                self.log.info("FIGHT!")
-                self.log.info(f"Agent deals {agent.fight_power} damage")
-                self.log.info(f"Enemy deals {other.fight_power} damage")
-                self.log.info(f"Agent health {agent.health}")
-                self.log.info(f"Enemy health {other.health}")
+                # monsters do not fight each other
+                if (
+                    other.entity_type == EntityType.PLAYER
+                    or agent.entity_type == EntityType.PLAYER
+                ):
+                    other.take_damage(agent.fight_power)
+                    agent.take_damage(other.fight_power)
+                    self.log.info("FIGHT!")
+                    self.log.info(f"Agent deals {agent.fight_power} damage")
+                    self.log.info(f"Enemy deals {other.fight_power} damage")
+                    self.log.info(f"Agent health {agent.health}")
+                    self.log.info(f"Enemy health {other.health}")
         if agent.state == "dead":
             self.pending_sounds.append(SoundType.DIE)
 
@@ -1644,7 +1655,6 @@ class GameEngine:
             else:
                 round_time_left = self.max_round_time
 
-
         # Build tilemap as 2D numpy array
         tilemap = GameEngine.tilemap_to_numpy(self.tiles)
         explosions_copy = self.explosions.copy()
@@ -1680,7 +1690,7 @@ class GameEngine:
             server_time=now,
             sounds=sounds,
             running=self.running,
-            round_time_left=round_time_left
+            round_time_left=round_time_left,
         )
 
     def cleanup_render_state(self):

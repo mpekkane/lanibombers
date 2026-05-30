@@ -85,6 +85,8 @@ class ClientSimulation:
             se.treasure()
         elif sound_type == SoundType.DIE:
             se.die()
+        elif sound_type == SoundType.MONSTER:
+            se.monster()
 
     def has_state(self) -> bool:
         """Whether at least one server state has been received."""

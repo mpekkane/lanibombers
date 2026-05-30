@@ -13,12 +13,18 @@ class SlimeAI(MonsterAI):
         super().__init__()
         self.smell_radius = 10
         self.view_radius = 10
+        self.hunt_time = 0
+        self.bravery = 0
 
     def think(
         self, state: RenderState, state_updated: bool, own_entity: DynamicEntity
     ) -> Optional[Action]:
         smell_targets = self.smell(state, own_entity)
         see_targets = self.see(state, own_entity)
+        in_danger = self.sense_bombs(state, own_entity, MonsterSense.SMELL)
+
+        if in_danger:
+            return self.bomb_avoidance_behavior(state, own_entity)
 
         targets = self.fuse_senses([smell_targets, see_targets])
         # random action if no players are seen

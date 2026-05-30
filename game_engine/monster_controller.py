@@ -9,8 +9,10 @@ from game_engine.entities.dynamic_entity import Direction, EntityType
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.input_queue import InputCommand
 from game_engine.monster_ai import MonsterAI, MONSTER_AI_MAP
+from game_engine.monster_ai.monster_ai_base import MonsterState
 from game_engine.render_state import RenderState
 from game_engine.utils import xy_to_tile
+from game_engine.render_state import SoundType
 
 if TYPE_CHECKING:
     from game_engine.entities.dynamic_entity import DynamicEntity
@@ -39,6 +41,7 @@ class MonsterController:
         self._lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self.ai_previous_state: MonsterState = MonsterState.IDLE
 
     def push_state(self, state: RenderState) -> None:
         """Store the latest render state and mark as updated."""
@@ -81,6 +84,13 @@ class MonsterController:
                 continue
 
             action = self.ai.think(state, updated, self.monster)
+
+            if (
+                self.ai.state != self.ai_previous_state
+                and self.ai.state == MonsterState.HUNTING
+            ):
+                self.engine.pending_sounds.append(SoundType.MONSTER)
+            self.ai_previous_state = self.ai.state
             if action is not None:
                 self._execute_action(action)
 
@@ -97,10 +107,7 @@ class MonsterController:
             else:
                 direction = _ACTION_TO_DIRECTION[action]
                 # Redundant direction guard (same as on_control)
-                if (
-                    self.monster.direction == direction
-                    and self.monster.state == "walk"
-                ):
+                if self.monster.direction == direction and self.monster.state == "walk":
                     return
                 self.monster.direction = direction
                 self.monster.state = "walk"
@@ -121,5 +128,7 @@ class MonsterController:
                 direction=self.monster.direction,
             )
             self.engine.input_queue.submit(
-                InputCommand(entity=self.monster, action=action, timestamp=now, bomb=bomb)
+                InputCommand(
+                    entity=self.monster, action=action, timestamp=now, bomb=bomb
+                )
             )

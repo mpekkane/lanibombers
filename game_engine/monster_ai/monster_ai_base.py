@@ -5,15 +5,16 @@ from typing import Optional, List, Tuple, Callable
 import random
 from collections import deque
 import numpy as np
+from heapq import heappop, heappush
 
 from game_engine.agent_state import Action
 from game_engine.render_state import RenderState
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction
-from game_engine.entities.player import Player
-from game_engine.entities.tile import Tile, TileType
+from game_engine.entities import Player, Tile, TileType, BombType
 from enum import Enum
 from dataclasses import dataclass
 from game_engine.clock import Clock
+from game_engine.game_engine import EXPLOSION_MAP
 
 GridPos = tuple[int, int]
 
@@ -46,28 +47,74 @@ class PathMap:
         path.reverse()
         return path
 
+    def print_path(
+        self,
+        occupancy: np.ndarray,
+        goal_x: int,
+        goal_y: int,
+    ) -> None:
+        path = self.path_to(goal_x, goal_y)
+
+        height, width = occupancy.shape
+
+        chars = np.full((height, width), "#", dtype="<U1")
+
+        for y in range(height):
+            for x in range(width):
+                if occupancy[y, x]:
+                    chars[y, x] = "."
+
+        if path is None:
+            print("No path")
+            for y in range(height):
+                print("".join(chars[y]))
+            return
+
+        for i, (x, y) in enumerate(path):
+            chars[y, x] = str(i % 10)
+
+        sx, sy = self.start
+        chars[sy, sx] = "S"
+
+        chars[goal_y, goal_x] = "G"
+
+        for y in range(height):
+            print("".join(chars[y]))
+
 
 class MonsterSense(Enum):
     SMELL = "smell"
     VISION = "vision"
 
 
+class MonsterState(Enum):
+    IDLE = "idle"
+    HUNTING = "hunting"
+
+
 class MonsterAI(ABC):
     """Abstract base class for monster AI behavior."""
 
-    smell_radius: float
-    view_radius: float
+    # monster properties
+    smell_radius: float  # range for smell sense
+    view_radius: float  # range for vision sense
+    bravery: int  # how much damage is the monster willing to take when hunting
+    hunt_time: float  # how long does the monster hunt the player, seconds
+    fire_delay: float = -1  # time between shots, seconds
+
+    # store data
+    state: MonsterState = MonsterState.IDLE
     occupancy: Optional[np.ndarray] = None
     fov: Optional[np.ndarray] = None
     fov_cache_key: Optional[Tuple[int, int]] = None
     path_map: Optional[PathMap] = None
     path_cache_key: Optional[Tuple[int, int]] = None
-    fire_delay: float = -1
     last_fire: float = -1
-    hunt_time: float
     last_seen_time: float = -1
     hunt_target: Optional[DynamicEntity] = None
     hunting: bool = False
+    danger_zone: np.ndarray = np.array([])
+    danger_discount: float = 0.25
 
     @abstractmethod
     def think(
@@ -89,7 +136,14 @@ class MonsterAI(ABC):
     # BEHAVIORS
     ################
 
+    def idle_behavior(self) -> Optional[Action]:
+        self.hunting = False
+        self.hunt_target = None
+        self.state = MonsterState.IDLE
+        return Action.STOP
+
     def random_behavior(self, threshold: float) -> Optional[Action]:
+        self.state = MonsterState.IDLE
         r = random.random()
         if r > threshold:
             return random.choice(
@@ -119,12 +173,26 @@ class MonsterAI(ABC):
             entity.x -> x
             entity.y -> y
         """
-        # If we have a smell trail
-        if self.path_map is not None:
-            return self.follow_path(target, own_entity)
+        self.state = MonsterState.HUNTING
+        self.path_map = self._get_path_sense(
+            state,
+            own_entity,
+            MonsterSense.VISION,
+            avoid_danger=True,
+            target_x=int(target.x),
+            target_y=int(target.y),
+        )
 
-        # If we don't, we have to go visually
-        return self.visual_path(state, own_entity, target)
+        # print("*" * 80)
+        # self.path_map.print_path(
+        #     self.get_occupancy(
+        #         state, self.get_discriminator_function(MonsterSense.VISION)
+        #     ),
+        #     int(target.x),
+        #     int(target.y),
+        # )
+
+        return self.follow_path(target, own_entity)
 
     def shooting_behavior(
         self,
@@ -142,6 +210,7 @@ class MonsterAI(ABC):
             entity.x -> x
             entity.y -> y
         """
+        self.state = MonsterState.HUNTING
         occupancy = self.get_occupancy(state, MonsterAI.can_see_through)
         height, width = occupancy.shape
 
@@ -189,25 +258,40 @@ class MonsterAI(ABC):
         candidates.sort(reverse=False, key=lambda item: item[0])
 
         for _, action, nx, ny in candidates:
-            if 0 <= nx < width and 0 <= ny < height and occupancy[ny, nx]:
+            if (
+                0 <= nx < width
+                and 0 <= ny < height
+                and occupancy[ny, nx]
+                and (self.danger_zone is None or self.danger_zone[ny, nx] <= 0)
+            ):
                 return action
 
     def hunting_behavior(
-        self,
-        state: RenderState,
-        own_entity: DynamicEntity
+        self, state: RenderState, own_entity: DynamicEntity
     ) -> Optional[Action]:
         if self.hunt_target is None:
-            self.hunting = False
-            return Action.STOP
+            return self.idle_behavior()
 
         if Clock.now() - self.last_seen_time > self.hunt_time:
-            self.hunting = False
-            self.hunt_target = None
-            return Action.STOP
+            return self.idle_behavior()
 
         else:
             return self.target_seeking_behavior(state, own_entity, self.hunt_target)
+
+    def bomb_avoidance_behavior(
+        self, state: RenderState, own_entity: DynamicEntity
+    ) -> Optional[Action]:
+        path = self.shortest_path_out_of_area(
+            occupancy=self.get_occupancy(state, MonsterAI.can_see_through),
+            area=self.danger_zone,
+            start_x=int(own_entity.x),
+            start_y=int(own_entity.y),
+        )
+
+        if path is None:
+            return None
+
+        return self.path_to_next_action(path)
 
     ################
     # SENSES
@@ -258,6 +342,34 @@ class MonsterAI(ABC):
 
         return MonsterAI._sort(visible)
 
+    def sense_bombs(
+        self,
+        state: RenderState,
+        own_entity: DynamicEntity,
+        dominant_sense: MonsterSense,
+    ) -> bool:
+        self.danger_zone = np.zeros((state.height, state.width)).astype(dtype=np.int32)
+
+        if dominant_sense == MonsterSense.VISION:
+            sensed = self._get_los_sense(state, own_entity, MonsterSense.VISION)
+        elif dominant_sense == MonsterSense.SMELL:
+            pathmap = self._get_path_sense(state, own_entity, MonsterSense.SMELL)
+            sensed = pathmap.reachable
+
+        assert self.danger_zone is not None
+        solids = np.zeros((state.height, state.width), dtype=bool)
+        for b in state.bombs:
+            if b.bomb_type is BombType.LANDMINE:
+                continue
+            if sensed[int(b.y), int(b.x)]:
+                explosion = EXPLOSION_MAP[b.explosion_type]
+                damage_array = explosion.calculate_damage(b.x, b.y, solids)
+                self.danger_zone += damage_array
+        danger_level = self.danger_zone[int(own_entity.y), int(own_entity.x)]
+
+        # If more danger than the monster is willing to take, flee
+        return danger_level * self.danger_discount > self.bravery
+
     def _get_los_sense(
         self,
         state: RenderState,
@@ -292,6 +404,9 @@ class MonsterAI(ABC):
         state: RenderState,
         own_entity: DynamicEntity,
         dominant_sense: MonsterSense,
+        avoid_danger: bool = False,
+        target_x: Optional[int] = None,
+        target_y: Optional[int] = None,
     ) -> PathMap:
         discriminator = MonsterAI.get_discriminator_function(dominant_sense)
         occupancy = self.get_occupancy(state, discriminator)
@@ -299,20 +414,32 @@ class MonsterAI(ABC):
         origin_x = int(own_entity.x)
         origin_y = int(own_entity.y)
 
-        path_map = self.compute_path_map(
-            occupancy=occupancy,
-            origin_x=origin_x,
-            origin_y=origin_y,
-            radius=int(self.view_radius),
-        )
+        if avoid_danger:
+            cost_map = self.danger_zone
 
-        # print("=" * 80)
-        # print("Get path sense")
-        # print("occupancy")
-        # self._print_occupancy(occupancy, own_entity)
-        # print("-" * 40)
-        # print("reachable")
-        # self._print_occupancy(path_map.reachable, own_entity)
+            path_map = self.compute_safe_short_path_map(
+                occupancy=occupancy,
+                danger_map=self.danger_zone,
+                origin_x=origin_x,
+                origin_y=origin_y,
+                radius=int(self.view_radius),
+                danger_threshold=self.bravery,
+                target_x=target_x,
+                target_y=target_y,
+            )
+
+        else:
+            cost_map = None
+
+            path_map = self.compute_path_map(
+                occupancy=occupancy,
+                origin_x=origin_x,
+                origin_y=origin_y,
+                radius=int(self.view_radius),
+                cost_map=cost_map,
+                target_x=target_x,
+                target_y=target_y,
+            )
 
         return path_map
 
@@ -339,13 +466,23 @@ class MonsterAI(ABC):
         self.hunt_target = target
         self.hunting = True
 
-    def follow_path(self, target: DynamicEntity, own_entity: DynamicEntity):
+    def follow_path(
+        self,
+        target: DynamicEntity,
+        own_entity: DynamicEntity,
+    ) -> Optional[Action]:
         assert self.path_map is not None
+
         path = self.path_map.path_to(
             goal_x=int(target.x),
             goal_y=int(target.y),
         )
+
         if path is None or len(path) < 2:
+            return None
+
+        total_danger = np.sum([float(self.danger_zone[y, x]) for x, y in path[1:]])
+        if self.bravery < total_danger:
             return None
 
         x = int(own_entity.x)
@@ -353,13 +490,19 @@ class MonsterAI(ABC):
 
         next_x, next_y = path[1]
 
-        if next_x < x:
+        dx = next_x - x
+        dy = next_y - y
+
+        if abs(dx) + abs(dy) != 1:
+            return None
+
+        if dx == -1:
             return Action.LEFT
-        if next_x > x:
+        if dx == 1:
             return Action.RIGHT
-        if next_y < y:
+        if dy == -1:
             return Action.UP
-        if next_y > y:
+        if dy == 1:
             return Action.DOWN
 
         return None
@@ -394,7 +537,12 @@ class MonsterAI(ABC):
         candidates.sort(reverse=True, key=lambda item: item[0])
 
         for _, action, nx, ny in candidates:
-            if 0 <= nx < width and 0 <= ny < height and occupancy[ny, nx]:
+            if (
+                0 <= nx < width
+                and 0 <= ny < height
+                and occupancy[ny, nx]
+                and (self.danger_zone is None or self.danger_zone[ny, nx] <= 0)
+            ):
                 return action
 
         return None
@@ -419,7 +567,7 @@ class MonsterAI(ABC):
                 if int(entity.x) == x and int(entity.y) == y:
                     row += "X"
                 else:
-                    row += "1" if occupancy[y, x] else "0"
+                    row += "#" if occupancy[y, x] else "."
 
             rows.append(row)
 
@@ -480,17 +628,136 @@ class MonsterAI(ABC):
         origin_y: int,
         radius: int,
         *,
+        cost_map: Optional[np.ndarray] = None,
+        target_x: Optional[int] = None,
+        target_y: Optional[int] = None,
         reveal_blocking_tiles: bool = False,
     ) -> PathMap:
+        use_cache = cost_map is None and target_x is None and target_y is None
         key = (origin_x, origin_y)
-        if self.path_cache_key is not None and self.path_cache_key == key:
+
+        if use_cache and self.path_cache_key is not None and self.path_cache_key == key:
             assert self.path_map is not None
             return self.path_map
 
         height, width = occupancy.shape
 
         reachable = np.zeros_like(occupancy, dtype=bool)
-        distance = np.full(occupancy.shape, fill_value=-1, dtype=int)
+        distance = np.full(occupancy.shape, fill_value=np.inf, dtype=float)
+        parent: dict[GridPos, GridPos] = {}
+
+        start = (origin_x, origin_y)
+
+        if not (0 <= origin_x < width and 0 <= origin_y < height):
+            return PathMap(reachable, distance, parent, start)
+
+        if not occupancy[origin_y, origin_x]:
+            return PathMap(reachable, distance, parent, start)
+
+        if cost_map is None:
+            move_cost = np.ones_like(occupancy, dtype=float)
+        else:
+            if cost_map.shape != occupancy.shape:
+                raise ValueError("cost_map must have the same shape as occupancy")
+            move_cost = cost_map.astype(float, copy=False)
+
+        def target_tiebreaker(x: int, y: int) -> float:
+            if target_x is None or target_y is None:
+                return 0.0
+            return abs(target_x - x) + abs(target_y - y)
+
+        radius = max(0, int(radius))
+
+        heap: list[tuple[float, float, GridPos]] = [
+            (0.0, target_tiebreaker(origin_x, origin_y), start)
+        ]
+
+        reachable[origin_y, origin_x] = True
+        distance[origin_y, origin_x] = 0.0
+
+        while heap:
+            current_cost, _, (x, y) = heappop(heap)
+
+            if current_cost != distance[y, x]:
+                continue
+
+            if current_cost >= radius:
+                continue
+
+            for nx, ny in MonsterAI.get_neighbors(x, y, width, height):
+                if not occupancy[ny, nx]:
+                    if reveal_blocking_tiles:
+                        reachable[ny, nx] = True
+                    continue
+
+                step_cost = float(move_cost[ny, nx])
+
+                if step_cost < 0:
+                    raise ValueError("cost_map cannot contain negative costs")
+
+                new_cost = current_cost + step_cost
+
+                if new_cost > radius:
+                    continue
+
+                if new_cost >= distance[ny, nx]:
+                    continue
+
+                reachable[ny, nx] = True
+                distance[ny, nx] = new_cost
+                parent[(nx, ny)] = (x, y)
+
+                heappush(
+                    heap,
+                    (new_cost, target_tiebreaker(nx, ny), (nx, ny)),
+                )
+
+        path_map = PathMap(reachable, distance, parent, start)
+
+        if use_cache:
+            self.path_cache_key = key
+            self.path_map = path_map
+
+        return path_map
+
+    def compute_safe_short_path_map(
+        self,
+        occupancy: np.ndarray,
+        danger_map: np.ndarray,
+        origin_x: int,
+        origin_y: int,
+        radius: int,
+        danger_threshold: float,
+        *,
+        target_x: Optional[int] = None,
+        target_y: Optional[int] = None,
+    ) -> PathMap:
+        """
+        Find shortest paths while keeping total route danger below threshold.
+
+        Primary objective:
+            minimize number of steps
+
+        Constraint:
+            total danger along path <= danger_threshold
+
+        Tie-breakers:
+            lower total danger
+            lower Manhattan distance to target, if target given
+        """
+        height, width = occupancy.shape
+
+        if danger_map.shape != occupancy.shape:
+            raise ValueError("danger_map must have the same shape as occupancy")
+
+        reachable = np.zeros_like(occupancy, dtype=bool)
+
+        # Here distance means number of steps, not danger.
+        distance = np.full(occupancy.shape, fill_value=np.inf, dtype=float)
+
+        # Track best known total danger for each cell.
+        danger = np.full(occupancy.shape, fill_value=np.inf, dtype=float)
+
         parent: dict[GridPos, GridPos] = {}
 
         start = (origin_x, origin_y)
@@ -502,38 +769,75 @@ class MonsterAI(ABC):
             return PathMap(reachable, distance, parent, start)
 
         radius = max(0, int(radius))
+        danger_threshold = float(danger_threshold)
 
-        queue: deque[GridPos] = deque([start])
+        def target_tiebreaker(x: int, y: int) -> float:
+            if target_x is None or target_y is None:
+                return 0.0
+            return abs(target_x - x) + abs(target_y - y)
+
+        # heap item:
+        #   steps, total_danger, target_distance, position
+        heap: list[tuple[int, float, float, GridPos]] = [
+            (0, 0.0, target_tiebreaker(origin_x, origin_y), start)
+        ]
 
         reachable[origin_y, origin_x] = True
         distance[origin_y, origin_x] = 0
+        danger[origin_y, origin_x] = 0.0
 
-        while queue:
-            x, y = queue.popleft()
-            d = distance[y, x]
+        while heap:
+            steps, total_danger, _, (x, y) = heappop(heap)
 
-            if d >= radius:
+            if steps > distance[y, x]:
+                continue
+
+            if steps == distance[y, x] and total_danger > danger[y, x]:
+                continue
+
+            if steps >= radius:
                 continue
 
             for nx, ny in MonsterAI.get_neighbors(x, y, width, height):
-                if distance[ny, nx] != -1:
+                if not occupancy[ny, nx]:
                     continue
 
-                if not occupancy[ny, nx]:
-                    if reveal_blocking_tiles:
-                        reachable[ny, nx] = True
+                new_steps = steps + 1
+                new_danger = total_danger + float(danger_map[ny, nx])
+
+                if new_steps > radius:
+                    continue
+
+                if new_danger > danger_threshold:
+                    continue
+
+                old_steps = distance[ny, nx]
+                old_danger = danger[ny, nx]
+
+                # Prefer shorter paths.
+                if new_steps > old_steps:
+                    continue
+
+                # Among equally short paths, prefer less danger.
+                if new_steps == old_steps and new_danger >= old_danger:
                     continue
 
                 reachable[ny, nx] = True
-                distance[ny, nx] = d + 1
+                distance[ny, nx] = new_steps
+                danger[ny, nx] = new_danger
                 parent[(nx, ny)] = (x, y)
-                queue.append((nx, ny))
 
-        path_map = PathMap(reachable, distance, parent, start)
+                heappush(
+                    heap,
+                    (
+                        new_steps,
+                        new_danger,
+                        target_tiebreaker(nx, ny),
+                        (nx, ny),
+                    ),
+                )
 
-        self.path_cache_key = key
-        self.path_map = path_map
-        return path_map
+        return PathMap(reachable, distance, parent, start)
 
     def compute_fov(
         self,
@@ -702,6 +1006,101 @@ class MonsterAI(ABC):
         self.fov_cache_key = key
         self.fov = visible
         return visible
+
+    def shortest_path_out_of_area(
+        self,
+        occupancy: np.ndarray,
+        area: Optional[np.ndarray],
+        start_x: int,
+        start_y: int,
+    ) -> Optional[list[GridPos]]:
+        """
+        Find shortest cardinal path from start to the nearest walkable cell
+        outside `area`.
+
+        occupancy[y, x] == True means walkable.
+        area[y, x] == True means inside the area to escape.
+
+        Returns [(x, y), ...], including start and exit cell.
+        Returns None if no exit is reachable.
+        """
+        start = (start_x, start_y)
+        if area is None:
+            return [start]
+
+        height, width = occupancy.shape
+
+        if area.shape != occupancy.shape:
+            raise ValueError("area and occupancy must have the same shape")
+
+        if not (0 <= start_x < width and 0 <= start_y < height):
+            return None
+
+        if not occupancy[start_y, start_x]:
+            return None
+
+        # Already outside.
+        if area[start_y, start_x] <= 0:
+            return [start]
+
+        visited = np.zeros_like(occupancy, dtype=bool)
+        visited[start_y, start_x] = True
+
+        parent: dict[GridPos, GridPos] = {}
+
+        queue: deque[GridPos] = deque([start])
+
+        while queue:
+            x, y = queue.popleft()
+
+            for nx, ny in MonsterAI.get_neighbors(x, y, width, height):
+                if visited[ny, nx]:
+                    continue
+
+                if not occupancy[ny, nx]:
+                    continue
+
+                visited[ny, nx] = True
+                parent[(nx, ny)] = (x, y)
+
+                # First outside cell found by BFS is shortest exit.
+                if area[ny, nx] <= 0:
+                    goal = (nx, ny)
+
+                    path = [goal]
+                    while path[-1] != start:
+                        path.append(parent[path[-1]])
+
+                    path.reverse()
+                    return path
+
+                queue.append((nx, ny))
+
+        return None
+
+    def path_to_next_action(self, path: list[GridPos]) -> Optional[Action]:
+        if len(path) < 2:
+            return None
+
+        x, y = path[0]
+        nx, ny = path[1]
+
+        dx = nx - x
+        dy = ny - y
+
+        if abs(dx) + abs(dy) != 1:
+            raise ValueError(f"Non-cardinal path step: {(x, y)} -> {(nx, ny)}")
+
+        if dx == -1:
+            return Action.LEFT
+        if dx == 1:
+            return Action.RIGHT
+        if dy == -1:
+            return Action.UP
+        if dy == 1:
+            return Action.DOWN
+
+        return None
 
     ################
     # PROPERTIES

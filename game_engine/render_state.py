@@ -23,6 +23,7 @@ class SoundType(IntEnum):
     DIG = 4
     TREASURE = 5
     DIE = 6
+    MONSTER = 7
 
 
 @dataclass
