@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['test_server.py'],
+    ['server.py'],
     pathex=[],
     binaries=[],
     datas=[('cfg', 'cfg'), ('assets', 'assets'), ('common/room_templates', 'common/room_templates')],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='test_server',
+    name='server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

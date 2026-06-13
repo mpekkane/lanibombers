@@ -44,15 +44,15 @@ goto server
 
 :server_init
 echo === Building server (init) ===
-%PI% --onefile --name "test_server" --add-data "cfg;cfg" --add-data "assets;assets" --add-data "common/room_templates;common/room_templates" test_server.py
+%PI% --onefile --name "server" --add-data "cfg;cfg" --add-data "assets;assets" --add-data "common/room_templates;common/room_templates" server.py
 goto end
 
 :server
 echo === Building server (spec) ===
-%PI% test_server.spec
+%PI% server.spec
 goto end
 
-:server_all
+:client_all
 call "%~f0" client-init
 goto client
 
