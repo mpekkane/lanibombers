@@ -3,7 +3,6 @@
 from typing import Tuple, List
 import numpy as np
 import random
-from tqdm import tqdm
 
 
 def ed(x1: np.ndarray, x2: np.ndarray) -> float:
@@ -50,7 +49,7 @@ def perlin_noise(x_r: int, y_r: int, g: int) -> np.ndarray:
         for gy in range(grid.shape[1]):
             grid[gx, gy] = random.random() * 2 * np.pi
 
-    for x in tqdm(range(x_r), desc="generating map...", leave=False):
+    for x in range(x_r):
         for y in range(y_r):
             grid_l = x // g
             grid_r = x // g + 1
