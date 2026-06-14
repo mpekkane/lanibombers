@@ -11,6 +11,7 @@ import tempfile
 import copy
 import yaml
 
+from common.config_reader import resource_path
 from game_engine.session_parser import Session
 
 DEFAULT_RANDOM_PARAMS = {
@@ -55,7 +56,7 @@ class TkBomberServer(BomberServerBase):
         self._start_requested = False
         self._stop_server_requested = False
 
-        self.icon_dir = Path("assets/server")
+        self.icon_dir = resource_path("assets/server")
         self.icons: dict[str, tk.PhotoImage] = {}
 
         self.log_path = Path(log_path)
@@ -1152,11 +1153,7 @@ class TkBomberServer(BomberServerBase):
             - assets/maps/*.MNL
             - plus RANDOM
         """
-        project_root = Path(__file__).resolve().parent.parent
-        maps_dir = project_root / "assets" / "maps"
-
-        if not maps_dir.exists():
-            maps_dir = Path.cwd() / "assets" / "maps"
+        maps_dir = resource_path("assets/maps")
 
         files = sorted(p.name for p in maps_dir.glob("*.MNE"))
         files.extend(sorted(p.name for p in maps_dir.glob("*.MNL")))

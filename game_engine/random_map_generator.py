@@ -5,6 +5,7 @@ import array
 import random
 from typing import List, Tuple
 import numpy as np
+from common.config_reader import resource_path
 from game_engine.map_loader import MapData
 from game_engine.entities.tile import Tile
 from game_engine.entities.treasure import TreasureType, Treasure
@@ -194,12 +195,12 @@ class RandomMapGenerator:
         )
 
     def get_room(self) -> Tuple[int, int, List, MapData]:
-        rooms = os.listdir("common/room_templates")
-        room = random.choice(rooms)
-        path = f"common/room_templates/{room}"
+        room_templates_dir = resource_path("common/room_templates")
+        rooms = os.listdir(room_templates_dir)
+        path = room_templates_dir / random.choice(rooms)
 
         tiles: List[int] = []
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if i == 0:

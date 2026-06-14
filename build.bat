@@ -44,7 +44,7 @@ goto server
 
 :server_init
 echo === Building server (init) ===
-%PI% --onefile --name "server" --additional-hooks-dir "pyinstaller_hooks" --add-data "cfg;cfg" --add-data "assets;assets" --add-data "common/room_templates;common/room_templates" server.py
+%PI% --onefile --windowed --name "server" --icon "server.ico" --additional-hooks-dir "pyinstaller_hooks" --add-data "cfg;cfg" --add-data "assets;assets" --add-data "common/room_templates;common/room_templates" server.py
 goto end
 
 :server
@@ -58,7 +58,7 @@ goto client
 
 :client_init
 echo === Building client (init) ===
-%PI% --onefile --name "gui_client" --additional-hooks-dir "pyinstaller_hooks" --add-data "cfg;cfg" --add-data "assets;assets" gui_client.py
+%PI% --onefile --windowed --name "gui_client" --icon "client.ico" --additional-hooks-dir "pyinstaller_hooks" --add-data "cfg;cfg" --add-data "assets;assets" gui_client.py
 goto end
 
 :client

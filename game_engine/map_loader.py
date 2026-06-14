@@ -4,8 +4,10 @@ Map loader for loading game maps from .MNE files.
 
 import array
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List
 
+from common.config_reader import resource_path
 from common.tile_dictionary import (
     EMPTY_TILE_ID,
     ROCK1_TILE_ID,
@@ -64,9 +66,13 @@ def load_map(path: str, width: int = 64, height: int = 45) -> MapData:
     Returns:
         MapData containing tile grid and monster list
     """
+    map_path = Path(path)
+    if not map_path.exists() and not map_path.is_absolute():
+        map_path = resource_path(path)
+
     # Read raw bytes from file
     tilemap = array.array("B")
-    with open(path, "rb") as f:
+    with map_path.open("rb") as f:
         for line in f:
             line = line.rstrip(b"\r\n")
             for char in line:
