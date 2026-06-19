@@ -46,13 +46,24 @@ class Player(DynamicEntity):
     def initialize_player(self, money: int) -> None:
         pass
 
-    def choose(self) -> None:
-        if not self.inventory:
-            return
+    def select(self, target_type: BombType) -> None:
+        for i, (bomb_type, _count) in enumerate(self.inventory):
+            if bomb_type == target_type:
+                self.set_selected(i)
 
-        self.update_selected(1)
-        if self.selected >= len(self.inventory):
-            self.set_selected(0)
+        self.remove_empty_weapons()
+
+    def remove_empty_weapons(self) -> None:
+        for i, (weapon, count) in enumerate(self.inventory):
+            if count <= 0:
+                del self.inventory[i]
+
+                if self.selected < i:
+                    self.selected -= 1
+
+                # Adjust selected index if it's now out of bounds
+                if self.selected >= len(self.inventory) and self.inventory:
+                    self.set_selected(len(self.inventory) - 1)
 
     def update_selected(self, change: int) -> None:
         self.selected += change
@@ -77,6 +88,9 @@ class Player(DynamicEntity):
         selected_bomb_type, bomb_count = self.inventory[self.selected]
         vx, vy = xy_to_tile(self.x, self.y)
 
+        if bomb_count <= 0:
+            return None
+
         bomb = Bomb(
             x=vx,
             y=vy,
@@ -87,14 +101,10 @@ class Player(DynamicEntity):
         )
         new_count = bomb_count - 1
 
-        if new_count <= 0:
-            del self.inventory[self.selected]
-            # Adjust selected index if it's now out of bounds
-            if self.selected >= len(self.inventory) and self.inventory:
-                self.set_selected(len(self.inventory) - 1)
+        if new_count < 0:
+            new_count = 0
 
-        else:
-            self.inventory[self.selected] = selected_bomb_type, new_count
+        self.inventory[self.selected] = selected_bomb_type, new_count
 
         return bomb
 

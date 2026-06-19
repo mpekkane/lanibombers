@@ -719,9 +719,6 @@ class BomberServerBase:
                         )
                     )
 
-            elif cmd == Action.CHOOSE:
-                player.choose()
-
             elif cmd == Action.REMOTE:
                 self.engine.input_queue.submit(
                     InputCommand(entity=player, action=cmd, timestamp=now)
@@ -748,10 +745,7 @@ class BomberServerBase:
 
         target_type = all_types[msg.bomb_type]
 
-        for i, (bomb_type, _count) in enumerate(player.inventory):
-            if bomb_type == target_type:
-                player.set_selected(i)
-                return
+        player.select(target_type)
 
     def _ensure_timestamp(self, msg: Ping) -> None:
         if getattr(msg, "timestamp", None) is None:
