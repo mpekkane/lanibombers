@@ -415,8 +415,6 @@ class GameView(arcade.View):
         arcade.draw_circle_outline(
             center_x=(client_player.x) * 20,
             center_y=(VIEWPORT_HEIGHT - client_player.y) * 20,
-            center_x=center_x,
-            center_y=center_y,
             radius=radius,
             color=col,
             border_width=remaining,
