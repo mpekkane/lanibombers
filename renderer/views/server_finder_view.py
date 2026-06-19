@@ -15,7 +15,7 @@ from common.keymapper import key_to_char
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
 _DEFAULT_SUBNET: int | None = 1
-_DEFAULT_PORT = 9999
+_DEFAULT_PORT = 8888
 _DEFAULT_TIMEOUT = 1.5
 
 SPRITES_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites")
@@ -252,17 +252,37 @@ class ServerFinderView(arcade.View):
             )
         else:
             sprites = arcade.SpriteList()
-            for i, (ip, port) in enumerate(self._servers):
+            max_visible_servers = 26
+
+            num_servers = len(self._servers)
+
+            if num_servers <= max_visible_servers:
+                start = 0
+            else:
+                # Keep selected roughly centered when possible
+                start = self._selected - max_visible_servers // 2
+
+                # Clamp scroll window
+                start = max(0, start)
+                start = min(start, num_servers - max_visible_servers)
+
+            end = min(start + max_visible_servers, num_servers)
+
+            for row, i in enumerate(range(start, end)):
+                ip, port = self._servers[i]
+
                 prefix = "> " if i == self._selected else "  "
                 color = (
                     (0x8B, 0x8B, 0x8B) if i == self._selected else (0x67, 0x67, 0x67)
                 )
+
                 line = self.bitmap_text.create_text_sprites(
                     f"{prefix}{ip}:{port}",
                     base_x,
-                    base_y - i * line_h,
+                    base_y - row * line_h,
                     color=color,
                 )
+
                 for s in line:
                     sprites.append(s)
             self.server_list_sprites = sprites
