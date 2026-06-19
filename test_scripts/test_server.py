@@ -259,8 +259,8 @@ class BomberServer:
             if gp is not None:
                 player.inventory = gp.inventory
                 player.money = gp.money
-                player.tools = gp.tools
-                player.dig_power = gp.dig_power
+                player.tools = {}
+                player.dig_power = 10
 
             player.score += points_by_name[player.name]
         self.engine = None

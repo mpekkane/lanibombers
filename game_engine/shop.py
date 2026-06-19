@@ -9,10 +9,11 @@ from common.tile_dictionary import EMPTY_TILE_ID, DIRT_TILE_ID, ROCK1_TILE_ID
 import random
 from game_engine.entities.pickup import Pickup, PickupType
 import numpy as np
-from game_engine.entities.tool import TOOL_DIG_POWER, ToolType
+from game_engine.entities.tool import TOOL_DIG_POWER, ToolType, KEVLAR_HEALTH_BOOST
 from uuid import UUID
 from game_engine.agent_state import Action
 from common.logger import get_logger
+
 
 class Shop:
     def __init__(self, players: List[SessionPlayer], dynamic_pricing: bool) -> None:
@@ -245,7 +246,7 @@ class Shop:
     def apply_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
         """Apply a powerup to a player."""
         if item == PowerupType.KEVLAR_VEST:
-            player.max_health += 50
+            player.max_health += KEVLAR_HEALTH_BOOST
             return
         dp = TOOL_DIG_POWER.get(ToolType.from_powerup(item))
         if dp is not None:

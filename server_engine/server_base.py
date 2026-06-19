@@ -47,6 +47,7 @@ from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.state_machine import ServerState, ServerStateMachine
 from game_engine.shop import Shop
+from common.player_constants import BASE_DIGGING_POWER
 
 
 class BomberServerBase:
@@ -521,8 +522,9 @@ class BomberServerBase:
             if gp is not None:
                 player.inventory = gp.inventory
                 player.money = gp.money
-                player.tools = gp.tools
-                player.dig_power = gp.dig_power
+                player.tools = {}
+                player.dig_power = BASE_DIGGING_POWER
+                player.max_health = 100
 
             player.score += points_by_name[player.name]
 

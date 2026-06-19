@@ -8,13 +8,15 @@ from common.bomb_dictionary import BOMB_TYPES
 from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
 from common.logger import get_logger
+from common.player_constants import BASE_DIGGING_POWER
+
 
 @dataclass
 class Player(DynamicEntity):
     inventory: List[Tuple[BombType, int]] = field(default_factory=lambda: [])
     tools: Dict[ToolType, int] = field(default_factory=lambda: {})
     selected: int = 0
-    dig_power: int = 10
+    dig_power: int = BASE_DIGGING_POWER
     selected_type: BombType = BombType.SMALL_BOMB
 
     def test_inventory(self) -> None:
@@ -108,7 +110,7 @@ class Player(DynamicEntity):
 
         # heal with medpack
         if tool.tool_type == ToolType.MEDPACK:
-            self.health = 100
+            self.health = max(100, self.health)
 
         # random weapons from a crate
         if tool.tool_type == ToolType.CRATE:

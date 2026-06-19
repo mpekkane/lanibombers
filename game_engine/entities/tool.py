@@ -47,6 +47,7 @@ TOOL_DIG_POWER = {
     ToolType.KEVLAR_VEST: 0
 }
 
+KEVLAR_HEALTH_BOOST = 50
 
 @dataclass(kw_only=True)
 class Tool(Pickup):

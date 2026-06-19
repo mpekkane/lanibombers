@@ -6,6 +6,7 @@ from game_engine.entities import Player
 from uuid import UUID, uuid4
 from game_engine.entities import BombType, ToolType
 from game_engine.spawn_points import SpawnType
+from common.player_constants import BASE_DIGGING_POWER
 
 
 class SessionMapType(IntEnum):
@@ -30,7 +31,7 @@ class SessionPlayer:
         self.money = money
         self.inventory: List[Tuple[BombType, int]] = []
         self.tools: Dict[ToolType, int] = {}
-        self.dig_power = 10
+        self.dig_power = BASE_DIGGING_POWER
         self.max_health = 100
         self.score = 0
 
