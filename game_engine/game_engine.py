@@ -1559,11 +1559,12 @@ class GameEngine:
         for other in entities:
             ox, oy = (int)(other.x), (int)(other.y)
             if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
-                # monsters do not fight each other
+                # only monster/player combat
                 if (
-                    other.entity_type == EntityType.PLAYER
-                    or agent.entity_type == EntityType.PLAYER
-                ):
+                    other.entity_type.is_player() and agent.entity_type.is_monster()
+                ) or (other.entity_type.is_monster() and agent.entity_type.is_player()):
+                    # note: current melee is symmetric,
+                    # maybe the entering entity should strike first?
                     other.take_damage(agent.fight_power)
                     agent.take_damage(other.fight_power)
                     self.log.info("FIGHT!")

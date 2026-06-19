@@ -19,6 +19,17 @@ class EntityType(Enum):
     GRENADEMONSTER = "grenademonster"
     GRENADE = "grenade"
 
+    def is_monster(self) -> bool:
+        return (
+            self == EntityType.FURRYMAN
+            or self == EntityType.SLIME
+            or self == EntityType.GRENADEMONSTER
+            or self == EntityType.ALIEN
+        )
+
+    def is_player(self) -> bool:
+        return self == EntityType.PLAYER
+
 
 MONSTER_DAMAGE = {
     EntityType.FURRYMAN: 10,
