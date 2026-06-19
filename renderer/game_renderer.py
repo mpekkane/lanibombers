@@ -58,7 +58,7 @@ class GameView(arcade.View):
         self,
         render_state_function: Callable[[], RenderState],
         client_player_name: str = "",
-        show_stats: bool = True,
+        show_stats: bool = False,
         show_grid: bool = True,
         item_hotkeys: Optional[Dict[BombType, str]] = None,
     ):

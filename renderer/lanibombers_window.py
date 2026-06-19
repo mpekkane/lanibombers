@@ -65,6 +65,7 @@ class LanibombersWindow(arcade.Window):
         local_ip: Optional[str] = None,
         player_config_path: Optional[str] = None,
         auto: bool = False,
+        show_stats: bool = False
     ):
         super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, vsync=True)
         # FIXME: for debugging multiple processes as once
@@ -72,6 +73,7 @@ class LanibombersWindow(arcade.Window):
             size=(4096, 4096),
             ctx=self.ctx,
         )
+        self.show_stats = show_stats
         # this is the default behavior
         # self.atlas = self.ctx.default_atlas
 
@@ -190,6 +192,7 @@ class LanibombersWindow(arcade.Window):
                 self.get_render_state,
                 client_player_name=self.name,
                 item_hotkeys=self.item_hotkeys,
+                show_stats=self.show_stats,
             )
             view.bind_input_callback(self.on_press)
             self.sound_engine.game()

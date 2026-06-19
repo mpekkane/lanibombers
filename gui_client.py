@@ -13,11 +13,13 @@ def main():
     parser.add_argument("--ip", "-i", type=str, default=None)
     parser.add_argument("--cfg", "-c", type=str, default=None)
     parser.add_argument("--auto", "-a", action="store_true")
+    parser.add_argument("--stats", "-s", action="store_true")
     args = parser.parse_args()
     ip = args.ip
     cfg = args.cfg
     auto = args.auto
-    window = LanibombersWindow(ip, cfg, auto)
+    stats = args.stats
+    window = LanibombersWindow(ip, cfg, auto, stats)
     window.render_view()
     arcade.run()
 
