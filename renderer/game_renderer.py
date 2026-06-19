@@ -411,9 +411,12 @@ class GameView(arcade.View):
             radius = remaining**2
         else:
             radius = 25 + 5 * np.sin(5 * elapsed)
+
         arcade.draw_circle_outline(
             center_x=(client_player.x) * 20,
-            center_y=(state.height - client_player.y) * 20,
+            center_y=(VIEWPORT_HEIGHT - client_player.y) * 20,
+            center_x=center_x,
+            center_y=center_y,
             radius=radius,
             color=col,
             border_width=remaining,
@@ -424,9 +427,6 @@ class GameView(arcade.View):
         countdown = self.window.countdown
         text = str(int(countdown))
 
-        x = state.width / 2 * 20
-        y = state.height / 2 * 20
-
         color = GameView.countdown_color(countdown)
 
         self.cool_draw(text, color)
@@ -435,9 +435,8 @@ class GameView(arcade.View):
         self.cool_draw("Round end", arcade.color.WHITE)
 
     def cool_draw(self, text: str, color) -> None:
-        state = self.render_state_function()
-        x = state.width / 2 * 20
-        y = state.height / 2 * 20
+        x = VIEWPORT_WIDTH / 2 * 20
+        y = VIEWPORT_HEIGHT / 2 * 20
         # Shadow
         arcade.draw_text(
             text,
