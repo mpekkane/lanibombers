@@ -253,6 +253,18 @@ class GameView(arcade.View):
         self.tile_renderer.on_update(
             state, view_start_x, view_end_x, view_start_y, view_end_y
         )
+        countdown_started_at = self.window.countdown_value_started_at
+        time_in_value = (
+            time.perf_counter() - countdown_started_at
+            if countdown_started_at is not None
+            else 0.0
+        )
+        self.tile_renderer.update_countdown_overlay(
+            state,
+            self.window.countdown,
+            time_in_value,
+            self.client_player_name,
+        )
         self.entity_renderer.on_update(
             state,
             current_time,
@@ -364,6 +376,10 @@ class GameView(arcade.View):
         self.entity_renderer.monster_sprite_list.draw(pixelated=True)  # type: ignore
         self.entity_renderer.player_sprite_list.draw(pixelated=True)  # type: ignore
         self.entity_renderer.explosion_sprite_list.draw(pixelated=True)  # type: ignore
+        # Countdown reveal overlay: solid-colour blocks over the map during
+        # the round-start countdown, fading to transparent radially in the
+        # final second. Drawn last in game-camera space so it covers entities.
+        self.tile_renderer.overlay_sprite_list.draw(pixelated=True)  # type: ignore
 
         # Draw white flash overlay (in game camera space, fades over 1 second)
         if elapsed < self.NUKE_FLASH_DURATION:
@@ -389,12 +405,6 @@ class GameView(arcade.View):
             self.ui_camera.use()
             self.header_renderer.draw_perf_graphs()
 
-        # initial position indicator
-        elapsed = Clock.now() - self.start_time
-        notify_len = 10
-        if elapsed < notify_len:
-            self.draw_player_position_indicator(notify_len)
-
         # round countdown
         if self.window.countdown is not None and self.window.countdown > 0:
             self.draw_countdown()
@@ -402,34 +412,6 @@ class GameView(arcade.View):
         # round end
         if self.closing:
             self.draw_end()
-
-    def draw_player_position_indicator(self, notify_len: int):
-        elapsed = Clock.now() - self.start_time
-        state = self.render_state_function()
-        client_player = self.find_client_player(state.players)
-
-        ratio = elapsed / notify_len
-        remaining = notify_len - elapsed
-        alpha = int(255 * (1 - ratio))
-        col = [
-            client_player.color[0],
-            client_player.color[1],
-            client_player.color[2],
-            alpha,
-        ]
-
-        if elapsed < notify_len / 2:
-            radius = remaining**2
-        else:
-            radius = 25 + 5 * np.sin(5 * elapsed)
-
-        arcade.draw_circle_outline(
-            center_x=(client_player.x) * 20,
-            center_y=(VIEWPORT_HEIGHT - client_player.y) * 20,
-            radius=radius,
-            color=col,
-            border_width=remaining,
-        )
 
     def draw_countdown(self):
         state = self.render_state_function()

@@ -477,7 +477,7 @@ class BomberServerBase:
         assert self.engine is not None
 
         self.game_on_countdown = True
-        countdown_length = 10
+        countdown_length = 5
         count = -1
         start = Clock.now()
         elapsed = Clock.now() - start

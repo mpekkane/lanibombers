@@ -4,6 +4,7 @@ Handles background tiles and transition rendering.
 """
 
 import os
+from typing import Dict, Optional, Tuple
 
 import arcade
 import numpy as np
@@ -332,6 +333,155 @@ class TileRenderer:
                 sprite.center_x = map_px_w / 2
                 sprite.center_y = (state.height - y) * SPRITE_SIZE * zoom
                 self.grid_sprite_list.append(sprite)
+
+        # ── Countdown reveal overlay ───────────────────────────────────────
+        # One sprite per tile, drawn on top of the real tilemap. During the
+        # round-start countdown it shows solid-colour blocks (black + player
+        # colours) so the map is hidden; in the final second it transparents
+        # out radially from each player so the real map "reveals" outward.
+        self._color_tile_cache: Dict[Tuple[int, int, int], arcade.Texture] = {}
+        self._black_tile_texture = self._make_color_tile_texture((0, 0, 0))
+
+        self.overlay_sprite_list = arcade.SpriteList()
+        self.overlay_sprite_list.initialize()
+        self.overlay_sprites = [
+            arcade.Sprite() for _ in range(state.width * state.height)
+        ]
+        sprite_idx = 0
+        for y in range(state.height):
+            world_y = (
+                state.height - 1 - y
+            ) * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
+            for x in range(state.width):
+                world_x = x * SPRITE_SIZE * zoom + SPRITE_CENTER_OFFSET * zoom
+                sprite = self.overlay_sprites[sprite_idx]
+                sprite.center_x = world_x
+                sprite.center_y = world_y
+                sprite.scale = zoom
+                sprite.texture = transparent_texture
+                sprite_idx += 1
+        self.overlay_sprite_list.extend(self.overlay_sprites)
+
+        # Track each overlay sprite's currently-bound texture so we only
+        # reassign when it actually changes (avoids buffer churn).
+        self._overlay_current_textures: list = [
+            transparent_texture for _ in self.overlay_sprites
+        ]
+
+    def _make_color_tile_texture(self, rgb: Tuple[int, int, int]) -> arcade.Texture:
+        img = Image.new("RGBA", (SPRITE_SIZE, SPRITE_SIZE), (rgb[0], rgb[1], rgb[2], 255))
+        return arcade.Texture(img, name=f"countdown_color_{rgb[0]}_{rgb[1]}_{rgb[2]}")
+
+    def _get_color_tile_texture(self, rgb) -> arcade.Texture:
+        key = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        tex = self._color_tile_cache.get(key)
+        if tex is None:
+            tex = self._make_color_tile_texture(key)
+            self._color_tile_cache[key] = tex
+        return tex
+
+    def update_countdown_overlay(
+        self,
+        state: RenderState,
+        countdown: Optional[int],
+        time_in_value: float,
+        client_player_name: str,
+    ) -> None:
+        """Set overlay textures for the round-start countdown reveal.
+
+        Phases (countdown values are integers ticking 5 → 1):
+          5, 4 : black everywhere except a 5x5 block around the client player
+                 (filled with the client player's colour).
+          3, 2 : same plus a 3x3 block of each enemy player's colour around them.
+          1    : radial reveal. A growing radius around every player exposes
+                 the real tile beneath; `time_in_value` (0 → 1 seconds) scales
+                 the radius so the whole map is revealed exactly at countdown
+                 end. Outside the radius, the phase-2 colour-block scheme
+                 still applies.
+          None / 0 : overlay cleared (fully transparent).
+        """
+        H, W = state.height, state.width
+
+        def assign_all(texture):
+            for i, sprite in enumerate(self.overlay_sprites):
+                if self._overlay_current_textures[i] is not texture:
+                    sprite.texture = texture
+                    self._overlay_current_textures[i] = texture
+
+        if countdown is None or countdown <= 0:
+            assign_all(self.transparent_texture)
+            return
+
+        client_player = None
+        enemies = []
+        for p in state.players:
+            if p.name == client_player_name:
+                client_player = p
+            else:
+                enemies.append(p)
+        if client_player is None:
+            # No anchor — render the map as black until we know who we are.
+            assign_all(self._black_tile_texture)
+            return
+
+        yy, xx = np.indices((H, W))
+        cp_dist = np.maximum(
+            np.abs(yy - int(client_player.y)),
+            np.abs(xx - int(client_player.x)),
+        )
+        enemy_dists = [
+            np.maximum(np.abs(yy - int(e.y)), np.abs(xx - int(e.x)))
+            for e in enemies
+        ]
+
+        # Phase-2 colour-block layout (applies in phases 2 and 3 too):
+        # client's 5x5 wins over enemy 3x3 on overlap.
+        client_rgb = (
+            int(client_player.color[0]),
+            int(client_player.color[1]),
+            int(client_player.color[2]),
+        )
+        client_mask = cp_dist <= 2
+        enemy_marks_active = countdown <= 3
+        enemy_masks = []
+        if enemy_marks_active:
+            for ed in enemy_dists:
+                enemy_masks.append((ed <= 1) & ~client_mask)
+
+        # Phase 3: radial reveal threshold.
+        revealed_mask = np.zeros((H, W), dtype=bool)
+        if countdown == 1:
+            all_dists = [cp_dist] + enemy_dists
+            nearest = (
+                np.stack(all_dists).min(axis=0) if enemy_dists else cp_dist
+            )
+            max_dist = float(nearest.max())
+            progress = max(0.0, min(1.0, time_in_value))
+            threshold = max_dist * progress
+            revealed_mask = nearest <= threshold
+
+        client_tex = self._get_color_tile_texture(client_rgb)
+        enemy_texs = [
+            self._get_color_tile_texture(e.color) for e in enemies
+        ] if enemy_marks_active else []
+
+        for y in range(H):
+            for x in range(W):
+                idx = y * W + x
+                if revealed_mask[y, x]:
+                    tex = self.transparent_texture
+                elif client_mask[y, x]:
+                    tex = client_tex
+                else:
+                    tex = self._black_tile_texture
+                    if enemy_marks_active:
+                        for em, et in zip(enemy_masks, enemy_texs):
+                            if em[y, x]:
+                                tex = et
+                                break
+                if self._overlay_current_textures[idx] is not tex:
+                    self.overlay_sprites[idx].texture = tex
+                    self._overlay_current_textures[idx] = tex
 
     def on_update(
         self,

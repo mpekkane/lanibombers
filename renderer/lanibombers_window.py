@@ -1,6 +1,7 @@
 # renderer/lanibombers_window.py
 from typing import List, Dict, Optional
 import threading
+import time
 
 import arcade
 
@@ -98,6 +99,10 @@ class LanibombersWindow(arcade.Window):
         self.standings: Optional[List[PlayerResult]] = None
         self.got_session = False
         self.countdown = None
+        # perf_counter() time at which `self.countdown` last changed value.
+        # Used by the renderer to interpolate within the final second for the
+        # radial map-reveal animation.
+        self.countdown_value_started_at: Optional[float] = None
         self.local_ip = local_ip
         self.player_config_path = player_config_path
         self.next_rounds_left: Optional[int] = None
@@ -227,6 +232,7 @@ class LanibombersWindow(arcade.Window):
         elif state == ClientState.GAME:
             self.client_simulation = None
             self.countdown = None
+            self.countdown_value_started_at = None
         elif state == ClientState.ENDING:
             return
         elif state == ClientState.QUIT:
@@ -302,6 +308,8 @@ class LanibombersWindow(arcade.Window):
         self.got_session = True
 
     def _on_countdown(self, msg: Countdown) -> None:
+        if msg.count != self.countdown:
+            self.countdown_value_started_at = time.perf_counter()
         self.countdown = msg.count
 
     def _on_scoreboard(self, msg: Scoreboard) -> None:
