@@ -251,8 +251,15 @@ class ShopView(arcade.View):
                 str(cursor_count), base_x, base_y - 3 * row_spacing
             )
 
-        # Quantity bars (rebuild if inventory or health changed)
-        inventory_key = (tuple(client_player.inventory), client_player.health)
+        # Quantity bars (rebuild if inventory, health, or tools changed)
+        tools_key = tuple(sorted(
+            (t.value, n) for t, n in client_player.tools.items()
+        ))
+        inventory_key = (
+            tuple(client_player.inventory),
+            client_player.health,
+            tools_key,
+        )
         if inventory_key != self._cached_inventory:
             self._cached_inventory = inventory_key
             self._build_quantity_bars(client_player)
@@ -527,9 +534,11 @@ class ShopView(arcade.View):
         """Build quantity bar sprites for each item card based on player inventory.
 
         For bombs: bar height = item count (1px per item).
-        For kevlar vest: bar height = extra HP over 100 (1px per 50 HP).
+        For powerups (kevlar, picks, drills): bar height = purchases of that
+        powerup (1px per purchase), read from client_player.tools.
         """
         from common.item_dictionary import PowerupType
+        from game_engine.entities.tool import ToolType
 
         self.quantity_bar_sprites = arcade.SpriteList()
 
@@ -539,7 +548,6 @@ class ShopView(arcade.View):
             inventory_counts[bomb_type] = inventory_counts.get(bomb_type, 0) + count
 
         player_color = client_player.color
-        extra_hp = max(0, client_player.health - 100)
 
         grid_x = 32
         grid_y = 96
@@ -556,10 +564,13 @@ class ShopView(arcade.View):
             card_top = grid_y + row * card_h
 
             # Determine bar height based on item type
-            if item == PowerupType.KEVLAR_VEST:
-                bar_height = min(extra_hp // 50, max_bar_height)
-            elif isinstance(item, BombType):
+            if isinstance(item, BombType):
                 bar_height = min(inventory_counts.get(item, 0), max_bar_height)
+            elif isinstance(item, PowerupType):
+                tool_count = client_player.tools.get(
+                    ToolType.from_powerup(item), 0
+                )
+                bar_height = min(tool_count, max_bar_height)
             else:
                 continue
 

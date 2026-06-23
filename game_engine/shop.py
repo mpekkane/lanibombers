@@ -245,10 +245,15 @@ class Shop:
 
     def apply_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
         """Apply a powerup to a player."""
+        # Count the purchase in player.tools so the shop renderer can show a
+        # cumulative bar per powerup type (matches how bomb counts are shown).
+        tool_type = ToolType.from_powerup(item)
+        player.tools[tool_type] = player.tools.get(tool_type, 0) + 1
+
         if item == PowerupType.KEVLAR_VEST:
             player.max_health += KEVLAR_HEALTH_BOOST
             return
-        dp = TOOL_DIG_POWER.get(ToolType.from_powerup(item))
+        dp = TOOL_DIG_POWER.get(tool_type)
         if dp is not None:
             player.dig_power += dp
 
