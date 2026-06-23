@@ -205,6 +205,44 @@ class EntityRenderer:
                 self.explosion_sprites.append(sprite)
                 self.explosion_sprite_list.append(sprite)
 
+        # Blood/splatter sprite list. Holds the sprites of dead players and
+        # dead monsters so they can be drawn early (just above the tilemap)
+        # instead of on top of everything else like live entities. Each
+        # sprite belongs to exactly one list at a time — its main list
+        # (player/monster) while alive, this list once dead.
+        self.blood_sprite_list = arcade.SpriteList()
+        self.blood_sprite_list.initialize()
+        self.blood_sprite_list.preload_textures(
+            [self.blood_texture, self.blood_green_texture]
+        )
+        self._player_in_blood: list[bool] = [False] * len(self.player_sprites)
+        self._monster_in_blood: list[bool] = [False] * len(self.monster_sprites)
+
+    def _move_to_blood(self, sprite, alive_list) -> None:
+        alive_list.remove(sprite)
+        self.blood_sprite_list.append(sprite)
+
+    def _move_to_alive(self, sprite, alive_list) -> None:
+        self.blood_sprite_list.remove(sprite)
+        alive_list.append(sprite)
+
+    def on_draw(self, splatter: bool, pixelated: bool = True) -> None:
+        """Draw the entity sprite lists in one of two passes.
+
+        splatter=True:  blood sprites only (dead players, dead monsters).
+                        Game renderer calls this just above the tilemap.
+        splatter=False: pickups, bombs, alive monsters, alive players,
+                        explosions — drawn on top of everything else.
+        """
+        if splatter:
+            self.blood_sprite_list.draw(pixelated=pixelated)  # type: ignore
+            return
+        self.pickup_sprite_list.draw(pixelated=pixelated)  # type: ignore
+        self.bomb_sprite_list.draw(pixelated=pixelated)  # type: ignore
+        self.monster_sprite_list.draw(pixelated=pixelated)  # type: ignore
+        self.player_sprite_list.draw(pixelated=pixelated)  # type: ignore
+        self.explosion_sprite_list.draw(pixelated=pixelated)  # type: ignore
+
     def on_update(
         self,
         state: RenderState,
@@ -282,18 +320,37 @@ class EntityRenderer:
             )
             self.monster_sprites.append(sprite)
             self.monster_sprite_list.append(sprite)
+            self._monster_in_blood.append(False)
 
         while len(self.monster_sprites) > monster_count:
             sprite = self.monster_sprites.pop()
-            self.monster_sprite_list.remove(sprite)
+            was_in_blood = self._monster_in_blood.pop()
+            if was_in_blood:
+                self.blood_sprite_list.remove(sprite)
+            else:
+                self.monster_sprite_list.remove(sprite)
 
         for i, monster in enumerate(state.monsters):
             self.monster_sprites[i].entity_type = monster.entity_type
             self.monster_sprites[i].update_from_entity(monster, delta_time)
+            is_dead = monster.state == "dead"
+            if is_dead and not self._monster_in_blood[i]:
+                self._move_to_blood(self.monster_sprites[i], self.monster_sprite_list)
+                self._monster_in_blood[i] = True
+            elif not is_dead and self._monster_in_blood[i]:
+                self._move_to_alive(self.monster_sprites[i], self.monster_sprite_list)
+                self._monster_in_blood[i] = False
 
         # Update players
         for i, player in enumerate(state.players):
             self.player_sprites[i].update_from_entity(player, delta_time)
+            is_dead = player.state == "dead"
+            if is_dead and not self._player_in_blood[i]:
+                self._move_to_blood(self.player_sprites[i], self.player_sprite_list)
+                self._player_in_blood[i] = True
+            elif not is_dead and self._player_in_blood[i]:
+                self._move_to_alive(self.player_sprites[i], self.player_sprite_list)
+                self._player_in_blood[i] = False
 
     def _load_bomb_textures(self):
         """Load all bomb textures into self.bomb_textures dict."""

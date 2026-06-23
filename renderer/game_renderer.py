@@ -371,11 +371,11 @@ class GameView(arcade.View):
         self.tile_renderer.vertical_transition_sprite_list.draw(pixelated=True)  # type: ignore
         self.tile_renderer.horizontal_transition_sprite_list.draw(pixelated=True)  # type: ignore
         self.tile_renderer.grid_sprite_list.draw(pixelated=True)  # type: ignore
-        self.entity_renderer.pickup_sprite_list.draw(pixelated=True)  # type: ignore
-        self.entity_renderer.bomb_sprite_list.draw(pixelated=True)  # type: ignore
-        self.entity_renderer.monster_sprite_list.draw(pixelated=True)  # type: ignore
-        self.entity_renderer.player_sprite_list.draw(pixelated=True)  # type: ignore
-        self.entity_renderer.explosion_sprite_list.draw(pixelated=True)  # type: ignore
+        # Dead-entity sprites (blood/splatter) sit on top of the tilemap but
+        # below pickups/bombs/live entities so corpses don't occlude active
+        # gameplay elements.
+        self.entity_renderer.on_draw(splatter=True)
+        self.entity_renderer.on_draw(splatter=False)
         # Countdown reveal overlay: solid-colour blocks over the map during
         # the round-start countdown, fading to transparent radially in the
         # final second. Drawn last in game-camera space so it covers entities.
