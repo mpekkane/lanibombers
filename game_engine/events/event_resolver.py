@@ -96,10 +96,13 @@ class EventResolver:
         flags: ResolveFlags = ResolveFlags(),
     ) -> None:
         events = self.get_object_events(creator, type)
+        # Cancel BEFORE invoking the resolve callback so any follow-up events
+        # the callback schedules don't see the in-flight event as a duplicate
+        # (mirrors the pop-then-resolve discipline of _process_due_events).
+        for event in events:
+            self.cancel_event(event.id)
         for event in events:
             self._resolve_event(event, flags)
-            # Remove from queue so the timer can't resolve it again
-            self.cancel_event(event.id)
 
     def _resolve_event(self, event: Event, flags: ResolveFlags) -> None:
         assert self._resolve is not None, "resolve handle missing"

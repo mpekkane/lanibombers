@@ -8,7 +8,7 @@ from game_engine.agent_state import Action
 
 if TYPE_CHECKING:
     from game_engine.entities.bomb import Bomb
-    from game_engine.entities.dynamic_entity import DynamicEntity
+    from game_engine.entities.dynamic_entity import DynamicEntity, Direction
 
 
 @dataclass
@@ -18,6 +18,11 @@ class InputCommand:
     action: Action
     timestamp: float
     bomb: Optional[Bomb] = None
+    # Captured direction the issuing thread (network / monster AI) intended.
+    # The engine thread applies this to entity.direction inside
+    # change_entity_direction so direction/state mutation is single-threaded.
+    # None for STOP (or commands that don't change direction).
+    direction: Optional[Direction] = None
 
 
 class InputQueue:

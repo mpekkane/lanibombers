@@ -102,17 +102,24 @@ class MonsterController:
         now = Clock.now()
 
         if action.is_move():
+            # Direction / state mutations now happen exclusively on the
+            # engine thread via change_entity_direction. We just capture
+            # the intended direction into the command.
             if action == Action.STOP:
-                self.monster.state = "idle"
+                if self.monster.state == "idle":
+                    return
+                direction = None
             else:
                 direction = _ACTION_TO_DIRECTION[action]
-                # Redundant direction guard (same as on_control)
                 if self.monster.direction == direction and self.monster.state == "walk":
                     return
-                self.monster.direction = direction
-                self.monster.state = "walk"
             self.engine.input_queue.submit(
-                InputCommand(entity=self.monster, action=action, timestamp=now)
+                InputCommand(
+                    entity=self.monster,
+                    action=action,
+                    timestamp=now,
+                    direction=direction,
+                )
             )
         elif action == Action.FIRE:
             # Only grenade monsters can fire

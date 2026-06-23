@@ -34,6 +34,16 @@ from game_engine.entities import Direction
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
+
+
+# Action → Direction mapping for movement commands. STOP and non-move
+# actions deliberately omitted (look-up returns None for them).
+_ACTION_TO_DIRECTION = {
+    Action.UP: Direction.UP,
+    Action.DOWN: Direction.DOWN,
+    Action.LEFT: Direction.LEFT,
+    Action.RIGHT: Direction.RIGHT,
+}
 from common.bomb_dictionary import BombType
 from game_engine import GameEngine
 from game_engine.sound_engine import SoundEngine
@@ -681,35 +691,29 @@ class BomberServerBase:
         now = Clock.now()
 
         if cmd.is_move():
-            if cmd == Action.RIGHT:
-                if player.direction == Direction.RIGHT and player.state == "walk":
+            # Best-effort dedup of no-op repeats. Reading entity.direction /
+            # state here is a benign cross-thread read — worst case is a
+            # spurious command that the engine processes idempotently.
+            # Direction / state mutations now happen exclusively on the
+            # engine thread via change_entity_direction.
+            intended_direction = _ACTION_TO_DIRECTION.get(cmd)
+            if cmd == Action.STOP:
+                if player.state == "idle":
                     return
-                player.direction = Direction.RIGHT
-                player.state = "walk"
-
-            elif cmd == Action.LEFT:
-                if player.direction == Direction.LEFT and player.state == "walk":
-                    return
-                player.direction = Direction.LEFT
-                player.state = "walk"
-
-            elif cmd == Action.UP:
-                if player.direction == Direction.UP and player.state == "walk":
-                    return
-                player.direction = Direction.UP
-                player.state = "walk"
-
-            elif cmd == Action.DOWN:
-                if player.direction == Direction.DOWN and player.state == "walk":
-                    return
-                player.direction = Direction.DOWN
-                player.state = "walk"
-
-            elif cmd == Action.STOP:
-                player.state = "idle"
+            elif (
+                intended_direction is not None
+                and player.direction == intended_direction
+                and player.state == "walk"
+            ):
+                return
 
             self.engine.input_queue.submit(
-                InputCommand(entity=player, action=cmd, timestamp=now)
+                InputCommand(
+                    entity=player,
+                    action=cmd,
+                    timestamp=now,
+                    direction=intended_direction,
+                )
             )
 
         else:

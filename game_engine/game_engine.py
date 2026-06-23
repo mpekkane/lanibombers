@@ -191,7 +191,7 @@ class GameEngine:
             if cmd.entity.state == "dead":
                 continue
             if cmd.action.is_move():
-                self.change_entity_direction(cmd.entity)
+                self.change_entity_direction(cmd.entity, cmd)
             elif cmd.action == Action.FIRE:
                 if cmd.bomb is not None:
                     self.plant_bomb(cmd.bomb)
@@ -440,10 +440,25 @@ class GameEngine:
         # Safety: clear all dig events from the queue
         self.event_resolver.cancel_object_events(player.id, "dig")
 
-    def change_entity_direction(self, player: DynamicEntity) -> None:
+    def change_entity_direction(
+        self,
+        player: DynamicEntity,
+        cmd: Optional[InputCommand] = None,
+    ) -> None:
         """Create and handle player movement events"""
         if player.state == "dead":
             return
+
+        # Apply the input command's captured intent. This is now the single
+        # point where entity.direction / entity.state is mutated for
+        # movement commands — network and monster-AI threads only submit
+        # InputCommands, they no longer mutate the entity directly.
+        if cmd is not None:
+            if cmd.action == Action.STOP:
+                player.state = "idle"
+            elif cmd.direction is not None:
+                player.direction = cmd.direction
+                player.state = "walk"
 
         # Capture wall-clock time once for premature event resolution.
         # This is the single place where Clock.now() is used for movement
@@ -461,8 +476,22 @@ class GameEngine:
         # collision check
         in_bounds, next_tile = self.get_neighbor_tile(player)
         if in_bounds:
-            if next_tile.solid:
+            # Only kick off dig / boulder interaction from here if the
+            # player is already centered on a tile. Otherwise schedule a
+            # normal move first — the natural `resolve_movement` flow will
+            # fire `collision_check` from `entity_reach_tile_center`, which
+            # is guaranteed centered. This prevents off-center dig (and
+            # off-center boulder push) when reversing/turning mid-traverse.
+            px, py = xy_to_tile(player.x, player.y)
+            at_tile_center = (
+                abs(player.x - (px + 0.5)) < 0.01
+                and abs(player.y - (py + 0.5)) < 0.01
+            )
+            if next_tile.solid and at_tile_center:
                 self.collision_check(player, next_tile, now)
+            elif next_tile.solid:
+                # Off-center: defer to resolve_movement at the next center.
+                self.move_entity(player, now=now)
             elif not self.try_push_bomb(player):
                 # Create new movement (no bomb blocked us)
                 self.move_entity(player, now=now)
@@ -1369,9 +1398,13 @@ class GameEngine:
 
         # Use event's scheduled time for normal resolution (timer-fired).
         # For premature resolution (direction change), use the resolve_time
-        # captured in change_entity_direction.
+        # captured in change_entity_direction — but cap it at trigger_at so
+        # we never advance the entity FURTHER than the event originally
+        # targeted (otherwise a late wake-up + premature resolve combo can
+        # overshoot the next half-tile, causing a 1-tile teleport when the
+        # caller then snaps via centralize_position).
         if flags.resolve_time > 0:
-            current_time = flags.resolve_time
+            current_time = min(flags.resolve_time, event.trigger_at)
         else:
             current_time = event.trigger_at
         dt = current_time - event.created_at
@@ -1465,6 +1498,13 @@ class GameEngine:
         target_tile.take_damage(dig_power)
         if is_player:
             self.pending_sounds.append(SoundType.DIG)
+
+        # Premature resolution (spawn=False, e.g. clear_entity_dig_events
+        # during a direction change) only wants the damage applied — no
+        # follow-up dig or move event should be scheduled here, the caller
+        # will set up whatever comes next.
+        if not flags.spawn:
+            return
 
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
@@ -1626,6 +1666,13 @@ class GameEngine:
             return
         progress = min((now - event.created_at) / total_duration, 1.0)
         d = progress * 0.5
+        # Report the effective speed implied by the event's timing so the
+        # client extrapolator advances at the same rate the server's
+        # interpolation does. Critical for slow events like boulder push
+        # (push_power scales the duration) — without this the client
+        # extrapolates at base walk speed and visibly snaps backwards on
+        # every server packet until the push completes.
+        render_entity.speed = 0.5 / total_duration
 
         direction = Direction(event.direction)
         if direction == Direction.RIGHT:
