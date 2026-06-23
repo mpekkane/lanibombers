@@ -124,6 +124,10 @@ class GameEngine:
             [None for _ in range(width)] for _ in range(height)
         ]
         self.bombs: List[Bomb] = []
+        # Bombs that have been accepted but are waiting on a delayed "plant"
+        # event (see BOMB_PLACEMENT_DELAY). Tracked separately so the
+        # one-bomb-per-tile rule also considers in-flight placements.
+        self.pending_bombs: List[Bomb] = []
         self.explosion_times: Dict[Tuple[int, int], Tuple[float, int]] = (
             {}
         )  # (x, y) -> (start_time, type)
@@ -210,6 +214,30 @@ class GameEngine:
                 self.change_entity_direction(cmd.entity, cmd)
             elif cmd.action == Action.FIRE:
                 if cmd.bomb is not None:
+                    # 1. Inventory check — must own this bomb type.
+                    if not isinstance(cmd.entity, Player):
+                        continue
+                    inv_index = None
+                    for i, (bt, count) in enumerate(cmd.entity.inventory):
+                        if bt == cmd.bomb.bomb_type and count > 0:
+                            inv_index = i
+                            break
+                    if inv_index is None:
+                        continue
+                    # 2. Tile-occupancy check — one bomb per tile across
+                    # both live bombs and in-flight delayed placements.
+                    occupied = any(
+                        b.x == cmd.bomb.x and b.y == cmd.bomb.y
+                        for b in self.bombs
+                    ) or any(
+                        b.x == cmd.bomb.x and b.y == cmd.bomb.y
+                        for b in self.pending_bombs
+                    )
+                    if occupied:
+                        continue
+                    # 3. Commit: decrement inventory and place.
+                    bt, count = cmd.entity.inventory[inv_index]
+                    cmd.entity.inventory[inv_index] = (bt, count - 1)
                     # Immediate-effect weapons fire on press — no spawn
                     # delay (they aren't pushable objects you'd want to
                     # step away from). Everything else gets the small
@@ -217,6 +245,7 @@ class GameEngine:
                     if cmd.bomb.bomb_type in IMMEDIATE_FIRE_BOMBS:
                         self.plant_bomb(cmd.bomb)
                     else:
+                        self.pending_bombs.append(cmd.bomb)
                         plant_event = Event(
                             trigger_at=cmd.timestamp + BOMB_PLACEMENT_DELAY,
                             target=cmd.bomb,
@@ -674,6 +703,12 @@ class GameEngine:
             self.resolve_bomb(target, event, flags)
         # Delayed bomb materialisation (BOMB_PLACEMENT_DELAY after FIRE).
         elif isinstance(target, Bomb) and event.event_type == "plant":
+            # Remove from pending list so future tile-occupancy checks
+            # only see it via self.bombs after this point.
+            try:
+                self.pending_bombs.remove(target)
+            except ValueError:
+                pass
             # Reset placed_at to the actual spawn time so the fuse starts
             # ticking when the bomb appears (full fuse_pct on first render),
             # and so any immediate-fire bomb types schedule their explosion

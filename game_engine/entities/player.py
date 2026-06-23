@@ -99,13 +99,9 @@ class Player(DynamicEntity):
             owner_id=self.id,
             direction=self.direction,  # Pass player's direction for directed weapons
         )
-        new_count = bomb_count - 1
-
-        if new_count < 0:
-            new_count = 0
-
-        self.inventory[self.selected] = selected_bomb_type, new_count
-
+        # Inventory is decremented on the engine thread after the placement
+        # has been accepted (tile-occupancy check passes) — see
+        # GameEngine.process_inputs.
         return bomb
 
     def pickup_tool(self, tool: Tool) -> None:
