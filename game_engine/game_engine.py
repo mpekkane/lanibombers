@@ -41,6 +41,22 @@ from game_engine.entities.explosion import (
 )
 from game_engine.events.event import Event, ResolveFlags, MoveEvent
 
+# Delay between a FIRE input being processed and the resulting bomb actually
+# materialising in the world. Position is captured at the moment of input
+# (cmd.timestamp), but the bomb only spawns / becomes pushable this many
+# seconds later. Makes "plant and push" intuitive — the player can step
+# into the bomb's tile during the gap and naturally push it on spawn.
+BOMB_PLACEMENT_DELAY = 0.050
+
+# Bomb types that aren't really "placed" — they're directional / instant
+# weapons fired in place. These bypass BOMB_PLACEMENT_DELAY so the input
+# feels responsive.
+IMMEDIATE_FIRE_BOMBS = frozenset({
+    BombType.GRENADE,
+    BombType.FIRE_EXTINGUISHER,
+    BombType.FLAMETHROWER,
+})
+
 # Map ExplosionType to explosion instances
 EXPLOSION_MAP = {
     ExplosionType.SMALL: SmallExplosion(),
@@ -194,7 +210,19 @@ class GameEngine:
                 self.change_entity_direction(cmd.entity, cmd)
             elif cmd.action == Action.FIRE:
                 if cmd.bomb is not None:
-                    self.plant_bomb(cmd.bomb)
+                    # Immediate-effect weapons fire on press — no spawn
+                    # delay (they aren't pushable objects you'd want to
+                    # step away from). Everything else gets the small
+                    # placement delay so "plant and push" feels natural.
+                    if cmd.bomb.bomb_type in IMMEDIATE_FIRE_BOMBS:
+                        self.plant_bomb(cmd.bomb)
+                    else:
+                        plant_event = Event(
+                            trigger_at=cmd.timestamp + BOMB_PLACEMENT_DELAY,
+                            target=cmd.bomb,
+                            event_type="plant",
+                        )
+                        self.event_resolver.schedule_event(plant_event)
             elif cmd.action == Action.REMOTE:
                 if isinstance(cmd.entity, Player):
                     self.detonate_remotes(cmd.entity)
@@ -644,6 +672,14 @@ class GameEngine:
         # Handle bomb explosion
         if isinstance(target, Bomb) and event.event_type == "explode":
             self.resolve_bomb(target, event, flags)
+        # Delayed bomb materialisation (BOMB_PLACEMENT_DELAY after FIRE).
+        elif isinstance(target, Bomb) and event.event_type == "plant":
+            # Reset placed_at to the actual spawn time so the fuse starts
+            # ticking when the bomb appears (full fuse_pct on first render),
+            # and so any immediate-fire bomb types schedule their explosion
+            # from now rather than from the input time.
+            target.placed_at = event.trigger_at
+            self.plant_bomb(target)
         elif isinstance(target, DynamicEntity) and event.event_type == "move":
             if target.entity_type == EntityType.GRENADE:
                 self.resolve_grenade_movement(target, event, flags)
