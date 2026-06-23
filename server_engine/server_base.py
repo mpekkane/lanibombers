@@ -495,6 +495,12 @@ class BomberServerBase:
                 count = new_count
                 self.server.broadcast(Countdown(count=count))
 
+            # Broadcast render state every tick so inventory selections
+            # made via on_select during the countdown become visible to
+            # all clients in real time (the engine isn't running yet, so
+            # nothing else triggers state broadcasts here).
+            self.render_callback(self.engine.get_render_state())
+
             Clock.sleep(0.1)
 
         self.engine.start()
