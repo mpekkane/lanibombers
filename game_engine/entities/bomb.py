@@ -29,6 +29,10 @@ class Bomb(GameObject):
     fuse_duration: float = field(default=0.0, init=False)
     explosion_type: ExplosionType = field(default=ExplosionType.SMALL, init=False)
     state: str = field(default='active', init=False)
+    # Populated by GameEngine.get_render_state when the render state is sent
+    # to clients, so the renderer can pick a fuse animation frame without
+    # doing cross-clock arithmetic.
+    fuse_pct: float = field(default=1.0, init=False)
 
     def __post_init__(self):
         fuse, explosion_type = BOMB_PROPERTIES[self.bomb_type]

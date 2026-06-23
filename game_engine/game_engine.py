@@ -1677,6 +1677,9 @@ class GameEngine:
         sounds = self.pending_sounds.copy()
         self.pending_sounds.clear()
 
+        for bomb in self.bombs:
+            bomb.fuse_pct = bomb.get_fuse_percentage(now)
+
         return RenderState(
             width=self.width,
             height=self.height,

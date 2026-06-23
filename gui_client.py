@@ -1,4 +1,6 @@
 # main.py  (project root)
+import faulthandler
+faulthandler.enable()
 import arcade
 from renderer.lanibombers_window import LanibombersWindow
 from argparse import ArgumentParser

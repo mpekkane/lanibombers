@@ -48,12 +48,12 @@ class BombSprite(arcade.Sprite):
         elif bomb.state == 'defused':
             texture_key = (bomb.bomb_type, 'defused', 0)
         else:
-            # Active bomb - select frame based on fuse percentage
-            fuse_pct = bomb.get_fuse_percentage(current_time)
+            # Active bomb - select frame from fuse percentage populated by
+            # the server in get_render_state (avoids client/server clock skew).
             # First 33% (100%-67%) = frame 1, next 33% (67%-33%) = frame 2, last 33% (33%-0%) = frame 3
-            if fuse_pct > 0.67:
+            if bomb.fuse_pct > 0.67:
                 frame = 1
-            elif fuse_pct > 0.33:
+            elif bomb.fuse_pct > 0.33:
                 frame = 2
             else:
                 frame = 3

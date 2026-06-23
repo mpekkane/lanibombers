@@ -14,6 +14,7 @@ from renderer.tile_renderer import TileRenderer
 from renderer.entity_renderer import EntityRenderer
 from renderer.header_renderer import HeaderRenderer
 from renderer.margin_renderer import MarginRenderer
+from renderer.bitmap_text import BitmapText
 from game_engine.render_state import RenderState, ExplosionVisual
 from game_engine.entities.dynamic_entity import DynamicEntity
 from game_engine.entities.player import Player
@@ -37,6 +38,10 @@ UI_TOP_MARGIN = 30  # Pixels of free space at top for UI (before zoom)
 # Viewport constants
 VIEWPORT_WIDTH = 64  # Visible tiles horizontally
 VIEWPORT_HEIGHT = 45  # Visible tiles vertically
+
+# Big overlay text (countdown / round end). Bitmap font is 8x8 base,
+# zoom 12 matches the visual weight of the previous arcade font_size=100.
+COOL_TEXT_ZOOM = 12
 
 
 # ============================================================================
@@ -161,6 +166,12 @@ class GameView(arcade.View):
         self.NUKE_SHAKE_MAX_AMP = 50 * self.zoom  # screen pixels (5 tiles)
         self._nuke_start_time = 0.0
         self._cam_position = (0.0, 0.0)
+
+        # Bitmap text for large overlay text (countdown, round-end banner)
+        self.cool_text = BitmapText(
+            os.path.join(SPRITES_PATH, "font.png"),
+            zoom=COOL_TEXT_ZOOM,
+        )
 
         # White flash overlay sprite (1x1 white pixel scaled to cover viewport + shake margin)
         white_image = Image.new("RGBA", (1, 1), (255, 255, 255, 255))
@@ -433,41 +444,26 @@ class GameView(arcade.View):
         self.cool_draw("Round end", arcade.color.WHITE)
 
     def cool_draw(self, text: str, color) -> None:
-        x = VIEWPORT_WIDTH / 2 * 20
-        y = VIEWPORT_HEIGHT / 2 * 20
+        cx = VIEWPORT_WIDTH / 2 * 20
+        cy = VIEWPORT_HEIGHT / 2 * 20
+        # BitmapText draws from top-left; convert center coords to top-left.
+        text_w = self.cool_text.get_text_width(text)
+        text_h = self.cool_text.get_text_height()
+        x = cx - text_w / 2
+        y = cy + text_h / 2
+
+        black = (0, 0, 0, 255)
+        white = (255, 255, 255, 255)
+
         # Shadow
-        arcade.draw_text(
-            text,
-            x + 5,
-            y - 5,
-            arcade.color.BLACK,
-            font_size=100,
-            anchor_x="center",
-            anchor_y="center",
-        )
+        self.cool_text.draw_text(text, x + 5, y - 5, black)
 
         # Outline
         for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
-            arcade.draw_text(
-                text,
-                x + dx,
-                y + dy,
-                arcade.color.WHITE,
-                font_size=100,
-                anchor_x="center",
-                anchor_y="center",
-            )
+            self.cool_text.draw_text(text, x + dx, y + dy, white)
 
         # Main text
-        arcade.draw_text(
-            text,
-            x,
-            y,
-            color,
-            font_size=100,
-            anchor_x="center",
-            anchor_y="center",
-        )
+        self.cool_text.draw_text(text, x, y, color)
 
     @staticmethod
     def countdown_color(countdown: float) -> tuple[int, int, int]:

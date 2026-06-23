@@ -4,7 +4,7 @@ Combined asset extractor for lanibombers.
 Extracts all game assets from a ZIP file:
 - SPY files -> PNG (sprites)
 - PPM files -> PNG (PCX graphics)
-- VOC files -> WAV (sounds)
+- VOC files -> MP3 (sounds)
 - S3M files -> copy (music)
 - MNE/MNL files -> copy (maps)
 """
@@ -12,9 +12,8 @@ Extracts all game assets from a ZIP file:
 import os
 import sys
 import zipfile
-import wave
+import lameenc
 from PIL import Image
-from io import BytesIO
 
 
 # ============================================================================
@@ -123,19 +122,29 @@ def extract_spy(data, name):
 # ============================================================================
 
 VOC_SAMPLE_RATE = 11025
-VOC_BITS_PER_SAMPLE = 8
 VOC_NUM_CHANNELS = 1
+MP3_BITRATE_KBPS = 64
+MP3_QUALITY = 2
 
 
-def convert_voc_to_wav(pcm_data):
-    """Convert raw PCM data to WAV format, returns bytes"""
-    output = BytesIO()
-    with wave.open(output, 'wb') as wav:
-        wav.setnchannels(VOC_NUM_CHANNELS)
-        wav.setsampwidth(VOC_BITS_PER_SAMPLE // 8)
-        wav.setframerate(VOC_SAMPLE_RATE)
-        wav.writeframes(pcm_data)
-    return output.getvalue()
+def convert_voc_to_mp3(pcm_data):
+    """Encode raw 8-bit unsigned PCM (as found in VOC bodies) to MP3 bytes.
+
+    LAME expects signed 16-bit samples, so each byte is recentered around zero
+    and scaled up to fill the 16-bit range.
+    """
+    pcm16 = bytearray(len(pcm_data) * 2)
+    for i, b in enumerate(pcm_data):
+        s = (b - 128) << 8
+        pcm16[i * 2] = s & 0xFF
+        pcm16[i * 2 + 1] = (s >> 8) & 0xFF
+
+    encoder = lameenc.Encoder()
+    encoder.set_bit_rate(MP3_BITRATE_KBPS)
+    encoder.set_in_sample_rate(VOC_SAMPLE_RATE)
+    encoder.set_channels(VOC_NUM_CHANNELS)
+    encoder.set_quality(MP3_QUALITY)
+    return encoder.encode(bytes(pcm16)) + encoder.flush()
 
 
 # ============================================================================
@@ -1025,12 +1034,12 @@ def extract_assets(zip_path, output_base):
                     img.save(os.path.join(dirs['graphics'], f"{name}.png"))
                     stats['graphics'] += 1
 
-                # VOC sounds -> WAV
+                # VOC sounds -> MP3
                 elif ext == '.VOC':
                     print(f"  Converting sound: {filename}")
-                    wav_data = convert_voc_to_wav(data)
-                    with open(os.path.join(dirs['sounds'], f"{name}.wav"), 'wb') as f:
-                        f.write(wav_data)
+                    mp3_data = convert_voc_to_mp3(data)
+                    with open(os.path.join(dirs['sounds'], f"{name}.mp3"), 'wb') as f:
+                        f.write(mp3_data)
                     stats['sounds'] += 1
 
                 # S3M music -> copy

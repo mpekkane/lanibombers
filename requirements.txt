@@ -1,5 +1,6 @@
 # python 3.10
 arcade==3.3.3
+lameenc==1.8.2
 numpy==2.2.6
 pillow==11.3.0
 pyinstaller==6.17.0
