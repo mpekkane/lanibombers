@@ -3,6 +3,7 @@ Client-side simulation for state extrapolation.
 Receives RenderState from server and extrapolates between updates.
 """
 
+import threading
 from dataclasses import replace
 from typing import Any, Optional
 
@@ -38,6 +39,12 @@ class ClientSimulation:
         self._prev_server_time: float = 0.0  # Previous state's server_time
         self._accumulated_explosions: Optional[np.ndarray] = None
         self._sound_engine = sound_engine
+        # Guards the shared fields above. receive_state runs on the network
+        # thread while get_render_state runs on the render thread; without this
+        # the render thread can read a freshly-advanced _server_state_time
+        # together with the not-yet-updated _server_state, drawing the entity
+        # one frame behind its true position.
+        self._lock = threading.Lock()
 
     def receive_state(self, state: RenderState) -> None:
         """
@@ -46,25 +53,26 @@ class ClientSimulation:
         Re-times state arrival using server clock deltas so that
         client-side extrapolation is immune to variable network/processing delays.
         """
-        if self._accumulated_explosions is not None:
-            # Merge: new explosions take priority, keep old where new is zero
-            self._accumulated_explosions = np.where(
-                state.explosions > 0, state.explosions, self._accumulated_explosions
-            )
-        else:
-            self._accumulated_explosions = state.explosions.copy()
+        with self._lock:
+            if self._accumulated_explosions is not None:
+                # Merge: new explosions take priority, keep old where new is zero
+                self._accumulated_explosions = np.where(
+                    state.explosions > 0, state.explosions, self._accumulated_explosions
+                )
+            else:
+                self._accumulated_explosions = state.explosions.copy()
 
-        # Re-time: advance client state time by the server's own time delta
-        # instead of using raw Clock.now() which includes variable network delay
-        if self._prev_server_time > 0 and state.server_time > 0:
-            server_delta = state.server_time - self._prev_server_time
-            self._server_state_time += server_delta
-        else:
-            # First state — bootstrap with client clock
-            self._server_state_time = Clock.now()
+            # Re-time: advance client state time by the server's own time delta
+            # instead of using raw Clock.now() which includes variable network delay
+            if self._prev_server_time > 0 and state.server_time > 0:
+                server_delta = state.server_time - self._prev_server_time
+                self._server_state_time += server_delta
+            else:
+                # First state — bootstrap with client clock
+                self._server_state_time = Clock.now()
 
-        self._prev_server_time = state.server_time
-        self._server_state = state
+            self._prev_server_time = state.server_time
+            self._server_state = state
 
         if self._sound_engine and state.sounds:
             for sound in state.sounds:
@@ -99,37 +107,40 @@ class ClientSimulation:
         Returns:
             Extrapolated RenderState, or None if no state has been received
         """
-        if self._server_state is None:
-            return None
+        # Snapshot the shared fields atomically so the extrapolation below uses
+        # a state and its matching timestamp (see _lock in __init__).
+        with self._lock:
+            server_state = self._server_state
+            if server_state is None:
+                return None
+            server_state_time = self._server_state_time
+            explosions = self._accumulated_explosions
+            self._accumulated_explosions = np.zeros_like(explosions)
 
         current_time = Clock.now()
-        delta_time = min(current_time - self._server_state_time, MAX_EXTRAPOLATION_TIME)
+        delta_time = min(current_time - server_state_time, MAX_EXTRAPOLATION_TIME)
 
         # Create extrapolated copies of dynamic entities
         extrapolated_players = [
             self._extrapolate_entity(player, delta_time)
-            for player in self._server_state.players
+            for player in server_state.players
         ]
         extrapolated_monsters = [
             self._extrapolate_entity(monster, delta_time)
-            for monster in self._server_state.monsters
+            for monster in server_state.monsters
         ]
 
-        # Use accumulated explosions and clear for next frame
-        explosions = self._accumulated_explosions
-        self._accumulated_explosions = np.zeros_like(explosions)
-
         return RenderState(
-            width=self._server_state.width,
-            height=self._server_state.height,
-            tilemap=self._server_state.tilemap,
+            width=server_state.width,
+            height=server_state.height,
+            tilemap=server_state.tilemap,
             players=extrapolated_players,
             monsters=extrapolated_monsters,
-            pickups=self._server_state.pickups,
-            bombs=self._server_state.bombs,
+            pickups=server_state.pickups,
+            bombs=server_state.bombs,
             explosions=explosions,
-            running=self._server_state.running,
-            round_time_left=self._server_state.round_time_left
+            running=server_state.running,
+            round_time_left=server_state.round_time_left
         )
 
     def get_render_state_unsafe(self) -> RenderState:
