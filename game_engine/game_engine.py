@@ -674,6 +674,13 @@ class GameEngine:
 
     def dig(self, entity: DynamicEntity, now: float = 0.0) -> None:
         self.event_resolver.cancel_object_events(entity.id, "move")
+        # Enforce a single active dig event per entity. dig() is the only place
+        # dig events are scheduled, so cancelling any stray pending dig here
+        # guarantees at most one dig chain — preventing two overlapping chains
+        # from damaging a tile at double rate. The in-flight event currently
+        # being resolved is already popped from the queue, so this never
+        # cancels the tick that is re-arming us.
+        self.event_resolver.cancel_object_events(entity.id, "dig")
         dig_event = Event(
             trigger_at=now + DIG_INTERVAL,
             target=entity,
@@ -1572,15 +1579,18 @@ class GameEngine:
             return
         dig_power = target.get_dig_power() if isinstance(target, Player) else 1
         target_tile.take_damage(dig_power)
-        if is_player:
-            self.pending_sounds.append(SoundType.DIG)
 
         # Premature resolution (spawn=False, e.g. clear_entity_dig_events
         # during a direction change) only wants the damage applied — no
         # follow-up dig or move event should be scheduled here, the caller
-        # will set up whatever comes next.
+        # will set up whatever comes next. It must also stay silent: playing
+        # the dig sound here fires an extra off-cadence "beat" every time a
+        # movement command flushes a pending dig tick early.
         if not flags.spawn:
             return
+
+        if is_player:
+            self.pending_sounds.append(SoundType.DIG)
 
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
