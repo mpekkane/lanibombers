@@ -4,7 +4,7 @@ import threading
 import time
 
 import arcade
-
+import re
 from game_engine.agent_state import Action
 from game_engine.client_simulation import ClientSimulation
 from game_engine.render_state import RenderState
@@ -275,7 +275,12 @@ class LanibombersWindow(arcade.Window):
         self.connection_state = msg.state
 
     def _on_chat(self, msg: ChatText) -> None:
+        m = re.fullmatch(r"<([^>]+)>\s*(.*)", msg.text)
+        if m:
+            sender = m.group(1)
+            content = m.group(2)
         self.chat_log.append(f"{msg.text}")
+        self._easteregg(content)
 
     def send_chat(self, msg: str) -> None:
         if self.network_client is not None:
@@ -547,3 +552,13 @@ class LanibombersWindow(arcade.Window):
                 pass
             elif state == ClientState.QUIT:
                 pass
+
+    def _easteregg(self, msg: str) -> None:
+        if msg == "11":
+            self.sound_engine.urethane()
+        elif msg == "14":
+            self.sound_engine.die()
+        elif msg == "9":
+            self.sound_engine.win()
+        elif msg == "17":
+            self.sound_engine.monster()
