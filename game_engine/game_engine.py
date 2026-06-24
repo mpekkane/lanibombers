@@ -77,6 +77,7 @@ from game_engine.session_parser import (
 )
 from game_engine.spawn_points import get_spawn_points, SpawnType
 from common.logger import get_logger
+from common.player_constants import DIG_INTERVAL
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -674,7 +675,7 @@ class GameEngine:
     def dig(self, entity: DynamicEntity, now: float = 0.0) -> None:
         self.event_resolver.cancel_object_events(entity.id, "move")
         dig_event = Event(
-            trigger_at=now + 0.1,
+            trigger_at=now + DIG_INTERVAL,
             target=entity,
             event_type="dig",
             created_at=now,
