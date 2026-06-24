@@ -13,6 +13,7 @@ import yaml
 
 from common.config_reader import resource_path
 from game_engine.session_parser import Session
+from game_engine.spawn_points import SpawnType
 
 DEFAULT_RANDOM_PARAMS = {
     "width": 64,
@@ -850,7 +851,7 @@ class TkBomberServer(BomberServerBase):
             "floating_market": getattr(self.session, "floating_market", False),
             "damage_multiplier": getattr(self.session, "damage_multiplier", 1.0),
             "speed_multiplier": getattr(self.session, "speed_multiplier", 1.0),
-            "spawn_type": int(getattr(self.session, "spawn_type", 0)),
+            "spawn_type": SpawnType(getattr(self.session, "spawn_type", SpawnType.EDGES)),
             "round_time": int(getattr(self.session, "round_time", 60)),
             "maps": [],
         }
@@ -862,7 +863,7 @@ class TkBomberServer(BomberServerBase):
         config.setdefault("floating_market", False)
         config.setdefault("damage_multiplier", 1.0)
         config.setdefault("speed_multiplier", 1.0)
-        config.setdefault("spawn_type", 0)
+        config.setdefault("spawn_type", SpawnType.EDGES)
         config.setdefault("round_time", 60)
         config.setdefault("maps", [])
 
@@ -870,7 +871,12 @@ class TkBomberServer(BomberServerBase):
         config["floating_market"] = bool(config["floating_market"])
         config["damage_multiplier"] = float(config["damage_multiplier"])
         config["speed_multiplier"] = float(config["speed_multiplier"])
-        config["spawn_type"] = int(config["spawn_type"])
+        spawn_type = config["spawn_type"]
+        if isinstance(spawn_type, str):
+            spawn_type = spawn_type.removeprefix("SpawnType.")
+            config["spawn_type"] = SpawnType[spawn_type]
+        else:
+            config["spawn_type"] = SpawnType(spawn_type)
         config["round_time"] = int(config["round_time"])
 
         if not isinstance(config["maps"], list):
@@ -929,7 +935,7 @@ class TkBomberServer(BomberServerBase):
             value=str(self.session_config.get("speed_multiplier", 1.0))
         )
         spawn_type_var = tk.StringVar(
-            value=str(self.session_config.get("spawn_type", 0))
+            value=self.session_config.get("spawn_type", SpawnType.EDGES).to_string()
         )
         round_time_var = tk.StringVar(
             value=str(self.session_config.get("round_time", 60))
@@ -950,7 +956,7 @@ class TkBomberServer(BomberServerBase):
         spawn_combo = ttk.Combobox(
             form,
             textvariable=spawn_type_var,
-            values=["0", "1", "2"],
+            values=[spawn_type.to_string() for spawn_type in SpawnType],
             state="readonly",
             width=20,
             font=self.base_font,
@@ -987,7 +993,7 @@ class TkBomberServer(BomberServerBase):
                     "floating_market": floating_market_var.get() == "Yes",
                     "damage_multiplier": float(damage_multiplier_var.get()),
                     "speed_multiplier": float(speed_multiplier_var.get()),
-                    "spawn_type": int(spawn_type_var.get()),
+                    "spawn_type": SpawnType.from_string(spawn_type_var.get()),
                     "round_time": int(round_time_var.get()),
                     "maps": maps,
                 }
@@ -1048,7 +1054,7 @@ class TkBomberServer(BomberServerBase):
             floating_market_var.set("Yes" if bool(config["floating_market"]) else "No")
             damage_multiplier_var.set(str(config["damage_multiplier"]))
             speed_multiplier_var.set(str(config["speed_multiplier"]))
-            spawn_type_var.set(str(config["spawn_type"]))
+            spawn_type_var.set(config["spawn_type"].name)
             round_time_var.set(str(config["round_time"]))
 
             maps_setter(config.get("maps", []))
@@ -1771,8 +1777,10 @@ class TkBomberServer(BomberServerBase):
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with path.open("w", encoding="utf-8") as f:
+            serializable_config = self._normalize_session_config_dict(config)
+            serializable_config["spawn_type"] = int(serializable_config["spawn_type"])
             yaml.dump(
-                self._normalize_session_config_dict(config),
+                serializable_config,
                 f,
                 default_flow_style=False,
                 sort_keys=False,

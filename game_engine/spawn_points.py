@@ -1,17 +1,7 @@
+from __future__ import annotations
 from typing import List, Tuple
 from game_engine.map_loader import MapData
 from enum import IntEnum
-from game_engine.entities import (
-    DynamicEntity,
-    Direction,
-    EntityType,
-    Tile,
-    TileType,
-    Treasure,
-    TreasureType,
-    Tool,
-    ToolType,
-)
 import numpy as np
 import random
 from scipy.stats import qmc
@@ -22,6 +12,27 @@ class SpawnType(IntEnum):
     EDGES = 0
     TRUE_RANDOM = 1
     UNIFORM_DIST_RANDOM = 2
+
+    def to_string(self) -> str:
+        if self == SpawnType.EDGES:
+            return "edges"
+        elif self == SpawnType.TRUE_RANDOM:
+            return "true random"
+        elif self == SpawnType.UNIFORM_DIST_RANDOM:
+            return "uniform distance"
+        else:
+            raise ValueError("Unknown spawn type")
+
+    @staticmethod
+    def from_string(string: str) -> SpawnType:
+        if string == "edges":
+            return SpawnType.EDGES
+        elif string == "true random":
+            return SpawnType.TRUE_RANDOM
+        elif string == "uniform distance":
+            return SpawnType.UNIFORM_DIST_RANDOM
+        else:
+            raise ValueError("Unknown spawn type")
 
 
 def get_spawn_points(
