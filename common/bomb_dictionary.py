@@ -64,7 +64,7 @@ BOMB_PROPERTIES = {
     BombType.NUKE: (6.0, ExplosionType.NUKE),
     BombType.GRASSHOPPER: (2.5, ExplosionType.SMALL),  # Initial explosion is small
     BombType.GRASSHOPPER_HOP: (0.0, ExplosionType.SMALL),  # Fuse set dynamically (1-4s random)
-    BombType.FLAME_BARREL: (3.0, ExplosionType.NONE),  # Flood fills and damages tiles
+    BombType.FLAME_BARREL: (4.5, ExplosionType.NONE),  # Flood fills and damages tiles
     BombType.CRACKER_BARREL: (-1.0, ExplosionType.NONE),  # Triggered by damage, not timed
     BombType.DIGGER_BOMB: (3.0, ExplosionType.LARGE),  # Only damages bedrock tiles
     BombType.BIOSLIME: (0.15, ExplosionType.NONE),  # Places bioslime tile at bomb location
