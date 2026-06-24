@@ -51,7 +51,7 @@ class TkBomberServer(BomberServerBase):
         map_path: Optional[str],
         log_path: str = "logs/server.log",
         font_size: int = 24,
-        ui_scale: float = 2.0,
+        ui_scale: float = 1.0,
     ) -> None:
         self._quit_requested = False
         self._start_requested = False
@@ -79,6 +79,9 @@ class TkBomberServer(BomberServerBase):
         self.large_font: Optional[tkfont.Font] = None
         self.small_font: Optional[tkfont.Font] = None
         self.log_font: Optional[tkfont.Font] = None
+        self._style: Optional[ttk.Style] = None
+        self._responsive_scale = 1.0
+        self._resize_after_id: Optional[str] = None
 
         # Palette. Change these if you want another flavor.
         self.bg = "#eef2f7"
@@ -116,6 +119,7 @@ class TkBomberServer(BomberServerBase):
         self.log_text: Optional[tk.Text] = None
         self.start_button: Optional[ttk.Button] = None
         self.session_button: Optional[ttk.Button] = None
+        self.quit_button: Optional[ttk.Button] = None
 
         super().__init__(
             cfg,
@@ -141,15 +145,15 @@ class TkBomberServer(BomberServerBase):
 
         self.root.configure(bg=self.bg)
 
-        # Start large, then try to maximize. This works better with large UI scaling.
-        self.root.geometry("2560x1440")
-        self.root.minsize(1400, 900)
-        self._maximize_root_window()
+        # Start at a usable desktop size; the layout responds to later resizing.
+        self.root.geometry("1280x800")
+        self.root.minsize(900, 600)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
         self._load_icons()
         self._build_widgets()
+        self.root.bind("<Configure>", self._on_root_configure)
 
     def _maximize_root_window(self) -> None:
         if self.root is None:
@@ -168,6 +172,61 @@ class TkBomberServer(BomberServerBase):
             return
         except tk.TclError:
             pass
+
+    def _set_dialog_geometry(self, win: tk.Toplevel, *, min_width: int, min_height: int) -> None:
+        """Size a dialog from the current main-window dimensions."""
+        assert self.root is not None
+        self.root.update_idletasks()
+        max_width = max(1, self.root.winfo_screenwidth() - 100)
+        max_height = max(1, self.root.winfo_screenheight() - 100)
+        width = min(1280, max_width, max(min_width, round(self.root.winfo_width() * 0.85)))
+        height = min(900, max_height, max(min_height, round(self.root.winfo_height() * 0.85)))
+        win.geometry(f"{width}x{height}")
+        win.minsize(min(width, min_width), min(height, min_height))
+
+    def _on_root_configure(self, event: tk.Event) -> None:
+        if self.root is None or event.widget is not self.root:
+            return
+
+        if self._resize_after_id is not None:
+            self.root.after_cancel(self._resize_after_id)
+        self._resize_after_id = self.root.after(75, self._update_responsive_scale)
+
+    def _update_responsive_scale(self) -> None:
+        self._resize_after_id = None
+        if self.root is None:
+            return
+
+        scale = min(self.root.winfo_width() / 1280, self.root.winfo_height() / 800)
+        scale = max(0.65, min(scale, 1.15))
+        if abs(scale - self._responsive_scale) < 0.03:
+            return
+
+        self._responsive_scale = scale
+        assert self.base_font is not None
+        assert self.title_font is not None
+        assert self.large_font is not None
+        assert self.small_font is not None
+        assert self.log_font is not None
+
+        base_size = max(11, round(self.font_size * scale))
+        self.base_font.configure(size=base_size)
+        self.title_font.configure(size=base_size + max(4, round(8 * scale)))
+        self.large_font.configure(size=base_size + max(2, round(2 * scale)))
+        self.small_font.configure(size=max(9, base_size - max(2, round(4 * scale))))
+        self.log_font.configure(size=max(9, base_size - max(3, round(6 * scale))))
+
+        if self._style is not None:
+            normal_padding = (round(18 * scale), round(10 * scale))
+            action_padding = (round(22 * scale), round(12 * scale))
+            self._style.configure("TButton", padding=normal_padding)
+            for style_name in ("Session.TButton", "Start.TButton", "Quit.TButton"):
+                self._style.configure(style_name, padding=action_padding)
+
+        button_width = 10 if scale < 0.9 else self.header_button_width
+        for button in (self.start_button, self.session_button, self.quit_button):
+            if button is not None:
+                button.configure(width=button_width)
 
     def ui_stop(self) -> None:
         if self.root is None:
@@ -282,6 +341,7 @@ class TkBomberServer(BomberServerBase):
         )
 
         style = ttk.Style()
+        self._style = style
 
         try:
             style.theme_use("clam")
@@ -589,7 +649,7 @@ class TkBomberServer(BomberServerBase):
 
         style.configure(
             "Icon.TButton",
-            padding=(8, 8),
+            padding=(3, 3),
             background="#374151",
             foreground="#ffffff",
             bordercolor="#374151",
@@ -622,7 +682,7 @@ class TkBomberServer(BomberServerBase):
 
         style.configure(
             "IconDanger.TButton",
-            padding=(8, 8),
+            padding=(3, 3),
             background=self.quit_bg,
             foreground="#ffffff",
             bordercolor=self.quit_bg,
@@ -662,10 +722,10 @@ class TkBomberServer(BomberServerBase):
         self.ping_var = tk.StringVar(value="-")
         self.footer_var = tk.StringVar(value="")
 
-        outer = ttk.Frame(self.root, padding=24)
+        outer = ttk.Frame(self.root, padding=14)
         outer.pack(fill=tk.BOTH, expand=True)
 
-        header = ttk.Frame(outer, style="Header.TFrame", padding=(20, 16))
+        header = ttk.Frame(outer, style="Header.TFrame", padding=(14, 10))
         header.pack(fill=tk.X)
 
         title = ttk.Label(
@@ -706,7 +766,7 @@ class TkBomberServer(BomberServerBase):
         self.quit_button.pack(side=tk.LEFT, padx=(0, 12))
 
         status = ttk.Frame(outer)
-        status.pack(fill=tk.X, pady=(20, 16))
+        status.pack(fill=tk.X, pady=(12, 10))
 
         self._make_status_card(status, "State", self.state_var).grid(
             row=0, column=0, sticky="nsew", padx=(0, 12)
@@ -730,13 +790,13 @@ class TkBomberServer(BomberServerBase):
         players_frame = ttk.LabelFrame(
             main,
             text="Players / Scoreboard",
-            padding=14,
+            padding=10,
             style="Panel.TLabelframe",
         )
         log_frame = ttk.LabelFrame(
             main,
             text=f"Log file: {self.log_path}",
-            padding=14,
+            padding=10,
             style="Panel.TLabelframe",
         )
 
@@ -797,7 +857,7 @@ class TkBomberServer(BomberServerBase):
             outer,
             textvariable=self.footer_var,
             anchor="w",
-            padding=(0, 14, 0, 0),
+            padding=(0, 8, 0, 0),
             style="Footer.TLabel",
         )
         footer.pack(fill=tk.X)
@@ -808,7 +868,7 @@ class TkBomberServer(BomberServerBase):
         title: str,
         variable: tk.StringVar,
     ) -> ttk.Frame:
-        card = ttk.Frame(parent, padding=(18, 12), style="Card.TFrame")
+        card = ttk.Frame(parent, padding=(12, 8), style="Card.TFrame")
 
         title_label = ttk.Label(
             card,
@@ -894,8 +954,7 @@ class TkBomberServer(BomberServerBase):
 
         win = tk.Toplevel(self.root)
         win.title("Session Setup")
-        win.geometry("2500x2000")
-        win.minsize(1500, 1200)
+        self._set_dialog_geometry(win, min_width=960, min_height=820)
         win.transient(self.root)
         win.grab_set()
         win.configure(bg=self.bg)
@@ -915,7 +974,45 @@ class TkBomberServer(BomberServerBase):
         )
         title.pack(anchor="w", pady=(0, 16))
 
-        form = ttk.Frame(container)
+        content_area = ttk.Frame(container, style="Dialog.TFrame")
+        content_area.pack(fill=tk.BOTH, expand=True)
+
+        content_canvas = tk.Canvas(
+            content_area,
+            bg=self.bg,
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        content_scrollbar = ttk.Scrollbar(
+            content_area,
+            orient=tk.VERTICAL,
+            command=content_canvas.yview,
+        )
+        content_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        content_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        content_canvas.configure(yscrollcommand=content_scrollbar.set)
+
+        scroll_content = ttk.Frame(content_canvas, style="Dialog.TFrame")
+        content_window = content_canvas.create_window((0, 0), window=scroll_content, anchor="nw")
+
+        def update_content_scroll_region(_event: object | None = None) -> None:
+            content_canvas.configure(scrollregion=content_canvas.bbox("all"))
+
+        def update_content_width(event: tk.Event) -> None:
+            content_canvas.itemconfigure(content_window, width=event.width)
+
+        def scroll_session_content(event: tk.Event) -> str:
+            if event.delta:
+                content_canvas.yview_scroll(-(event.delta // 120), "units")
+            return "break"
+
+        scroll_content.bind("<Configure>", update_content_scroll_region)
+        content_canvas.bind("<Configure>", update_content_width)
+        win.bind("<MouseWheel>", scroll_session_content)
+        win.bind("<Button-4>", lambda _event: content_canvas.yview_scroll(-1, "units"))
+        win.bind("<Button-5>", lambda _event: content_canvas.yview_scroll(1, "units"))
+
+        form = ttk.Frame(scroll_content, style="Dialog.TFrame")
         form.pack(fill=tk.X)
 
         starting_money_var = tk.StringVar(
@@ -968,7 +1065,7 @@ class TkBomberServer(BomberServerBase):
         form.columnconfigure(1, weight=1)
 
         maps_getter, maps_setter = self._build_maps_editor(
-            parent=container,
+            parent=scroll_content,
             initial_maps=self.session_config.get("maps", []),
         )
 
@@ -1054,7 +1151,7 @@ class TkBomberServer(BomberServerBase):
             floating_market_var.set("Yes" if bool(config["floating_market"]) else "No")
             damage_multiplier_var.set(str(config["damage_multiplier"]))
             speed_multiplier_var.set(str(config["speed_multiplier"]))
-            spawn_type_var.set(config["spawn_type"].name)
+            spawn_type_var.set(config["spawn_type"].to_string())
             round_time_var.set(str(config["round_time"]))
 
             maps_setter(config.get("maps", []))
@@ -1283,8 +1380,7 @@ class TkBomberServer(BomberServerBase):
 
         win = tk.Toplevel(self.root)
         win.title("Edit map")
-        win.geometry("1100x1850")
-        win.minsize(900, 960)
+        self._set_dialog_geometry(win, min_width=650, min_height=480)
         win.transient(self.root)
         win.grab_set()
         win.configure(bg=self.bg)
@@ -1478,7 +1574,9 @@ class TkBomberServer(BomberServerBase):
         path = self.icon_dir / filename
 
         try:
-            self.icons[name] = tk.PhotoImage(file=str(path))
+            icon = tk.PhotoImage(file=str(path))
+            divisor = max(1, (max(icon.width(), icon.height()) + 19) // 20)
+            self.icons[name] = icon.subsample(divisor, divisor)
         except tk.TclError:
             # Missing/bad icon: fall back to text button.
             return
@@ -1528,13 +1626,13 @@ class TkBomberServer(BomberServerBase):
         maps_frame = ttk.LabelFrame(
             parent,
             text="Maps",
-            padding=12,
+            padding=8,
             style="Panel.TLabelframe",
         )
-        maps_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 12))
+        maps_frame.pack(fill=tk.X, pady=(12, 8))
 
         top_row = ttk.Frame(maps_frame)
-        top_row.pack(fill=tk.X, pady=(0, 12))
+        top_row.pack(fill=tk.X, pady=(0, 6))
 
         add_button = self._icon_button(
             top_row,
@@ -1580,8 +1678,8 @@ class TkBomberServer(BomberServerBase):
                 child.destroy()
 
             for index, entry in enumerate(map_entries):
-                row = ttk.Frame(rows_frame, padding=(10, 8))
-                row.pack(fill=tk.X, pady=(0, 6))
+                row = ttk.Frame(rows_frame, padding=(6, 4))
+                row.pack(fill=tk.X, pady=(0, 3))
 
                 number = ttk.Label(
                     row,
@@ -1655,6 +1753,11 @@ class TkBomberServer(BomberServerBase):
                 )
                 remove_button.pack(side=tk.LEFT)
 
+            rows_frame.update_idletasks()
+            row_count = len(map_entries)
+            row_height = max(1, (rows_frame.winfo_reqheight() + row_count - 1) // row_count)
+            visible_rows = min(row_count, 8)
+            canvas.configure(height=min(rows_frame.winfo_reqheight() + 2, visible_rows * row_height + 2))
             update_scroll_region()
 
         def add_map() -> None:
@@ -2000,8 +2103,7 @@ class TkBomberServer(BomberServerBase):
 
         win = tk.Toplevel(self.root)
         win.title(title)
-        win.geometry("1400x1200")
-        win.minsize(1000, 900)
+        self._set_dialog_geometry(win, min_width=650, min_height=480)
         win.transient(self.root)
         win.grab_set()
         win.configure(bg=self.bg)
