@@ -206,6 +206,13 @@ class GameEngine:
         self.event_resolver.start()
         self._start_monster_controllers()
 
+        # Kick off the spreading tick for any bioslime authored into the map.
+        # The tick chain is otherwise only started when a bioslime BOMB
+        # resolves (_resolve_bioslime), so map-placed bioslime would sit inert
+        # and never spread until a player happened to detonate one.
+        if get_bioslime_map(self.tiles, self.height, self.width).any():
+            self._schedule_bioslime_tick(self.round_start_time)
+
     def process_inputs(self) -> None:
         """Drain the input queue and apply commands. Called from the resolver thread."""
         for cmd in self.input_queue.drain():
