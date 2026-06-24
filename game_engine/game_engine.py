@@ -1636,24 +1636,24 @@ class GameEngine:
                     )
                     self.event_resolver.schedule_event(explosion_event)
 
-    # TODO: tile center reached logic
-    def entity_reach_tile_center(self, entity: DynamicEntity) -> None:
-        """Events that happen when entity enters a tile center"""
-        px, py = xy_to_tile(entity.x, entity.y)
-
         # pickup items (only players pick up items)
-        if isinstance(entity, Player):
+        if isinstance(target, Player):
             pickup = self.pickups[py][px]
             if pickup:
                 if pickup.pickup_type == PickupType.TOOL:
                     assert isinstance(pickup, Tool)
-                    entity.pickup_tool(pickup)
+                    target.pickup_tool(pickup)
                 else:
                     assert isinstance(pickup, Treasure)
-                    entity.pickup_treasure(pickup)
+                    target.pickup_treasure(pickup)
                     # TODO:
                     self.pending_sounds.append(SoundType.TREASURE)
                 self.pickups[py][px] = None
+
+    # TODO: tile center reached logic
+    def entity_reach_tile_center(self, entity: DynamicEntity) -> None:
+        """Events that happen when entity enters a tile center"""
+        px, py = xy_to_tile(entity.x, entity.y)
 
         # teleport (applies to all entities)
         tile = self.tiles[py][px]
