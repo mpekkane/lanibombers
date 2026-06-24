@@ -15,7 +15,7 @@ def main() -> None:
     parser.add_argument("--display", "-d", action="store_true", default=False)
     parser.add_argument(
         "--ui",
-        choices=("legacy", "cli", "gui"),
+        choices=("legacy", "cli", "gui", "tk"),
         default="gui",
     )
     parser.add_argument(

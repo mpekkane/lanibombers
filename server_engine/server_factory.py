@@ -20,6 +20,17 @@ def build_server(
         return CursesBomberServer(cfg, session, headless, map_path)
 
     if ui == "gui":
+        from server_engine.qt_server import QtBomberServer
+        return QtBomberServer(
+            cfg=cfg,
+            session_setup=session,
+            headless=headless,
+            map_path=map_path,
+            log_path="logs/server.log",
+            font_size=font_size,
+        )
+
+    if ui == "tk":
         from server_engine.gui_server import TkBomberServer
         return TkBomberServer(
             cfg=cfg,
