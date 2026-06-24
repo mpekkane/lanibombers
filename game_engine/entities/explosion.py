@@ -34,10 +34,10 @@ EXPLOSION_SMALL_CROSS = _create_cross_pattern(31) # 25-tile diameter cross
 EXPLOSION_BIG_CROSS = _create_cross_pattern(127)  # 50-tile diameter cross
 
 # Explosion damage amounts
-DAMAGE_SMALL = 50
+DAMAGE_SMALL = 35
 DAMAGE_MEDIUM = 50
 DAMAGE_LARGE = 70
-DAMAGE_NUKE = 200
+DAMAGE_NUKE = 500
 DAMAGE_FLAME = 35
 DAMAGE_DIRECTED_FLAME = 35
 DAMAGE_SMALL_CROSS = 50

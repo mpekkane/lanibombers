@@ -210,6 +210,7 @@ class Tile(GameObject):
             interactable=False,
             diggable=True,
             visual_id=tile_id,
+            health=10,
         )
 
     @staticmethod
@@ -317,14 +318,6 @@ class Tile(GameObject):
             return
 
         damage = int(amount)
-
-        # Dirt takes double damage from small, medium, and large explosions
-        if self.tile_type == TileType.DIRT and damage_type in (
-            ExplosionType.SMALL,
-            ExplosionType.MEDIUM,
-            ExplosionType.LARGE,
-        ):
-            damage *= 2
 
         self.health = max(0, self.health - damage)
 
