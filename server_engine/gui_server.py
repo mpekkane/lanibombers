@@ -28,6 +28,36 @@ DEFAULT_RANDOM_PARAMS = {
     "room_chance": 0.1,
 }
 
+# Reference window size at which the responsive scale equals 1.0. Every font,
+# padding and dialog dimension is derived from how the live window compares to
+# this design size.
+DESIGN_WIDTH = 1280
+DESIGN_HEIGHT = 800
+
+# How far the UI is allowed to shrink/grow relative to the design size. A wide
+# range is what actually makes the layout feel responsive across resolutions.
+MIN_SCALE = 0.6
+MAX_SCALE = 1.6
+
+# Smallest scale change worth a full restyle pass (avoids churn during drags).
+SCALE_EPSILON = 0.015
+
+# Smallest absolute font sizes, so things stay legible when the window is tiny.
+MIN_BASE_FONT = 11
+
+# Target pixel size of the map-list row icons at scale 1.0; scaled with the
+# responsive scale like everything else.
+ICON_BASE_PX = 22
+
+# Font hierarchy expressed as multiples of the base font, so the proportions
+# hold at every scale instead of drifting like fixed +/- offsets would.
+FONT_RATIOS = {
+    "title": 1.4,
+    "large": 1.12,
+    "small": 0.82,
+    "log": 0.78,
+}
+
 
 class TkBomberServer(BomberServerBase):
     """
@@ -58,6 +88,9 @@ class TkBomberServer(BomberServerBase):
         self._stop_server_requested = False
 
         self.icon_dir = resource_path("assets/server")
+        # Original full-resolution icons, kept so we can re-derive scaled copies.
+        self.icon_sources: dict[str, tk.PhotoImage] = {}
+        # Currently displayed (scale-adjusted) icons used by the buttons.
         self.icons: dict[str, tk.PhotoImage] = {}
 
         self.log_path = Path(log_path)
@@ -174,14 +207,36 @@ class TkBomberServer(BomberServerBase):
             pass
 
     def _set_dialog_geometry(self, win: tk.Toplevel, *, min_width: int, min_height: int) -> None:
-        """Size a dialog from the current main-window dimensions."""
+        """Size and place a dialog relative to the current main window.
+
+        The minimum sizes are given at design scale and grown with the live
+        responsive scale, so a dialog opened over a large (big-font) window has
+        room for its content. The dialog is then centered over the main window
+        so it always "belongs" to the resized parent.
+        """
         assert self.root is not None
         self.root.update_idletasks()
-        max_width = max(1, self.root.winfo_screenwidth() - 100)
-        max_height = max(1, self.root.winfo_screenheight() - 100)
-        width = min(1280, max_width, max(min_width, round(self.root.winfo_width() * 0.85)))
-        height = min(900, max_height, max(min_height, round(self.root.winfo_height() * 0.85)))
-        win.geometry(f"{width}x{height}")
+
+        scale = self._responsive_scale
+        min_width = round(min_width * scale)
+        min_height = round(min_height * scale)
+
+        max_width = max(1, self.root.winfo_screenwidth() - 80)
+        max_height = max(1, self.root.winfo_screenheight() - 80)
+
+        parent_width = self.root.winfo_width()
+        parent_height = self.root.winfo_height()
+
+        width = min(max_width, max(min_width, round(parent_width * 0.9)))
+        height = min(max_height, max(min_height, round(parent_height * 0.9)))
+
+        # Center over the main window, kept on-screen.
+        parent_x = self.root.winfo_rootx()
+        parent_y = self.root.winfo_rooty()
+        x = max(0, min(parent_x + (parent_width - width) // 2, max_width - width))
+        y = max(0, min(parent_y + (parent_height - height) // 2, max_height - height))
+
+        win.geometry(f"{width}x{height}+{x}+{y}")
         win.minsize(min(width, min_width), min(height, min_height))
 
     def _on_root_configure(self, event: tk.Event) -> None:
@@ -192,41 +247,84 @@ class TkBomberServer(BomberServerBase):
             self.root.after_cancel(self._resize_after_id)
         self._resize_after_id = self.root.after(75, self._update_responsive_scale)
 
-    def _update_responsive_scale(self) -> None:
-        self._resize_after_id = None
-        if self.root is None:
-            return
+    def _compute_responsive_scale(self) -> float:
+        """Scale derived from how the live window compares to the design size.
 
-        scale = min(self.root.winfo_width() / 1280, self.root.winfo_height() / 800)
-        scale = max(0.65, min(scale, 1.15))
-        if abs(scale - self._responsive_scale) < 0.03:
-            return
+        Using ``min`` of the two ratios keeps content from overflowing the
+        shorter axis, then we clamp so fonts never collapse or explode.
+        """
+        assert self.root is not None
+        width_ratio = self.root.winfo_width() / DESIGN_WIDTH
+        height_ratio = self.root.winfo_height() / DESIGN_HEIGHT
+        scale = min(width_ratio, height_ratio)
+        return max(MIN_SCALE, min(scale, MAX_SCALE))
 
-        self._responsive_scale = scale
+    def _scaled_font_sizes(self, scale: float) -> dict[str, int]:
+        base = max(MIN_BASE_FONT, round(self.font_size * scale))
+        return {
+            "base": base,
+            "title": max(14, round(base * FONT_RATIOS["title"])),
+            "large": max(12, round(base * FONT_RATIOS["large"])),
+            "small": max(9, round(base * FONT_RATIOS["small"])),
+            "log": max(9, round(base * FONT_RATIOS["log"])),
+        }
+
+    def _apply_scale(self, scale: float) -> None:
+        """Resize every font and padding to the given scale.
+
+        Fonts are shared ``tkfont.Font`` objects, so reconfiguring them here
+        also updates any open dialog live, not just the main window.
+        """
         assert self.base_font is not None
         assert self.title_font is not None
         assert self.large_font is not None
         assert self.small_font is not None
         assert self.log_font is not None
 
-        base_size = max(11, round(self.font_size * scale))
-        self.base_font.configure(size=base_size)
-        self.title_font.configure(size=base_size + max(4, round(8 * scale)))
-        self.large_font.configure(size=base_size + max(2, round(2 * scale)))
-        self.small_font.configure(size=max(9, base_size - max(2, round(4 * scale))))
-        self.log_font.configure(size=max(9, base_size - max(3, round(6 * scale))))
+        sizes = self._scaled_font_sizes(scale)
+        self.base_font.configure(size=sizes["base"])
+        self.title_font.configure(size=sizes["title"])
+        self.large_font.configure(size=sizes["large"])
+        self.small_font.configure(size=sizes["small"])
+        self.log_font.configure(size=sizes["log"])
 
         if self._style is not None:
-            normal_padding = (round(18 * scale), round(10 * scale))
-            action_padding = (round(22 * scale), round(12 * scale))
-            self._style.configure("TButton", padding=normal_padding)
-            for style_name in ("Session.TButton", "Start.TButton", "Quit.TButton"):
-                self._style.configure(style_name, padding=action_padding)
+            def pad(x: int, y: int) -> tuple[int, int]:
+                return (max(2, round(x * scale)), max(2, round(y * scale)))
 
-        button_width = 10 if scale < 0.9 else self.header_button_width
+            self._style.configure("TButton", padding=pad(18, 10))
+            for style_name in (
+                "Session.TButton",
+                "Start.TButton",
+                "Quit.TButton",
+                "HeaderButton.TButton",
+            ):
+                self._style.configure(style_name, padding=pad(22, 12))
+            for style_name in ("Dialog.TButton", "DialogButton.TButton"):
+                self._style.configure(style_name, padding=pad(18, 10))
+            self._style.configure("TEntry", padding=pad(10, 8))
+            self._style.configure("TCombobox", padding=pad(10, 8))
+            for style_name in ("Icon.TButton", "IconDanger.TButton"):
+                self._style.configure(style_name, padding=pad(3, 3))
+
+        # Character-width is already font-relative; only pull it in when the
+        # window is small so the three header buttons don't crowd the title.
+        button_width = 10 if scale < 0.85 else self.header_button_width
         for button in (self.start_button, self.session_button, self.quit_button):
             if button is not None:
                 button.configure(width=button_width)
+
+    def _update_responsive_scale(self) -> None:
+        self._resize_after_id = None
+        if self.root is None:
+            return
+
+        scale = self._compute_responsive_scale()
+        if abs(scale - self._responsive_scale) < SCALE_EPSILON:
+            return
+
+        self._responsive_scale = scale
+        self._apply_scale(scale)
 
     def ui_stop(self) -> None:
         if self.root is None:
@@ -315,29 +413,83 @@ class TkBomberServer(BomberServerBase):
 
             font.configure(size=max(self.font_size, old_size))
 
-    def _setup_fonts(self) -> None:
-        # Your chosen fonts.
-        font_family = "helvetica"
-        log_font_family = "courier"
+    def _resolve_font_family(
+        self,
+        candidates: list[str],
+        *,
+        default_named: str,
+        fallback: str,
+    ) -> str:
+        """Return the first available family, preferring scalable (antialiased)
+        ones. Falls back to the platform's default named font (always a nice
+        antialiased family) and finally to ``fallback``.
+        """
+        try:
+            available = set(tkfont.families())
+        except tk.TclError:
+            available = set()
 
-        self.base_font = tkfont.Font(family=font_family, size=self.font_size)
+        for family in candidates:
+            if family in available:
+                return family
+
+        try:
+            return tkfont.nametofont(default_named).actual("family")
+        except tk.TclError:
+            return fallback
+
+    def _setup_fonts(self) -> None:
+        # Pick scalable (TrueType/OpenType) families. Tk antialiases these
+        # automatically; the old "helvetica"/"courier" aliases resolved to
+        # non-antialiased X11 core bitmap fonts on Linux, which looked jagged.
+        font_family = self._resolve_font_family(
+            [
+                "Segoe UI",        # Windows
+                "Helvetica Neue",  # macOS
+                "Noto Sans",
+                "DejaVu Sans",
+                "Liberation Sans",
+                "Arial",
+            ],
+            default_named="TkDefaultFont",
+            fallback="helvetica",
+        )
+        log_font_family = self._resolve_font_family(
+            [
+                "Cascadia Mono",   # Windows 11
+                "Consolas",        # Windows
+                "Menlo",           # macOS
+                "DejaVu Sans Mono",
+                "Liberation Mono",
+                "Noto Sans Mono",
+                "Courier New",
+            ],
+            default_named="TkFixedFont",
+            fallback="courier",
+        )
+
+        # Initial sizes come from the same proportional table the resize handler
+        # uses, so startup and resize stay perfectly consistent.
+        sizes = self._scaled_font_sizes(self._responsive_scale)
+
+        self.base_font = tkfont.Font(family=font_family, size=sizes["base"])
         self.title_font = tkfont.Font(
             family=font_family,
-            size=self.font_size + 8,
+            size=sizes["title"],
             weight="bold",
         )
         self.large_font = tkfont.Font(
             family=font_family,
-            size=self.font_size + 2,
+            size=sizes["large"],
             weight="bold",
         )
         self.small_font = tkfont.Font(
             family=font_family,
-            size=max(10, self.font_size - 4),
+            size=sizes["small"],
         )
         self.log_font = tkfont.Font(
             family=log_font_family,
-            size=max(10, self.font_size - 6),
+            size=sizes["log"],
         )
 
         style = ttk.Style()
@@ -1575,11 +1727,54 @@ class TkBomberServer(BomberServerBase):
 
         try:
             icon = tk.PhotoImage(file=str(path))
-            divisor = max(1, (max(icon.width(), icon.height()) + 19) // 20)
-            self.icons[name] = icon.subsample(divisor, divisor)
         except tk.TclError:
             # Missing/bad icon: fall back to text button.
             return
+
+        self.icon_sources[name] = icon
+        self.icons[name] = self._scaled_photo(icon, self._target_icon_px(self._responsive_scale))
+
+    def _target_icon_px(self, scale: float) -> int:
+        return max(10, round(ICON_BASE_PX * scale))
+
+    def _scaled_photo(self, source: tk.PhotoImage, target_px: int) -> tk.PhotoImage:
+        """Approximate ``target_px`` from ``source`` using Tk's integer-only
+        ``zoom``/``subsample``. A small zoom-then-subsample combo lets us hit
+        sizes between the coarse whole-number subsample steps.
+        """
+        size = max(1, source.width())
+
+        if target_px >= size:
+            factor = max(1, round(target_px / size))
+            return source.zoom(factor, factor)
+
+        best: Optional[tuple[float, int, int]] = None
+        for zoom in (1, 2, 3):
+            shrink = max(1, round(size * zoom / target_px))
+            result_px = size * zoom / shrink
+            error = abs(result_px - target_px)
+            if best is None or error < best[0]:
+                best = (error, zoom, shrink)
+
+        assert best is not None
+        _, zoom, shrink = best
+
+        image = source
+        if zoom > 1:
+            image = image.zoom(zoom, zoom)
+        if shrink > 1:
+            image = image.subsample(shrink, shrink)
+        return image
+
+    def _rescale_icons(self, scale: float) -> None:
+        """Rebuild the displayed icons for the given scale.
+
+        Called when the maps editor is built so its row buttons match the
+        current window size, like the fonts and paddings around them.
+        """
+        target_px = self._target_icon_px(scale)
+        for name, source in self.icon_sources.items():
+            self.icons[name] = self._scaled_photo(source, target_px)
 
     def _icon_button(
         self,
@@ -1614,6 +1809,9 @@ class TkBomberServer(BomberServerBase):
         parent: ttk.Frame,
         initial_maps: list[Any],
     ):
+        # Size the row icons to the current window before any button is built.
+        self._rescale_icons(self._responsive_scale)
+
         map_entries: list[dict[str, Any]] = [
             self._normalize_map_entry_for_editor(entry) for entry in initial_maps
         ]
