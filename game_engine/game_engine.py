@@ -11,7 +11,7 @@ from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
-from game_engine.engine_utils import flood_fill, get_solid_map, get_bioslime_map
+from game_engine.engine_utils import flood_fill, get_solid_map, get_bioslime_map, get_concrete_map
 from common.tile_dictionary import (
     C4_TILE_ID,
     URETHANE_TILE_ID,
@@ -799,10 +799,14 @@ class GameEngine:
             BombType.GRASSHOPPER_HOP,
         )
 
-        # Get explosion instance and calculate damage pattern
+        # Get explosion instance and calculate damage pattern. Cross explosions
+        # halt their arms at concrete tiles; other explosions ignore the mask.
         explosion = EXPLOSION_MAP[target.explosion_type]
-        solids = np.zeros((self.height, self.width), dtype=bool)
-        damage_array = explosion.calculate_damage(target.x, target.y, solids)
+        if target.explosion_type in (ExplosionType.SMALL_CROSS, ExplosionType.BIG_CROSS):
+            blockers = get_concrete_map(self.tiles, self.height, self.width)
+        else:
+            blockers = np.zeros((self.height, self.width), dtype=bool)
+        damage_array = explosion.calculate_damage(target.x, target.y, blockers)
 
         # Choose visual code for the explosion array
         visual = (

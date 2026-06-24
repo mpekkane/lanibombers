@@ -357,13 +357,21 @@ class MonsterAI(ABC):
             sensed = pathmap.reachable
 
         assert self.danger_zone is not None
-        solids = np.zeros((state.height, state.width), dtype=bool)
+        # Cross explosions halt their arms at concrete; other explosions ignore
+        # this mask, so it can be reused for every bomb.
+        concrete = np.array(
+            [
+                [Tile.visual_id_to_type(int(cell)) == TileType.CONCRETE for cell in row]
+                for row in state.tilemap
+            ],
+            dtype=bool,
+        )
         for b in state.bombs:
             if b.bomb_type is BombType.LANDMINE:
                 continue
             if sensed[int(b.y), int(b.x)]:
                 explosion = EXPLOSION_MAP[b.explosion_type]
-                damage_array = explosion.calculate_damage(b.x, b.y, solids)
+                damage_array = explosion.calculate_damage(b.x, b.y, concrete)
                 self.danger_zone += damage_array
         danger_level = self.danger_zone[int(own_entity.y), int(own_entity.x)]
 

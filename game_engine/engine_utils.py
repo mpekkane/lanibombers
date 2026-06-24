@@ -29,6 +29,25 @@ def get_solid_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarra
     return solid_map
 
 
+def get_concrete_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarray:
+    """
+    Return a numpy boolean array where True indicates a concrete tile.
+
+    Args:
+        tiles: 2D list of Tile objects
+        height: Map height
+        width: Map width
+
+    Returns:
+        Boolean array with shape (height, width) where True = concrete
+    """
+    concrete_map = np.zeros((height, width), dtype=bool)
+    for y in range(height):
+        for x in range(width):
+            concrete_map[y, x] = tiles[y][x].tile_type == TileType.CONCRETE
+    return concrete_map
+
+
 def get_bioslime_map(tiles: List[List[Tile]], height: int, width: int) -> np.ndarray:
     """
     Return a numpy boolean array where True indicates a bioslime tile.

@@ -1,8 +1,8 @@
 ---
   # koti2 (current LAN)
   #########
-  # base_addr: "10.0"
-  # subnet: 0
+  base_addr: "10.0"
+  subnet: 0
   # port: 8888
   #########
   # aalto
@@ -13,8 +13,8 @@
   #########
   # koti
   #########
-  base_addr: "192.168"
-  subnet: 101
+  #base_addr: "192.168"
+  #subnet: 101
   port: 8888
 
   protocol: "tcp"

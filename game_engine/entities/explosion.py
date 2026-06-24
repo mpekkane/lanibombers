@@ -56,25 +56,27 @@ class Explosion(ABC):
         self.pattern = pattern
         self.base_damage = base_damage
 
-    def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
+    def calculate_damage(self, origin_x: int, origin_y: int, blockers: np.ndarray) -> np.ndarray:
         """
-        Calculate damage pattern based on solid blocks.
+        Calculate damage pattern centered at the origin.
 
         Args:
             origin_x: X coordinate of explosion center
             origin_y: Y coordinate of explosion center
-            solids: Boolean numpy array where True = solid block
+            blockers: Boolean numpy array of tiles that block the explosion.
+                Sized to the map. Pattern-based explosions ignore it; shaped
+                explosions (e.g. the cross) use it to halt propagation.
 
         Returns:
             uint8 numpy array with damage values (0 = no damage)
         """
-        return self._apply_pattern(origin_x, origin_y, solids)
+        return self._apply_pattern(origin_x, origin_y, blockers)
 
-    def _apply_pattern(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
+    def _apply_pattern(self, origin_x: int, origin_y: int, blockers: np.ndarray) -> np.ndarray:
         """Apply the explosion pattern centered at origin, clipped to map bounds."""
-        damage = np.zeros(solids.shape, dtype=np.uint8)
+        damage = np.zeros(blockers.shape, dtype=np.uint8)
         pat_height, pat_width = self.pattern.shape
-        map_height, map_width = solids.shape
+        map_height, map_width = blockers.shape
 
         # Pattern center indices
         center_y = pat_height // 2
@@ -126,15 +128,53 @@ class NukeExplosion(Explosion):
         super().__init__(EXPLOSION_NUKE, base_damage)
 
 
-class SmallCrossExplosion(Explosion):
-    """Cross-shaped explosion with 25-tile diameter (cardinal directions only)."""
+class CrossExplosion(Explosion):
+    """
+    Base for cross-shaped explosions that fire in the four cardinal directions.
+
+    Each arm propagates outward from the origin and stops when it hits a
+    concrete tile: tiles before the concrete take damage, the concrete tile
+    and everything beyond it on that arm take none. The other arms continue
+    independently.
+    """
+
+    def calculate_damage(self, origin_x: int, origin_y: int, blockers: np.ndarray) -> np.ndarray:
+        """
+        Args:
+            origin_x: X coordinate of explosion center
+            origin_y: Y coordinate of explosion center
+            blockers: Boolean array where True = a tile that halts an arm
+                (concrete tiles for cross explosions)
+        """
+        damage = np.zeros(blockers.shape, dtype=np.uint8)
+        map_height, map_width = blockers.shape
+        reach = self.pattern.shape[0] // 2  # arm length in each direction
+
+        # Center tile is always part of the cross.
+        damage[origin_y, origin_x] = self.base_damage
+
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            for step in range(1, reach + 1):
+                x = origin_x + dx * step
+                y = origin_y + dy * step
+                if not (0 <= x < map_width and 0 <= y < map_height):
+                    break
+                if blockers[y, x]:
+                    break  # blocker halts this arm before it takes damage
+                damage[y, x] = self.base_damage
+
+        return damage
+
+
+class SmallCrossExplosion(CrossExplosion):
+    """Cross-shaped explosion with 15-tile arms (cardinal directions only)."""
 
     def __init__(self, base_damage: int = DAMAGE_SMALL_CROSS):
         super().__init__(EXPLOSION_SMALL_CROSS, base_damage)
 
 
-class BigCrossExplosion(Explosion):
-    """Cross-shaped explosion with 50-tile diameter (cardinal directions only)."""
+class BigCrossExplosion(CrossExplosion):
+    """Cross-shaped explosion with 63-tile arms (cardinal directions only)."""
 
     def __init__(self, base_damage: int = DAMAGE_BIG_CROSS):
         super().__init__(EXPLOSION_BIG_CROSS, base_damage)
@@ -146,7 +186,7 @@ class FlameExplosion(Explosion):
     def __init__(self, base_damage: int = DAMAGE_FLAME):
         super().__init__(np.zeros((1, 1), dtype=bool), base_damage)
 
-    def calculate_damage(self, origin_x: int, origin_y: int, solids: np.ndarray) -> np.ndarray:
+    def calculate_damage(self, origin_x: int, origin_y: int, blockers: np.ndarray) -> np.ndarray:
         pass  # TODO: implement flame spread logic
 
 
