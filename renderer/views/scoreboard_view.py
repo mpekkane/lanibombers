@@ -219,5 +219,10 @@ class ScoreboardView(arcade.View):
             self._disconnect_and_return()
 
     def _disconnect_and_return(self):
+        # Return to the menu via RESTART -> MENU. The scoreboard can be shown
+        # while the state machine is in either SHOP or ENDING; a plain
+        # view_complete() would advance SHOP -> GAME and desync, so force MENU.
+        from game_engine.state_machine import ClientStateAction
+
         self.window.connection_state = ClientConnectionState.NONE
-        self.window.view_complete()
+        self.window.view_complete(ClientStateAction.RESTART)

@@ -167,6 +167,9 @@ class LanibombersWindow(arcade.Window):
         elif state == ClientState.SHOP:
             while not (self.got_shop and self.got_session):
                 Clock.sleep(1)
+                # FIXME: this is not good, only for saving for missed TCP packages
+                # so the last game -> shop change will result in the scoreboard
+                # This might cause issues
                 if self.session_end:
                     self.sound_engine.scoreboard()
                     assert self.standings is not None
@@ -229,11 +232,13 @@ class LanibombersWindow(arcade.Window):
             self.shop = None
             self.got_shop = False
             self.got_session = False
+            self.session_end = False
         elif state == ClientState.GAME:
             self.client_simulation = None
             self.countdown = None
             self.countdown_value_started_at = None
         elif state == ClientState.ENDING:
+            self.session_end = False
             return
         elif state == ClientState.QUIT:
             return
