@@ -324,9 +324,9 @@ class ServerFinderView(arcade.View):
             return
         else:
             if symbol == arcade.key.ESCAPE:
-                from renderer.views.main_menu_view import MainMenuView
+                from game_engine.state_machine import ClientStateAction
 
-                self.window.show_view(MainMenuView())
+                self.window.view_complete(ClientStateAction.RESTART)
             elif symbol == arcade.key.R:
                 self._start_scan()
             elif symbol == arcade.key.UP:
