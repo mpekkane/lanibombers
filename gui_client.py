@@ -1,6 +1,17 @@
 # main.py  (project root)
 import faulthandler
-faulthandler.enable()
+import os
+import sys
+
+# In a PyInstaller --windowed build there is no console, so sys.stderr is None
+# and the default faulthandler.enable() raises "RuntimeError: sys.stderr is
+# None". Fall back to a log file so we still capture crash tracebacks.
+try:
+    faulthandler.enable()
+except (RuntimeError, ValueError):
+    os.makedirs("logs", exist_ok=True)
+    _fault_log = open("logs/faulthandler.log", "w")
+    faulthandler.enable(_fault_log)
 import arcade
 from renderer.lanibombers_window import LanibombersWindow
 from argparse import ArgumentParser
