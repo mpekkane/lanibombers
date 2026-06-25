@@ -16,6 +16,7 @@ from PIL import Image
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Any
+from common.config_reader import user_config_path
 from common.keymapper import key_to_char
 from game_engine.entities import Direction
 from renderer.bitmap_text import BitmapText
@@ -81,6 +82,42 @@ class MenuField:
     options: List[Any] = field(default_factory=list)
     option_names: List[str] = field(default_factory=list)
     selected_option_index: int = 0
+
+
+# Network settings shown on the Player tab, backed by cfg/client_config.yaml.
+NETWORK_PROTOCOLS = ["tcp", "udp"]
+
+# (display label, client_config.yaml key, default) in display order. Edited as
+# free text and coerced back to the right type on save.
+NETWORK_FIELDS = [
+    ("Server addr", "base_addr", "192.168"),
+    ("Subnet", "subnet", 1),
+]
+
+
+def _net_value_to_str(value) -> str:
+    """Render a client_config value as editable text ('' for missing/None)."""
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _coerce_net_value(key: str, text: str):
+    """Convert edited text back to the type client_config.yaml expects."""
+    text = text.strip()
+    if text == "" or text.lower() == "none":
+        return None
+    if key in ("subnet", "port"):
+        try:
+            return int(text)
+        except ValueError:
+            return text
+    if key == "timeout":
+        try:
+            return float(text)
+        except ValueError:
+            return text
+    return text
 
 
 # ███╗   ███╗██╗███╗   ██╗██╗███╗   ███╗ █████╗ ██████╗
@@ -263,6 +300,7 @@ class PlayerSetupView(arcade.View):
 
         # Load saved config if it exists
         self._load_config()
+        self.net_config = self._load_network_config()
 
         # Initialize menu fields per tab
         self._init_fields()
@@ -505,6 +543,35 @@ class PlayerSetupView(arcade.View):
                 selected_option_index=self.player_color_index,
             ),
         ]
+
+        # Network settings (cfg/client_config.yaml) are appended to the Player
+        # tab so they render just below the player details and reuse the same
+        # navigation / editing machinery. _net_start marks where they begin.
+        self._net_start = len(self.player_fields)
+        net = self.net_config
+        for label, key, default in NETWORK_FIELDS:
+            if key == "protocol":
+                proto = str(net.get(key, default)).lower()
+                if proto not in NETWORK_PROTOCOLS:
+                    proto = "tcp"
+                self.player_fields.append(
+                    MenuField(
+                        name=label,
+                        field_type=FieldType.OPTION,
+                        value=proto,
+                        options=list(NETWORK_PROTOCOLS),
+                        option_names=list(NETWORK_PROTOCOLS),
+                        selected_option_index=NETWORK_PROTOCOLS.index(proto),
+                    )
+                )
+            else:
+                self.player_fields.append(
+                    MenuField(
+                        name=label,
+                        field_type=FieldType.TEXT,
+                        value=_net_value_to_str(net.get(key, default)),
+                    )
+                )
 
         # Tab 1: Controls
         self.control_fields: List[MenuField] = [
@@ -855,7 +922,7 @@ class PlayerSetupView(arcade.View):
             (241 * z, self.window.height - 216 * z),
         ]
 
-        for i, menu_field in enumerate(self.player_fields):
+        for i, menu_field in enumerate(self.player_fields[: self._net_start]):
             is_selected = i == self.current_field_index
             center_x, y = field_positions[i]
             color = (255, 255, 255, 255) if is_selected else (0x8B, 0x8B, 0x8B, 255)
@@ -877,6 +944,49 @@ class PlayerSetupView(arcade.View):
                 continue
 
             for s in sprites:
+                self.menu_text_sprites.append(s)
+
+        self._append_network_field_text()
+
+    def _append_network_field_text(self):
+        """Render the network settings (label + value) below the player details.
+
+        The background image only labels Name/Appearance/Color, so these fields
+        draw their own labels using the same bitmap font.
+        """
+        z = self.zoom
+        label_x = 150 * z
+        value_x = 300 * z
+
+        heading_sprites = self.bitmap_text.create_text_sprites(
+            "Network", label_x, self.window.height - 248 * z, color=(120, 200, 255, 255)
+        )
+        for s in heading_sprites:
+            self.menu_text_sprites.append(s)
+
+        for offset, menu_field in enumerate(self.player_fields[self._net_start :]):
+            field_index = self._net_start + offset
+            is_selected = field_index == self.current_field_index
+            y = self.window.height - (264 + offset * 16) * z
+            color = (255, 255, 255, 255) if is_selected else (0x8B, 0x8B, 0x8B, 255)
+
+            label_sprites = self.bitmap_text.create_text_sprites(
+                menu_field.name + ":", label_x, y, color=color
+            )
+            for s in label_sprites:
+                self.menu_text_sprites.append(s)
+
+            if menu_field.field_type == FieldType.OPTION:
+                value_str = menu_field.option_names[menu_field.selected_option_index]
+            else:
+                value_str = menu_field.value or ""
+                if is_selected and self.editing_text and self.text_cursor_visible:
+                    value_str = value_str + "_"
+
+            value_sprites = self.bitmap_text.create_text_sprites(
+                value_str, value_x, y, color=color
+            )
+            for s in value_sprites:
                 self.menu_text_sprites.append(s)
 
     # ------------------------------------------------------------------
@@ -933,17 +1043,20 @@ class PlayerSetupView(arcade.View):
 
         # Handle text editing mode
         if self.editing_text and current_field:
+            is_name_field = current_field is self.player_fields[0]
+            max_len = 20 if is_name_field else 40
             if symbol == arcade.key.ESCAPE or symbol == arcade.key.ENTER:
                 self.editing_text = False
             elif symbol == arcade.key.BACKSPACE:
                 if current_field.value:
                     current_field.value = current_field.value[:-1]
-                    self.player_name = current_field.value
             else:
                 char = key_to_char(symbol, modifiers, is_text=True)
-                if char and len(current_field.value) < 20:
+                if char and len(current_field.value) < max_len:
                     current_field.value += char
-                    self.player_name = current_field.value
+            # Only the Name field mirrors into the live player card.
+            if is_name_field:
+                self.player_name = current_field.value
             return
 
         # Handle hotkey editing mode
@@ -1080,6 +1193,9 @@ class PlayerSetupView(arcade.View):
 
     def _snapshot_state(self) -> tuple:
         """Capture current settings as a comparable tuple."""
+        network = tuple(
+            (f.name, f.value) for f in self.player_fields[self._net_start :]
+        )
         return (
             self.player_name,
             self.player_appearance_index,
@@ -1088,6 +1204,7 @@ class PlayerSetupView(arcade.View):
             tuple((k.value, v) for k, v in self.hotkeys.items()),
             self.up_key, self.down_key, self.left_key, self.right_key,
             self.stop_key, self.fire_key, self.choose_key, self.remote_key,
+            network,
         )
 
     def _has_changes(self) -> bool:
@@ -1098,10 +1215,15 @@ class PlayerSetupView(arcade.View):
     # Config load/save
     # ------------------------------------------------------------------
 
+    def _load_network_config(self) -> dict:
+        """Load network settings from cfg/client_config.yaml (or {} if absent)."""
+        from common.config_reader import ConfigReader
+
+        return ConfigReader("cfg/client_config.yaml").config or {}
+
     def _load_config(self):
         """Load player configuration from cfg/player.yaml if it exists."""
-        cfg_path = os.path.join(os.path.dirname(__file__), "..", "..", "cfg")
-        yaml_path = os.path.join(cfg_path, "player.yaml")
+        yaml_path = user_config_path("cfg/player.yaml")
 
         if not os.path.exists(yaml_path):
             return
@@ -1209,9 +1331,29 @@ class PlayerSetupView(arcade.View):
             "items": items,
         }
 
-        cfg_path = os.path.join(os.path.dirname(__file__), "..", "..", "cfg")
-        os.makedirs(cfg_path, exist_ok=True)
-        yaml_path = os.path.join(cfg_path, "player.yaml")
+        yaml_path = user_config_path("cfg/player.yaml")
+        os.makedirs(os.path.dirname(yaml_path), exist_ok=True)
+        with open(yaml_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+        self._save_network_config()
+
+    def _save_network_config(self):
+        """Save the network fields back to cfg/client_config.yaml.
+
+        Unedited keys in the original file are preserved so we never drop
+        settings the editor doesn't expose.
+        """
+        config = dict(self.net_config)
+        for offset, (_label, key, _default) in enumerate(NETWORK_FIELDS):
+            menu_field = self.player_fields[self._net_start + offset]
+            if menu_field.field_type == FieldType.OPTION:
+                config[key] = menu_field.value
+            else:
+                config[key] = _coerce_net_value(key, menu_field.value)
+
+        yaml_path = user_config_path("cfg/client_config.yaml")
+        os.makedirs(os.path.dirname(yaml_path), exist_ok=True)
         with open(yaml_path, "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
