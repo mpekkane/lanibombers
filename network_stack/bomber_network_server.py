@@ -126,6 +126,13 @@ class BomberNetworkServer:
         for client in self._clients:
             self.disconnect(client._proto)
 
+    def _peer_ip(self, proto: TransportServerProtocol) -> str:
+        """Best-effort remote IP from the transport (name isn't known yet)."""
+        try:
+            return proto.transport.getPeer().host  # type: ignore[attr-defined]
+        except Exception:
+            return "?"
+
     def _on_receive(
         self, msg: Message, state: PeerState, proto: TransportServerProtocol
     ) -> None:
@@ -135,9 +142,12 @@ class BomberNetworkServer:
         ctx = ClientContext(server=self, state=state, _proto=proto)
         if ctx not in self._clients:
             self._clients.append(ctx)
+            self.log.info(f"Client connected from {self._peer_ip(proto)}")
         handler = self._handlers.get(type(msg))
         if handler is None:
-            # unknown message type: ignore or log
+            # Unknown/unhandled type. Log only the type name: msg is remote input
+            # and some messages (GameState, RawBytes) have huge reprs.
+            self.log.warning(f"Unknown message type received: {type(msg).__name__}")
             return
         handler(msg, ctx)
 
@@ -147,6 +157,7 @@ class BomberNetworkServer:
         proto: TransportServerProtocol,
         reason: Failure,
     ) -> None:
+        was_client = any(client._proto is proto for client in self._clients)
 
         self._clients = [
             client for client in self._clients if client._proto is not proto
@@ -154,4 +165,9 @@ class BomberNetworkServer:
 
         ctx = ClientContext(server=self, state=state, _proto=proto)
         self._diconnect_handler(ctx)
-        self.log.info(f"Client disconnected: {reason.getErrorMessage()}")
+
+        if was_client:
+            self.log.info(f"Client {state.name} disconnected: {reason.getErrorMessage()}")
+        else:
+            # Bare TCP connect with no handshake = LAN discovery scan probe.
+            self.log.info("Server scan request received")
