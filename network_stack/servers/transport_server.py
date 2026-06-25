@@ -14,6 +14,21 @@ from twisted.python.failure import Failure
 OnReceive = Callable[[Message, PeerState, "TransportServerProtocol"], None]
 OnDisconnect = Callable[[PeerState, "TransportServerProtocol", Failure], None]
 
+
+class ServerAddressInUseError(Exception):
+    """Raised when the server cannot bind its port because it is already in use.
+
+    Typically means another instance is already serving on this port in the
+    subnet, rather than a programming error.
+    """
+
+    def __init__(self, port: int) -> None:
+        self.port = port
+        super().__init__(
+            f"Another server is already running in the subnet "
+            f"(port {port} is already in use)."
+        )
+
 @runtime_checkable
 class TransportServerProtocol(Protocol):
     def send_message(self, msg: Message) -> None: ...

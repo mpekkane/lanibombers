@@ -14,6 +14,7 @@ from twisted.protocols.basic import Int32StringReceiver
 from network_stack.servers.transport_server import (
     TransportServer,
     TransportServerProtocol,
+    ServerAddressInUseError,
     OnReceive,
     OnDisconnect,
 )
@@ -87,26 +88,43 @@ class TCPServer(TransportServer):
         self._started = False
 
     def start(self) -> None:
-        """Start accepting TCP connections without restarting the reactor."""
+        """Start accepting TCP connections without restarting the reactor.
+
+        Binding happens synchronously: start() blocks until the port is either
+        bound or known to have failed, so a port-already-in-use error surfaces
+        to the caller as ServerAddressInUseError instead of silently killing the
+        reactor thread with an unhandled traceback.
+        """
+        self._listen_error: Optional[BaseException] = None
+        listen_done = threading.Event()
 
         def _listen() -> None:
-            if self._listening_port is not None:
-                return
-
-            self._listening_port = reactor.listenTCP(  # type: ignore
-                self.port,
-                self._factory,
-                interface="0.0.0.0",
-            )
-            self._started = True
+            try:
+                if self._listening_port is not None:
+                    return
+                self._listening_port = reactor.listenTCP(  # type: ignore
+                    self.port,
+                    self._factory,
+                    interface="0.0.0.0",
+                )
+                self._started = True
+            except error.CannotListenError as exc:
+                self._listen_error = exc
+            finally:
+                listen_done.set()
 
         if reactor.running:  # type: ignore
             reactor.callFromThread(_listen)  # type: ignore
+            listen_done.wait()
+            self._raise_if_listen_failed()
             return
 
         def _run() -> None:
             _listen()
-            reactor.run(installSignalHandlers=False)  # type: ignore
+            # Only drive the reactor if the bind succeeded. Otherwise the thread
+            # would crash inside reactor.run() on the failed listener.
+            if self._listen_error is None:
+                reactor.run(installSignalHandlers=False)  # type: ignore
 
         self._reactor_thread = threading.Thread(
             target=_run,
@@ -114,6 +132,26 @@ class TCPServer(TransportServer):
             name="TCPServerReactorThread",
         )
         self._reactor_thread.start()
+        listen_done.wait()
+        self._raise_if_listen_failed()
+
+    def _raise_if_listen_failed(self) -> None:
+        """Translate a captured bind failure into ServerAddressInUseError."""
+        if self._listen_error is not None:
+            err = self._listen_error
+            self._listen_error = None
+            # The reactor thread exits on its own when the bind fails (it never
+            # calls reactor.run()), but join it so we don't leave a half-started
+            # thread dangling behind the error.
+            self._join_reactor_thread()
+            raise ServerAddressInUseError(self.port) from err
+
+    def _join_reactor_thread(self, timeout: float = 2.0) -> None:
+        """Join and drop the reactor thread if it is no longer needed."""
+        thread = self._reactor_thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout)
+        self._reactor_thread = None
 
     def stop(self) -> None:
         """

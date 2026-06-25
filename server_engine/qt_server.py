@@ -11,6 +11,7 @@ from typing import Optional, Any
 import yaml
 
 from common.config_reader import resource_path
+from network_stack.shared.web_utils import get_local_ip
 from game_engine.session_parser import Session
 from game_engine.spawn_points import SpawnType
 
@@ -119,6 +120,7 @@ class QtBomberServer(BomberServerBase):
         self.players_value: Optional[QLabel] = None
         self.rounds_value: Optional[QLabel] = None
         self.ping_value: Optional[QLabel] = None
+        self.ip_value: Optional[QLabel] = None
         self.players_list: Optional[QListWidget] = None
         self.log_view: Optional[QPlainTextEdit] = None
         self.footer_label: Optional[QLabel] = None
@@ -207,6 +209,13 @@ class QtBomberServer(BomberServerBase):
             return False
         self._stop_server_requested = False
         return True
+
+    def ui_fatal_error(self, message: str) -> None:
+        from common.logger import get_logger
+
+        get_logger().error(message)
+        if self.app is not None:
+            QMessageBox.critical(self.win, "Server error", message)
 
     ##################
     # widget construction
@@ -302,12 +311,14 @@ class QtBomberServer(BomberServerBase):
         self.players_value = QLabel("0")
         self.rounds_value = QLabel("0")
         self.ping_value = QLabel("-")
+        self.ip_value = QLabel(get_local_ip())
 
         cards = [
             ("STATE", self.state_value),
             ("PLAYERS", self.players_value),
             ("ROUNDS LEFT", self.rounds_value),
             ("PING / PONG", self.ping_value),
+            ("SERVER IP", self.ip_value),
         ]
         for col, (title, value) in enumerate(cards):
             grid.addWidget(self._make_card(title, value), 0, col)

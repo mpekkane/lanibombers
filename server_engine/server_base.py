@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Callable
 import numpy as np
 
 from network_stack.bomber_network_server import BomberNetworkServer, ClientContext
+from network_stack.servers.transport_server import ServerAddressInUseError
 from network_stack.messages.messages import (
     Name,
     ChatText,
@@ -141,7 +142,13 @@ class BomberServerBase:
 
         self.server.start()
         self._networking_started = True
-        self.log("Server networking started.")
+
+        from network_stack.shared.web_utils import get_local_ip
+        from common.logger import get_logger
+
+        ip = get_local_ip()
+        get_logger().info(f"Server listening on {ip}:{self.server.port}")
+        self.log(f"Server networking started ({ip}:{self.server.port}).")
 
     def _stop_networking(self) -> None:
         """
@@ -230,6 +237,10 @@ class BomberServerBase:
                     continue
 
                 self.run_state()
+        except ServerAddressInUseError as exc:
+            # Port already taken (another server is up on this subnet). Report it
+            # clearly and shut down instead of leaving a dead reactor thread.
+            self.ui_fatal_error(str(exc))
         finally:
             self.ui_stop()
 
@@ -291,6 +302,14 @@ class BomberServerBase:
 
     def ui_stop_server_requested(self) -> bool:
         return False
+
+    def ui_fatal_error(self, message: str) -> None:
+        """Surface a fatal error to the user before shutdown.
+
+        Default logs it; GUI UIs override to show a blocking dialog so the
+        message is seen even though the window closes immediately afterwards.
+        """
+        self.log(message)
 
     ##################
     # Rendering

@@ -376,6 +376,13 @@ class TkBomberServer(BomberServerBase):
         self._stop_server_requested = False
         return True
 
+    def ui_fatal_error(self, message: str) -> None:
+        from common.logger import get_logger
+
+        get_logger().error(message)
+        if self.root is not None:
+            messagebox.showerror("Server error", message, parent=self.root)
+
     ##################
     # widget construction
     ##################
