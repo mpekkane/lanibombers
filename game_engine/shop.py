@@ -205,8 +205,14 @@ class Shop:
             return
         return self.purchase(idx, player.name)
 
+    def sell_current(self, id: UUID) -> None:
+        uid, idx = self.get_player_cursor_index(id)
+        player = self.get_player_by_id(id)
+        if player is None:
+            return
+        return self.sell(idx, player.name)
+
     def purchase(self, item_index: int, player_name: str) -> None:
-        """Stub: deduct money and add item to inventory."""
         item, price = self.items[item_index]
         client_player = self.get_player(player_name)
         if client_player is None:
@@ -243,6 +249,39 @@ class Shop:
                 return
         client_player.inventory.append((item, 1))
 
+    def sell(self, item_index: int, player_name: str) -> None:
+        item, price = self.items[item_index]
+        client_player = self.get_player(player_name)
+        if client_player is None:
+            return
+
+        # Ready button is special
+        if item == READY_ITEM:
+            for i, (name, state) in enumerate(self.state):
+                if name == player_name:
+                    self.state[i] = (name, False)
+        elif isinstance(item, BombType):
+            in_inventory = False
+            for i, (bt, count) in enumerate(client_player.inventory):
+                if bt == item:
+                    if count > 0:
+                        in_inventory = True
+            if not in_inventory:
+                return
+
+            # Add bomb to inventory or increment existing count
+            for i, (bt, count) in enumerate(client_player.inventory):
+                if bt == item:
+                    client_player.inventory[i] = (bt, count - 1)
+            client_player.money += price
+        # Powerups apply immediately, not added to bomb inventory
+        elif isinstance(item, PowerupType):
+            tool_type = ToolType.from_powerup(item)
+            if client_player.tools.get(tool_type, 0) == 0:
+                return
+            self.remove_powerup(client_player, item)
+            client_player.money += price
+
     def apply_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
         """Apply a powerup to a player."""
         # Count the purchase in player.tools so the shop renderer can show a
@@ -256,6 +295,17 @@ class Shop:
         dp = TOOL_DIG_POWER.get(tool_type)
         if dp is not None:
             player.dig_power += dp
+
+    def remove_powerup(self, player: SessionPlayer, item: PowerupType) -> None:
+        tool_type = ToolType.from_powerup(item)
+        player.tools[tool_type] = player.tools.get(tool_type, 0) - 1
+
+        if item == PowerupType.KEVLAR_VEST:
+            player.max_health -= KEVLAR_HEALTH_BOOST
+            return
+        dp = TOOL_DIG_POWER.get(tool_type)
+        if dp is not None:
+            player.dig_power -= dp
 
     # ███╗   ███╗ ██████╗  ██████╗██╗  ██╗███████╗
     # ████╗ ████║██╔═══██╗██╔════╝██║ ██╔╝██╔════╝

@@ -694,6 +694,9 @@ class BomberServerBase:
         if cmd == Action.FIRE:
             self.shop.purchase_current(player.id)
 
+        if cmd == Action.STOP:
+            self.shop.sell_current(player.id)
+
         self.shop_complete = self.shop.all_done
         self._send_shop()
 
