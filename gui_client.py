@@ -27,12 +27,18 @@ def main():
     parser.add_argument("--cfg", "-c", type=str, default=None)
     parser.add_argument("--auto", "-a", action="store_true")
     parser.add_argument("--stats", "-s", action="store_true")
+    parser.add_argument("--silent", action="store_true")
+    parser.add_argument("--music", type=float, default=0.5)
+    parser.add_argument("--fx", type=float, default=1.0)
     args = parser.parse_args()
     ip = args.ip
     cfg = args.cfg
     auto = args.auto
     stats = args.stats
-    window = LanibombersWindow(ip, cfg, auto, stats)
+    silent = args.silent
+    music = args.music
+    fx = args.fx
+    window = LanibombersWindow(ip, cfg, auto, stats, silent, music, fx)
     window.render_view()
     arcade.run()
 

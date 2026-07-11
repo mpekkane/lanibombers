@@ -280,6 +280,7 @@ class ClientControl(Message):
     def from_bytes(cls, payload: bytes) -> ClientControl:
         return cls(Action(int.from_bytes(payload, "big")))
 
+
 @register_message
 @dataclass(frozen=True)
 class GameState(Message):
@@ -312,7 +313,7 @@ class GameState(Message):
             server_time=state.server_time,
             sounds=tuple(state.sounds),
             running=state.running,
-            round_time_left=state.round_time_left
+            round_time_left=state.round_time_left,
         )
 
     def to_render(self) -> RenderState:
@@ -328,7 +329,7 @@ class GameState(Message):
             server_time=self.server_time,
             sounds=list(self.sounds),
             running=self.running,
-            round_time_left=self.round_time_left
+            round_time_left=self.round_time_left,
         )
 
     def to_bytes(self) -> bytes:
@@ -346,10 +347,6 @@ class GameState(Message):
         b_running = int(self.running).to_bytes(1, "big")
         b_round_time_left = struct.pack("!d", self.round_time_left)
         # auxiliary data
-        b_num_players = len(self.players).to_bytes(1, "big")
-        b_num_monsters = len(self.monsters).to_bytes(1, "big")
-        b_num_pickups = len(self.pickups).to_bytes(1, "big")
-        b_num_bombs = len(self.bombs).to_bytes(1, "big")
         b_tilemap_size = self.tilemap.size.to_bytes(4, "big")
         b_explosions_size = self.explosions.size.to_bytes(4, "big")
         b_players_size = len(b_players).to_bytes(2, "big")
@@ -362,10 +359,6 @@ class GameState(Message):
             b_width
             + b_height
             + b_server_time
-            + b_num_players
-            + b_num_monsters
-            + b_num_pickups
-            + b_num_bombs
             + b_tilemap_size
             + b_explosions_size
             + b_players_size
@@ -389,20 +382,16 @@ class GameState(Message):
         width = int(payload[0])
         height = int(payload[1])
         (server_time,) = struct.unpack("!d", payload[2:10])
-        num_players = int(payload[10])
-        num_monsters = int(payload[11])
-        num_pickups = int(payload[12])
-        num_bombs = int(payload[13])
-        tilemap_size = int.from_bytes(payload[14:18], "big")
-        explosions_size = int.from_bytes(payload[18:22], "big")
-        players_size = int.from_bytes(payload[22:24], "big")
-        monsters_size = int.from_bytes(payload[24:26], "big")
-        pickups_size = int.from_bytes(payload[26:28], "big")
-        bombs_size = int.from_bytes(payload[28:30], "big")
-        sounds_size = int.from_bytes(payload[30:32], "big")
-        running = bool(int(payload[32]))
-        (round_time_left,) = struct.unpack("!d", payload[33:41])
-        start = 41
+        tilemap_size = int.from_bytes(payload[10:14], "big")
+        explosions_size = int.from_bytes(payload[14:18], "big")
+        players_size = int.from_bytes(payload[18:20], "big")
+        monsters_size = int.from_bytes(payload[20:22], "big")
+        pickups_size = int.from_bytes(payload[22:24], "big")
+        bombs_size = int.from_bytes(payload[24:26], "big")
+        sounds_size = int.from_bytes(payload[26:28], "big")
+        running = bool(int(payload[28]))
+        (round_time_left,) = struct.unpack("!d", payload[29:37])
+        start = 37
         stop = start + tilemap_size
         tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
             (height, width)
@@ -535,7 +524,7 @@ class ShopState(Message):
             state=state,
             items=items,
             cursor_positions=cursor_positions,
-            running=running
+            running=running,
         )
 
     @staticmethod
@@ -546,7 +535,7 @@ class ShopState(Message):
             state=shop.state,
             items=shop.items,
             cursor_positions=shop.cursor_positions,
-            running=shop.all_done
+            running=shop.all_done,
         )
 
     @staticmethod
@@ -556,7 +545,9 @@ class ShopState(Message):
             players=state.players,
         )
         shop.update_state(
-            state=state.state, items=state.items, cursor_positions=state.cursor_positions
+            state=state.state,
+            items=state.items,
+            cursor_positions=state.cursor_positions,
         )
         return shop
 
@@ -574,10 +565,7 @@ class Scoreboard(Message):
         # auxiliary data
         b_players_size = len(b_players).to_bytes(2, "big")
 
-        return (
-            b_players_size
-            + b_players
-        )
+        return b_players_size + b_players
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> ShopState:
@@ -661,17 +649,13 @@ class Countdown(Message):
         # main data
         b_count = self.count.to_bytes(1, "big")
 
-        return (
-            b_count
-        )
+        return b_count
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> Countdown:
         count = int(payload[0])
 
-        return cls(
-            count=count
-        )
+        return cls(count=count)
 
 
 @register_message

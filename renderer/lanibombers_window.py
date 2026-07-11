@@ -66,7 +66,10 @@ class LanibombersWindow(arcade.Window):
         local_ip: Optional[str] = None,
         player_config_path: Optional[str] = None,
         auto: bool = False,
-        show_stats: bool = False
+        show_stats: bool = False,
+        silent: bool = False,
+        music_volume: float = 0.5,
+        fx_volume: float = 1.0
     ):
         super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, vsync=True)
         # FIXME: for debugging multiple processes as once
@@ -78,7 +81,12 @@ class LanibombersWindow(arcade.Window):
         # this is the default behavior
         # self.atlas = self.ctx.default_atlas
 
-        self.sound_engine: SoundEngine = SoundEngine(music_volume=0.5, fx_volume=1.0)
+        if silent:
+            music_volume = 0.0
+            fx_volume = 0.0
+        self.sound_engine: SoundEngine = SoundEngine(
+            music_volume=music_volume, fx_volume=fx_volume
+        )
         self.player_config: dict | None = None
         self.client_config: dict | None = None
         self.network_client: BomberNetworkClient | None = None
@@ -532,7 +540,7 @@ class LanibombersWindow(arcade.Window):
                             right=self._right,
                             up=self._up,
                             down=self._down,
-                            fire=self._fire
+                            fire=self._fire,
                         )
 
                     if shop_ai is not None:

@@ -13,6 +13,7 @@ from game_engine.entities.tool import Tool, ToolType
 from game_engine.entities import DynamicEntity
 from game_engine.perlin import generate_and_threshold
 from game_engine.map_loader import parse_map
+from common.logger import get_logger
 from common.tile_dictionary import (
     BEDROCK_INSIDE_TILES,
     BEDROCK_NW_ID,
@@ -25,7 +26,7 @@ from common.tile_dictionary import (
 
 class RandomMapGenerator:
     def __init__(self) -> None:
-        pass
+        self.log = get_logger()
 
     def is_bedrock(
         self, map: np.ndarray, x: int, y: int, width: int, height: int
@@ -47,7 +48,7 @@ class RandomMapGenerator:
         min_tools: int = 5,
         max_tools: int = 20,
         max_rooms: int = 5,
-        room_chance: float = 0.1
+        room_chance: float = 0.1,
     ) -> MapData:
         """Generate a random map.
 
@@ -76,6 +77,7 @@ class RandomMapGenerator:
         # no monsters in random levels
         monsters: List[DynamicEntity] = []
 
+        # place treasures
         treasures: List[Treasure] = []
         dist_from_edge = 3
         num_treasure = random.randint(min_treasure, max_treasure)
@@ -90,6 +92,7 @@ class RandomMapGenerator:
             treasures.append(Treasure.create(x, y, type))
             placed_items.append((x, y))
 
+        # place tools
         tools: List[Tool] = []
         num_tool = random.randint(min_tools, max_tools)
         available_tool_types = list(ToolType)
@@ -104,8 +107,6 @@ class RandomMapGenerator:
                     ok = True
             type = random.choice(available_tool_types)
             created_tool = Tool.create(x, y, type)
-            if created_tool == None:
-                a = 1
             tools.append(created_tool)
             placed_items.append((x, y))
 
@@ -113,6 +114,7 @@ class RandomMapGenerator:
 
         tiles: List[List[Tile]] = []
         tilemap = array.array("B")
+        rooms = np.zeros((height, width), dtype=bool)
         for y in range(height):
             tiles.append([])
             for x in range(width):
@@ -154,12 +156,27 @@ class RandomMapGenerator:
                             tiles[y].append(Tile.create_by_id(tile_id=rid))
                 tilemap.append(tiles[y][x].to_byte())
 
+        # create rooms
         for _ in range(random.randint(0, max_rooms)):
             p = random.uniform(0, 1)
-            if p < room_chance:
+            if p <= room_chance:
                 room_w, room_h, room_map, room_data = self.get_room()
-                left = random.randint(0, x-room_w)
-                top = random.randint(0, y-room_h)
+                left = random.randint(0, width - room_w)
+                top = random.randint(0, height - room_h)
+
+                max_tries = 1000
+                it = 0
+                spot = rooms[top:top+room_h+1, left:left+room_w+1]
+                while not np.all(~spot) and it < max_tries:
+                    left = random.randint(0, width - room_w)
+                    top = random.randint(0, height - room_h)
+                    spot = rooms[top:top+room_h+1, left:left+room_w+1]
+                    it += 1
+
+                if not np.all(~spot):
+                    self.log.info(f"No room for room. Tries {it}")
+                    continue
+
                 init_offset = top * width + left
 
                 for row in range(room_h):
@@ -167,8 +184,14 @@ class RandomMapGenerator:
                         idx = row * room_w + col
                         offset = row * width + col
                         tilemap[init_offset + offset] = room_map[idx]
-
-                        tiles[top+row][left+col] = Tile.create_by_id(room_map[idx])
+                        tiles[top + row][left + col] = Tile.create_by_id(room_map[idx])
+                        if (left + col, top + row) in placed_items:
+                            for t in treasures:
+                                if t.x == left + col and t.y == top + row:
+                                    treasures.remove(t)
+                            for t in tools:
+                                if t.x == left + col and t.y == top + row:
+                                    tools.remove(t)
 
                 for t in room_data.treasures:
                     t.x += left
@@ -183,6 +206,7 @@ class RandomMapGenerator:
                 treasures += room_data.treasures
                 tools += room_data.tools
                 monsters += room_data.monsters
+                rooms[top:top+room_h+1, left:left+room_w+1] = True
 
         return MapData(
             width=width,
