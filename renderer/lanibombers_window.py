@@ -225,7 +225,7 @@ class LanibombersWindow(arcade.Window):
         elif state == ClientState.SETUP:
             return
         elif state == ClientState.CONNECT:
-            return
+            self.chat_log = []
         elif state == ClientState.LOBBY:
             return
         elif state == ClientState.SHOP:
