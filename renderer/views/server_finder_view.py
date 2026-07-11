@@ -83,6 +83,7 @@ class ServerFinderView(arcade.View):
         self.writing = False
         self.text_msg = ""
         self.chat_sprites = arcade.SpriteList()
+        self.player_sprites = arcade.SpriteList()
         self.max_chat_line_len = 40
         self._start_scan()
 
@@ -133,6 +134,7 @@ class ServerFinderView(arcade.View):
             self.window.connection_state = ClientConnectionState.NONE
             self._connected = False
             self.chat_sprites = arcade.SpriteList()
+            self.player_sprites = arcade.SpriteList()
             if not self._scanning:
                 self._start_scan()
 
@@ -177,6 +179,7 @@ class ServerFinderView(arcade.View):
                     self._start_scan()
 
         if self._connected:
+            # Chat
             chat_x = SERVER_LIST_X + 320 * self.zoom
             chat_y = self.window.height - SERVER_LIST_Y * self.zoom
             chat_line_h = LINE_HEIGHT * self.zoom
@@ -212,6 +215,34 @@ class ServerFinderView(arcade.View):
                 for s in line:
                     sprites.append(s)
             self.chat_sprites = sprites
+
+            # Players
+            players_x = SERVER_LIST_X - 60 * self.zoom
+            players_y = self.window.height - SERVER_LIST_Y * self.zoom
+            players_line_h = LINE_HEIGHT * self.zoom
+            sprites = arcade.SpriteList()
+            msg_color = (0x8B, 0x8B, 0x8B)
+            line = self.bitmap_text.create_text_sprites(
+                "Players:",
+                players_x,
+                players_y,
+                color=(0xFF, 0xFF, 0xFF),
+            )
+            for s in line:
+                sprites.append(s)
+            players = self.window.lobby_players
+            N = 27
+            show_players = players if len(players) <= N else players[len(players) - N:len(players)]
+            for i, message in enumerate(show_players):
+                line = self.bitmap_text.create_text_sprites(
+                    message,
+                    players_x,
+                    players_y - (i + 1) * players_line_h,
+                    color=msg_color,
+                )
+                for s in line:
+                    sprites.append(s)
+            self.player_sprites = sprites
 
     def _rebuild_server_list(self) -> None:
         """Rebuild server list sprites only when state changes."""
@@ -297,6 +328,7 @@ class ServerFinderView(arcade.View):
         self.bg_sprite_list.draw(pixelated=True)
         self.server_list_sprites.draw(pixelated=True)
         self.chat_sprites.draw(pixelated=True)
+        self.player_sprites.draw(pixelated=True)
 
     # ------------------------------------------------------------------
     # Input

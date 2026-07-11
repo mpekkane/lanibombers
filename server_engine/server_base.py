@@ -29,6 +29,7 @@ from network_stack.messages.messages import (
     Countdown,
     ClientConnectionStateMessage,
     ClientConnectionState,
+    LobbyPlayers
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -386,9 +387,16 @@ class BomberServerBase:
 
     def run_lobby(self) -> None:
         ready = False
-
+        player_msg_time = 1.0
+        prev = -1
         while not ready and not self.ui_should_quit():
             self.ui_tick()
+
+            if prev < 0:
+                prev = Clock.now()
+            else:
+                if Clock.now() - prev > player_msg_time:
+                    self.server.broadcast(LobbyPlayers(players=self.players))
 
             if self._handle_stop_server_request():
                 return

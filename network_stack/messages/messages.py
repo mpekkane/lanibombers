@@ -676,3 +676,31 @@ class ClientConnectionStateMessage(Message):
         state = ClientConnectionState(int(payload[0]))
 
         return cls(state=state)
+
+
+@register_message
+@dataclass(frozen=True)
+class LobbyPlayers(Message):
+
+    TYPE: ClassVar[int] = 16
+    players: List[SessionPlayer]
+
+    def to_bytes(self) -> bytes:
+        b_players = pickle.dumps(self.players)
+        b_players_size = len(b_players).to_bytes(2, "big")
+
+        return (
+            b_players_size
+            + b_players
+        )
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> GameState:
+        players_size = int.from_bytes(payload[0:2], "big")
+        start = 2
+        stop = start + players_size
+        players = pickle.loads(payload[start:stop])
+
+        return cls(
+            players=players,
+        )

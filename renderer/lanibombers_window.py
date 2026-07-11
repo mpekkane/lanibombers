@@ -21,6 +21,7 @@ from network_stack.messages.messages import (
     ClientConnectionStateMessage,
     ClientConnectionState,
     ChatText,
+    LobbyPlayers
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -118,6 +119,7 @@ class LanibombersWindow(arcade.Window):
         self.log = get_logger()
         self.connection_state = ClientConnectionState.NONE
         self.chat_log = []
+        self.lobby_players = []
 
         if self.auto:
             self._auto_running = True
@@ -274,6 +276,7 @@ class LanibombersWindow(arcade.Window):
         client.set_callback(Countdown, self._on_countdown)
         client.set_callback(ClientConnectionStateMessage, self._on_client_state)
         client.set_callback(ChatText, self._on_chat)
+        client.set_callback(LobbyPlayers, self._on_lobby_players)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -294,6 +297,12 @@ class LanibombersWindow(arcade.Window):
             content = m.group(2)
         self.chat_log.append(f"{msg.text}")
         self._easteregg(content)
+
+    def _on_lobby_players(self, msg: LobbyPlayers) -> None:
+        self.lobby_players = []
+        for player in msg.players:
+            name = player.name
+            self.lobby_players.append(name)
 
     def send_chat(self, msg: str) -> None:
         if self.network_client is not None:
