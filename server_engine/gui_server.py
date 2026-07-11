@@ -1072,6 +1072,7 @@ class TkBomberServer(BomberServerBase):
             "speed_multiplier": getattr(self.session, "speed_multiplier", 1.0),
             "spawn_type": SpawnType(getattr(self.session, "spawn_type", SpawnType.EDGES)),
             "round_time": int(getattr(self.session, "round_time", 60)),
+            "money_inject": int(getattr(self.session, "money_inject", 500)),
             "maps": [],
         }
 
@@ -1084,6 +1085,7 @@ class TkBomberServer(BomberServerBase):
         config.setdefault("speed_multiplier", 1.0)
         config.setdefault("spawn_type", SpawnType.EDGES)
         config.setdefault("round_time", 60)
+        config.setdefault("money_inject", 500)
         config.setdefault("maps", [])
 
         config["starting_money"] = int(config["starting_money"])
@@ -1097,6 +1099,7 @@ class TkBomberServer(BomberServerBase):
         else:
             config["spawn_type"] = SpawnType(spawn_type)
         config["round_time"] = int(config["round_time"])
+        config["money_inject"] = int(config["money_inject"])
 
         if not isinstance(config["maps"], list):
             config["maps"] = []
@@ -1196,6 +1199,9 @@ class TkBomberServer(BomberServerBase):
         round_time_var = tk.StringVar(
             value=str(self.session_config.get("round_time", 60))
         )
+        money_inject_var = tk.StringVar(
+            value=str(self.session_config.get("money_inject", 500))
+        )
 
         self._session_editor_row(form, 0, "Starting money", starting_money_var)
         self._session_editor_bool_row(form, 1, "Floating market", floating_market_var)
@@ -1220,6 +1226,7 @@ class TkBomberServer(BomberServerBase):
         spawn_combo.grid(row=4, column=1, sticky="ew", pady=8)
 
         self._session_editor_row(form, 5, "Round time", round_time_var)
+        self._session_editor_row(form, 6, "Money after each round", money_inject_var)
 
         form.columnconfigure(1, weight=1)
 
@@ -1251,6 +1258,7 @@ class TkBomberServer(BomberServerBase):
                     "speed_multiplier": float(speed_multiplier_var.get()),
                     "spawn_type": SpawnType.from_string(spawn_type_var.get()),
                     "round_time": int(round_time_var.get()),
+                    "money_inject": int(money_inject_var.get()),
                     "maps": maps,
                 }
                 return self._normalize_session_config_dict(config)
@@ -1312,6 +1320,7 @@ class TkBomberServer(BomberServerBase):
             speed_multiplier_var.set(str(config["speed_multiplier"]))
             spawn_type_var.set(config["spawn_type"].to_string())
             round_time_var.set(str(config["round_time"]))
+            money_inject_var.set(str(config["money_inject"]))
 
             maps_setter(config.get("maps", []))
 

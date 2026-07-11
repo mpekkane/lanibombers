@@ -102,6 +102,7 @@ class SessionSetup(arcade.Window):
         self.edit_original_map_index = 0
         self.spawn_type = SpawnType.EDGES
         self.round_time = 60
+        self.money_inject = 500
 
         # Load saved config if it exists
         self._load_config()
@@ -292,6 +293,14 @@ class SessionSetup(arcade.Window):
                 step=10,
                 min_value=-10,
                 max_value=600,
+            ),
+            MenuField(
+                name="Money after each round",
+                field_type=FieldType.NUMERIC,
+                value=self.money_inject,
+                step=100,
+                min_value=0,
+                max_value=100000000,
             ),
         ]
 
@@ -753,6 +762,8 @@ class SessionSetup(arcade.Window):
             self.spawn_type = changed_field.value
         elif name == "Round time":
             self.round_time = changed_field.value
+        elif name == "Money after each round":
+            self.money_inject = int(changed_field.value)
         else:
             # Random map sub-fields — route to the owning entry's random_params
             idx = changed_field.map_entry_index
@@ -822,6 +833,9 @@ class SessionSetup(arcade.Window):
         if "round_time" in config:
             self.round_time = int(config["round_time"])
 
+        if "money_inject" in config:
+            self.money_inject = int(config["money_inject"])
+
         # Load maps list (new format) or single map (old format)
         if "maps" in config:
             self.map_list = []
@@ -880,6 +894,7 @@ class SessionSetup(arcade.Window):
             "speed_multiplier": self.speed_multiplier,
             "spawn_type": int(self.spawn_type),
             "round_time": int(self.round_time),
+            "money_inject": int(self.money_inject),
             "maps": maps_out,
         }
 

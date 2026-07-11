@@ -36,7 +36,6 @@ from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
 
-
 # Action → Direction mapping for movement commands. STOP and non-move
 # actions deliberately omitted (look-up returns None for them).
 _ACTION_TO_DIRECTION = {
@@ -504,6 +503,25 @@ class BomberServerBase:
 
     def run_game(self) -> None:
         assert self.engine is not None
+        self._at_round_start()
+
+        while self.engine.running and not self.ui_should_quit():
+            self.ui_tick()
+
+            if self._handle_stop_server_request():
+                return
+
+            render_state = self.engine.get_render_state()
+            self.server.broadcast(GameState.from_render(render_state), None)
+
+            Clock.sleep(1)
+
+        self.engine.stop()
+
+        self._at_round_end()
+
+    def _at_round_start(self) -> None:
+        assert self.engine is not None
 
         self.game_on_countdown = True
         countdown_length = 5
@@ -535,20 +553,10 @@ class BomberServerBase:
         self.engine.start()
         self.game_on_countdown = False
 
-        while self.engine.running and not self.ui_should_quit():
-            self.ui_tick()
-
-            if self._handle_stop_server_request():
-                return
-
-            render_state = self.engine.get_render_state()
-            self.server.broadcast(GameState.from_render(render_state), None)
-
-            Clock.sleep(1)
-
-        self.engine.stop()
-
+    def _at_round_end(self) -> None:
+        assert self.engine is not None
         points_by_name = self.score_players()
+        quit_session = self.session.session_complete()
 
         for player in self.players:
             player.created = False
@@ -561,12 +569,13 @@ class BomberServerBase:
                 player.dig_power = BASE_DIGGING_POWER
                 player.max_health = 100
 
+            if not quit_session:
+                player.money += self.session.money_inject
             player.score += points_by_name[player.name]
 
         self.engine = None
         self.ui_show_scores()
 
-        quit_session = self.session.session_complete()
         self.state_machine.update(quit=quit_session)
 
         if quit_session:

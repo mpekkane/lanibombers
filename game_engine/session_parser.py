@@ -87,7 +87,8 @@ class Session:
         speed_multiplier: float,
         spawn_type: SpawnType,
         maps: List[SessionMap],
-        round_time: int
+        round_time: int,
+        money_inject: int
     ) -> None:
         self.valid = True
         self.starting_money = starting_money
@@ -97,6 +98,7 @@ class Session:
         self.spawn_type = spawn_type
         self.round_time = round_time
         self.maps = maps
+        self.money_inject = money_inject
         self._current_map = 0
 
     def get_next_map(self) -> SessionMap:
@@ -115,7 +117,7 @@ class Session:
 
     @staticmethod
     def get_dummy() -> Session:
-        session = Session(0, False, 0, 0, SpawnType.EDGES, [])
+        session = Session(0, False, 0, 0, SpawnType.EDGES, [], 60, 0)
         session.valid = False
         return session
 
@@ -130,6 +132,7 @@ class Session:
         speed_multiplier = config.get_config_mandatory("speed_multiplier", float)
         spawn_type = config.get_config_mandatory("spawn_type", int)
         round_time = config.get_config_mandatory("round_time", int)
+        money_inject = config.get_config_mandatory("money_inject", int)
 
         maps = []
         raw_maps = config.get_config_mandatory("maps", list)
@@ -175,6 +178,7 @@ class Session:
             SpawnType(spawn_type),
             maps,
             round_time,
+            money_inject
         )
 
     @staticmethod
@@ -192,5 +196,6 @@ class Session:
             spawn_type=SpawnType.EDGES,
             maps=maps,
             round_time=60,
+            money_inject=0
         )
         return session
