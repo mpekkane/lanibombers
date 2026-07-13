@@ -29,7 +29,7 @@ from network_stack.messages.messages import (
     Countdown,
     ClientConnectionStateMessage,
     ClientConnectionState,
-    LobbyPlayers
+    LobbyPlayers,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction
@@ -59,6 +59,7 @@ from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.state_machine import ServerState, ServerStateMachine
 from game_engine.shop import Shop
 from common.player_constants import BASE_DIGGING_POWER
+from game_engine.lighting_effects import LightingEffects
 
 
 class BomberServerBase:
@@ -126,6 +127,14 @@ class BomberServerBase:
         # Keep False for curses UI, otherwise prints corrupt the screen.
         self.debug_prints = False
         self.end_screen_wait_time = 5
+
+        # If DMX enabled lights are connected:
+        self.use_lights = False
+        if self.use_lights:
+            self.lighting_fx = LightingEffects()
+            self.lighting_fx.start()
+        else:
+            self.lighting_fx = None
 
     ##################
     # Networking lifecycle
@@ -213,6 +222,9 @@ class BomberServerBase:
         self.session.reset()
         self.state_machine.stop()
 
+        if self.use_lights:
+            self.lighting_fx.stop_fx()
+
     def _handle_stop_server_request(self) -> bool:
         if self.state == ServerState.STOPPED:
             return False
@@ -228,8 +240,8 @@ class BomberServerBase:
     ##################
 
     def run_forever(self) -> None:
-        self.ui_start()
         try:
+            self.ui_start()
             while not self.ui_should_quit():
                 self.ui_tick()
 
@@ -242,7 +254,31 @@ class BomberServerBase:
             # clearly and shut down instead of leaving a dead reactor thread.
             self.ui_fatal_error(str(exc))
         finally:
-            self.ui_stop()
+            try:
+                self._shutdown_app()
+            finally:
+                self.ui_stop()
+
+    def _shutdown_app(self) -> None:
+        """Release long-lived workers when the server application exits."""
+        try:
+            if self.engine is not None:
+                self.engine.stop()
+                self.engine = None
+        finally:
+            try:
+                if self.sound_engine is not None:
+                    self.sound_engine.stop_all()
+                    self.sound_engine = None
+            finally:
+                try:
+                    self._stop_networking()
+                finally:
+                    if self.use_lights:
+                        # Unlike stop_server(), application shutdown is final.
+                        # The DMX worker is non-daemon and must be joined or
+                        # Python cannot exit.
+                        self.lighting_fx.stop()
 
     def run_state(self) -> None:
         state = self.state_machine.get_state()
@@ -492,6 +528,7 @@ class BomberServerBase:
             self.map_data.height,
             spawn_type=self.session.spawn_type,
             max_round_time=self.session.round_time,
+            lighting_fx=self.lighting_fx,
         )
         self.engine.set_render_callback(self.render_callback)
         self.engine.load_map(self.map_data)
@@ -585,6 +622,8 @@ class BomberServerBase:
         self.ui_show_scores()
 
         self.state_machine.update(quit=quit_session)
+        if self.use_lights:
+            self.lighting_fx.stop_fx()
 
         if quit_session:
             info = SessionInfo(
@@ -643,6 +682,18 @@ class BomberServerBase:
         start = Clock.now()
         dt = Clock.now() - start
 
+        if self.use_lights:
+            max_points = -1
+            winner = None
+            for p in self.players:
+                if p.score > max_points:
+                    max_points = p.score
+                    winner = p
+
+            assert winner
+            self.lighting_fx.stop_fx()
+            self.lighting_fx.win(winner.color[0], winner.color[1], winner.color[2])
+
         while dt < self.end_screen_wait_time and not self.ui_should_quit():
             self.ui_tick()
 
@@ -658,6 +709,8 @@ class BomberServerBase:
         self._stop_networking()
         self.session.reset()
         self.state_machine.update()
+        if self.use_lights:
+            self.lighting_fx.stop_fx()
 
     def update_state(self) -> None:
         if not self.state.running():

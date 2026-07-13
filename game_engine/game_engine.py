@@ -11,7 +11,12 @@ from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
 from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
-from game_engine.engine_utils import flood_fill, get_solid_map, get_bioslime_map, get_concrete_map
+from game_engine.engine_utils import (
+    flood_fill,
+    get_solid_map,
+    get_bioslime_map,
+    get_concrete_map,
+)
 from common.tile_dictionary import (
     C4_TILE_ID,
     URETHANE_TILE_ID,
@@ -51,11 +56,13 @@ BOMB_PLACEMENT_DELAY = 0.050
 # Bomb types that aren't really "placed" — they're directional / instant
 # weapons fired in place. These bypass BOMB_PLACEMENT_DELAY so the input
 # feels responsive.
-IMMEDIATE_FIRE_BOMBS = frozenset({
-    BombType.GRENADE,
-    BombType.FIRE_EXTINGUISHER,
-    BombType.FLAMETHROWER,
-})
+IMMEDIATE_FIRE_BOMBS = frozenset(
+    {
+        BombType.GRENADE,
+        BombType.FIRE_EXTINGUISHER,
+        BombType.FLAMETHROWER,
+    }
+)
 
 # Map ExplosionType to explosion instances
 EXPLOSION_MAP = {
@@ -78,6 +85,7 @@ from game_engine.session_parser import (
 from game_engine.spawn_points import get_spawn_points, SpawnType
 from common.logger import get_logger
 from common.player_constants import DIG_INTERVAL
+from game_engine.lighting_effects import LightingEffects
 
 if TYPE_CHECKING:
     from game_engine.map_loader import MapData
@@ -109,6 +117,7 @@ class GameEngine:
         height: int = 45,
         spawn_type: SpawnType = SpawnType.EDGES,
         max_round_time: int = -1,
+        lighting_fx: Optional[LightingEffects] = None,
     ):
         self.running = True
         self.width = width
@@ -150,6 +159,7 @@ class GameEngine:
         self.max_round_time = max_round_time
         self.round_start_time: Optional[float] = None
         self.log = get_logger()
+        self.lighting_fx = lighting_fx
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self._external_state_callback = callback
@@ -235,8 +245,7 @@ class GameEngine:
                     # 2. Tile-occupancy check — one bomb per tile across
                     # both live bombs and in-flight delayed placements.
                     occupied = any(
-                        b.x == cmd.bomb.x and b.y == cmd.bomb.y
-                        for b in self.bombs
+                        b.x == cmd.bomb.x and b.y == cmd.bomb.y for b in self.bombs
                     ) or any(
                         b.x == cmd.bomb.x and b.y == cmd.bomb.y
                         for b in self.pending_bombs
@@ -549,8 +558,7 @@ class GameEngine:
             # off-center boulder push) when reversing/turning mid-traverse.
             px, py = xy_to_tile(player.x, player.y)
             at_tile_center = (
-                abs(player.x - (px + 0.5)) < 0.01
-                and abs(player.y - (py + 0.5)) < 0.01
+                abs(player.x - (px + 0.5)) < 0.01 and abs(player.y - (py + 0.5)) < 0.01
             )
             if next_tile.solid and at_tile_center:
                 self.collision_check(player, next_tile, now)
@@ -817,7 +825,10 @@ class GameEngine:
         # Get explosion instance and calculate damage pattern. Cross explosions
         # halt their arms at concrete tiles; other explosions ignore the mask.
         explosion = EXPLOSION_MAP[target.explosion_type]
-        if target.explosion_type in (ExplosionType.SMALL_CROSS, ExplosionType.BIG_CROSS):
+        if target.explosion_type in (
+            ExplosionType.SMALL_CROSS,
+            ExplosionType.BIG_CROSS,
+        ):
             blockers = get_concrete_map(self.tiles, self.height, self.width)
         else:
             blockers = np.zeros((self.height, self.width), dtype=bool)
@@ -887,6 +898,18 @@ class GameEngine:
         # Remove bomb from list
         if target in self.bombs:
             self.bombs.remove(target)
+
+        if self.lighting_fx is not None:
+            if target.explosion_type == ExplosionType.NUKE:
+                self.lighting_fx.nuke()
+            elif target.explosion_type == ExplosionType.LARGE:
+                self.lighting_fx.big_bomb()
+            elif target.explosion_type == ExplosionType.MEDIUM:
+                self.lighting_fx.medium_bomb()
+            elif target.explosion_type == ExplosionType.SMALL:
+                self.lighting_fx.small_bomb()
+            else:
+                self.lighting_fx.random_bomb()
 
     def _resolve_c4(self, bomb: Bomb) -> None:
         """Resolve C4 bomb - flood fill empty tiles with c4_tiles."""

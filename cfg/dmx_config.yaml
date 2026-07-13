@@ -1,0 +1,5 @@
+---
+  device: "/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN522059-if00-port0"
+  ports:
+    - 1
+    - 10
