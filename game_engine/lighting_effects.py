@@ -79,10 +79,19 @@ class LightingState(IntEnum):
     SHOP = 4
     GAME = 5
     WIN = 6
+    COUNTDOWN = 7
+    NUKE_WARNING = 8
     FX = 100
 
 
 class LightingEffects:
+    BOMB_FX = frozenset({
+        "small_bomb",
+        "medium_bomb",
+        "big_bomb",
+        "strobe_bomb",
+    })
+
     # How long each effect occupies the lights. Events that happened during
     # that interval are overlapping and should not be replayed later.
     FX_DURATIONS = {
@@ -91,6 +100,7 @@ class LightingEffects:
         "big_bomb": 0.4,
         "strobe_bomb": 0.5,
         "nuke": 3.5,
+        "countdown": 0.2
     }
 
     # Override-order template. An incoming effect can interrupt the currently
@@ -101,6 +111,7 @@ class LightingEffects:
         "big_bomb": 3,
         "strobe_bomb": 4,
         "nuke": 5,
+        "countdown": 10
     }
 
     def __init__(self, config_path: str = "cfg/dmx_config.yaml") -> None:
@@ -120,6 +131,10 @@ class LightingEffects:
         self.alert_started = -1
         self.alert_limit = 0.5
         self.alert_mode = False
+        self.countdown_count = 0
+        self.nuke_warning_started = -1
+        self.nuke_warning_limit = 0.75
+        self.nuke_warning_mode = False
 
     def stop(self):
         self.running = False
@@ -142,17 +157,33 @@ class LightingEffects:
 
     def server(self):
         self.alert_time = 0
+        self.countdown_count = 0
         self.state = LightingState.SERVER
 
     def shop(self):
         self.state = LightingState.SHOP
 
     def game(self):
+        self.nuke_warning_started = -1
         self.state = LightingState.GAME
 
     def win(self, r: int, g: int, b: int):
         self.win_color = (r, g, b)
         self.state = LightingState.WIN
+
+    def countdown(self):
+        self.state = LightingState.COUNTDOWN
+        self.prev_state = LightingState.COUNTDOWN
+        self._queue_fx("countdown")
+
+    def nuke_warning(self):
+        with self.fx_queue_lock:
+            self.state = LightingState.NUKE_WARNING
+            self.fx_queue = [
+                fx for fx in self.fx_queue if fx[0] not in self.BOMB_FX
+            ]
+            if self.current_fx in self.BOMB_FX:
+                self.fx_interrupted.set()
 
     # ███████╗██╗   ██╗███████╗███╗   ██╗████████╗███████╗
     # ██╔════╝██║   ██║██╔════╝████╗  ██║╚══██╔══╝██╔════╝
@@ -185,6 +216,9 @@ class LightingEffects:
 
     def _queue_fx(self, name: str):
         with self.fx_queue_lock:
+            if name in self.BOMB_FX and self.state == LightingState.NUKE_WARNING:
+                return
+
             fx = (name, Clock.now())
             overrides_current = (
                 self.current_fx is not None
@@ -218,13 +252,23 @@ class LightingEffects:
                 fx = self.fx_queue.pop(0) if self.fx_queue else None
                 queue_was_empty = fx is None
                 if fx is not None:
-                    self.state = LightingState.FX
                     name, queued_at = fx
+
+                    # The nuke warning owns the lights; bomb effects must not
+                    # replace it, including effects queued just before the
+                    # warning state was entered.
+                    if (
+                        self.state == LightingState.NUKE_WARNING
+                        and name in self.BOMB_FX
+                    ):
+                        fx = None
+                    else:
+                        self.state = LightingState.FX
 
                     # Overlapping effects are normally skipped. A higher-
                     # priority effect is the exception: it replaces the
                     # lower-priority effect immediately.
-                    overlaps_previous = (
+                    overlaps_previous = fx is not None and (
                         last_fx_started_at is not None
                         and queued_at < last_fx_started_at + last_fx_duration
                     )
@@ -246,7 +290,6 @@ class LightingEffects:
                     if self.state != self.prev_state:
                         if self.state == LightingState.FX:
                             self.state = self.prev_state
-
                         self.prev_state = self.state
                         if self.state == LightingState.SERVER:
                             self._server_fx()
@@ -258,23 +301,30 @@ class LightingEffects:
                             self._game_fx()
                         elif self.state == LightingState.WIN:
                             self._win_fx()
+                        elif self.state == LightingState.NUKE_WARNING:
+                            self._nuke_warning_fx()
                     else:
                         if self.state == LightingState.SERVER_ALERT:
                             self._server_alert_fx()
+                        elif self.state == LightingState.NUKE_WARNING:
+                            self._nuke_warning_fx()
                         time.sleep(0.1)
                 continue
 
             try:
-                if name == "small_bomb":
-                    self._small_bomb_fx()
-                elif name == "medium_bomb":
-                    self._medium_bomb_fx()
-                elif name == "big_bomb":
-                    self._big_bomb_fx()
-                elif name == "strobe_bomb":
-                    self._strobe_bomb_fx()
-                elif name == "nuke":
-                    self._nuke_fx()
+                if self.state != LightingState.NUKE_WARNING:
+                    if name == "small_bomb":
+                        self._small_bomb_fx()
+                    elif name == "medium_bomb":
+                        self._medium_bomb_fx()
+                    elif name == "big_bomb":
+                        self._big_bomb_fx()
+                    elif name == "strobe_bomb":
+                        self._strobe_bomb_fx()
+                    elif name == "nuke":
+                        self._nuke_fx()
+                    elif name == "countdown":
+                        self._countdown_fx()
             finally:
                 with self.fx_queue_lock:
                     self.current_fx = None
@@ -457,5 +507,41 @@ class LightingEffects:
         self.dmx.send()
 
     def _game_fx(self):
-        self.dmx.set_all(uv=64, motor=128)
+        self.dmx.set_all(uv=128, motor=128)
         self.dmx.send()
+
+    def _countdown_fx(self):
+        if self.countdown_count == 0:
+            self.dmx.set_all(white=128)
+        elif self.countdown_count == 1:
+            self.dmx.set_all(white=64, amber=64)
+        elif self.countdown_count == 2:
+            self.dmx.set_all(amber=128)
+        elif self.countdown_count == 3:
+            self.dmx.set_all(red=64, amber=64)
+        elif self.countdown_count == 4:
+            self.dmx.set_all(red=128)
+        self.dmx.send()
+
+        Clock.sleep(0.1)
+
+        self.dmx.set_all()
+        self.dmx.send()
+
+        self.countdown_count += 1
+
+    def _nuke_warning_fx(self):
+        dt = Clock.now() - self.nuke_warning_started
+        run = False
+        if self.nuke_warning_started < 0:
+            run = True
+        if dt > self.nuke_warning_limit:
+            run = True
+        if run:
+            if self.nuke_warning_mode:
+                self.dmx.set_all(amber=200, red=200, motor=250)
+            else:
+                self.dmx.set_all()
+            self.dmx.send()
+            self.nuke_warning_started = Clock.now()
+            self.nuke_warning_mode = not self.nuke_warning_mode

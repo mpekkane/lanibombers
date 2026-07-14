@@ -130,6 +130,7 @@ class BomberServerBase:
 
         # If DMX enabled lights are connected:
         self.lobby_alert = False
+        self.nuke_warning = False
         self.use_lights = True
         if self.use_lights:
             self.lighting_fx = LightingEffects()
@@ -585,6 +586,21 @@ class BomberServerBase:
             render_state = self.engine.get_render_state()
             self.server.broadcast(GameState.from_render(render_state), None)
 
+            if self.use_lights:
+                nuke_found = False
+                for bomb in render_state.bombs:
+                    if bomb.bomb_type == BombType.NUKE:
+                        nuke_found = True
+                        break
+                if nuke_found:
+                    if not self.nuke_warning:
+                        self.lighting_fx.nuke_warning()
+                        self.nuke_warning = True
+                else:
+                    if self.nuke_warning:
+                        self.lighting_fx.game()
+                        self.nuke_warning = False
+
             Clock.sleep(1)
 
         self.engine.stop()
@@ -612,6 +628,8 @@ class BomberServerBase:
             if new_count != count:
                 count = new_count
                 self.server.broadcast(Countdown(count=count))
+                if self.use_lights:
+                    self.lighting_fx.countdown()
 
             # Broadcast render state every tick so inventory selections
             # made via on_select during the countdown become visible to
