@@ -15,8 +15,8 @@ from network_stack.shared.web_utils import get_local_ip
 from game_engine.session_parser import Session
 from game_engine.spawn_points import SpawnType
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QFontDatabase, QCloseEvent
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QCloseEvent, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -73,6 +73,53 @@ class _MainWindow(QMainWindow):
         event.accept()
 
 
+class _AlertSwitch(QPushButton):
+    """Compact push button with a painted, sliding red-alert switch."""
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        height = max(14.0, min(20.0, self.height() * 0.38))
+        width = height * 1.85
+        margin = max(10.0, self.height() * 0.22)
+        track = QRectF(
+            self.width() - width - margin,
+            (self.height() - height) / 2.0,
+            width,
+            height,
+        )
+
+        active = self.isChecked() and self.isEnabled()
+        if active:
+            glow = track.adjusted(-3, -3, 3, 3)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(255, 25, 25, 75))
+            painter.drawRoundedRect(glow, glow.height() / 2, glow.height() / 2)
+
+        painter.setPen(QPen(QColor("#ffb4b4" if active else "#0a0f17"), 1.2))
+        painter.setBrush(QColor("#d91515" if active else "#202a38"))
+        painter.drawRoundedRect(track, height / 2, height / 2)
+
+        knob_diameter = height - 5.0
+        knob_x = (
+            track.right() - knob_diameter - 2.5
+            if active
+            else track.left() + 2.5
+        )
+        knob = QRectF(
+            knob_x,
+            track.top() + 2.5,
+            knob_diameter,
+            knob_diameter,
+        )
+        painter.setPen(QPen(QColor("#ffe4e4" if active else "#94a3b8"), 1.0))
+        painter.setBrush(QColor("#fff5f5" if active else "#cbd5e1"))
+        painter.drawEllipse(knob)
+
+
 class QtBomberServer(BomberServerBase):
     """
     Modern PySide6 (Qt6) server GUI.
@@ -116,6 +163,7 @@ class QtBomberServer(BomberServerBase):
         self.start_button: Optional[QPushButton] = None
         self.session_button: Optional[QPushButton] = None
         self.quit_button: Optional[QPushButton] = None
+        self.alert_button: Optional[QPushButton] = None
         self.state_value: Optional[QLabel] = None
         self.players_value: Optional[QLabel] = None
         self.rounds_value: Optional[QLabel] = None
@@ -295,7 +343,15 @@ class QtBomberServer(BomberServerBase):
         self.quit_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.quit_button.clicked.connect(self._on_stop_or_quit)
 
-        for btn in (self.start_button, self.session_button, self.quit_button):
+        self.alert_button = _AlertSwitch("RED ALERT")
+        self.alert_button.setObjectName("alertBtn")
+        self.alert_button.setCheckable(True)
+        self.alert_button.setToolTip("Toggle the lobby red alert")
+        self.alert_button.setAccessibleName("Lobby red alert")
+        self.alert_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.alert_button.clicked.connect(self._on_alert)
+
+        for btn in (self.start_button, self.session_button, self.quit_button, self.alert_button):
             btn.setProperty("kind", "action")
             lay.addWidget(btn)
 
@@ -462,6 +518,48 @@ class QtBomberServer(BomberServerBase):
         QPushButton#quitBtn {{ background: #dc2626; }}
         QPushButton#quitBtn:hover {{ background: #b91c1c; }}
         QPushButton:disabled {{ background: #334155; color: #94a3b8; }}
+        QPushButton#alertBtn {{
+            min-width: {px(54)}px;
+            /* Two fewer vertical padding pixels compensate for the casing border,
+               keeping this control level with the other header buttons. */
+            padding: {px(9)}px {px(58)}px {px(9)}px {px(16)}px;
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 #4b5563, stop:0.48 #252d38, stop:1 #111827);
+            border: {px(2)}px solid #687386;
+            border-bottom-color: #080c12;
+            border-radius: {px(9)}px;
+            color: #cbd5e1;
+            font-size: {px(11)}px;
+            font-weight: 900;
+            letter-spacing: {px(1)}px;
+        }}
+        QPushButton#alertBtn:hover {{
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 #606b7c, stop:0.48 #303947, stop:1 #18202c);
+            border-color: #94a3b8;
+            color: #ffffff;
+        }}
+        QPushButton#alertBtn:pressed {{
+            background: #141a23;
+            border-color: #05070a;
+        }}
+        QPushButton#alertBtn:checked {{
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 #641d24, stop:0.5 #3b1118, stop:1 #20080d);
+            border: {px(2)}px solid #e03b47;
+            border-bottom-color: #160307;
+            color: #ffffff;
+        }}
+        QPushButton#alertBtn:checked:hover {{
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 #7f242c, stop:0.5 #4c151c, stop:1 #290a0f);
+            border-color: #ffe0e0;
+        }}
+        QPushButton#alertBtn:disabled {{
+            background: #1d2633;
+            border-color: #344154;
+            color: #64748b;
+        }}
 
         QScrollBar:vertical {{ background: transparent; width: {px(12)}px; margin: {px(2)}px; }}
         QScrollBar::handle:vertical {{ background: #2b3a59; border-radius: {px(5)}px; min-height: {px(30)}px; }}
@@ -515,6 +613,7 @@ class QtBomberServer(BomberServerBase):
         if self.state_value is None:
             return
         state = self.state_machine.get_state()
+        self.alert_button.setChecked(self.lobby_alert)
         self.state_value.setText(state.name)
         self.players_value.setText(str(len(self.players)))
         self.rounds_value.setText(str(self.rounds_left))
@@ -587,7 +686,7 @@ class QtBomberServer(BomberServerBase):
         return [line.rstrip("\n") for line in lines[-max_lines:]]
 
     def _update_controls(self) -> None:
-        if self.start_button is None or self.session_button is None or self.quit_button is None:
+        if self.start_button is None or self.session_button is None or self.quit_button is None or self.alert_button is None:
             return
 
         state = self.state_machine.get_state()
@@ -597,16 +696,19 @@ class QtBomberServer(BomberServerBase):
             self.start_button.setEnabled(True)
             self.session_button.setEnabled(True)
             self.quit_button.setText("Quit")
+            self.alert_button.setEnabled(False)
         elif state.name == "LOBBY":
             self.start_button.setText("Start game")
             self.start_button.setEnabled(len(self.players) > 0)
             self.session_button.setEnabled(False)
             self.quit_button.setText("Stop")
+            self.alert_button.setEnabled(True)
         else:
             self.start_button.setText("Start game")
             self.start_button.setEnabled(False)
             self.session_button.setEnabled(False)
             self.quit_button.setText("Stop")
+            self.alert_button.setEnabled(False)
 
     def _footer_text(self) -> str:
         state = self.state_machine.get_state()
@@ -640,6 +742,11 @@ class QtBomberServer(BomberServerBase):
             self._quit_requested = True
         else:
             self._stop_server_requested = True
+
+    def _on_alert(self) -> None:
+        self.toggle_lobby_alert()
+        if self.alert_button is not None:
+            self.alert_button.setChecked(self.lobby_alert)
 
     ##################
     # session config (pure logic, shared with the Tk version)

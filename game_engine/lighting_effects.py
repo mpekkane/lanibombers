@@ -4,6 +4,8 @@ import yaml
 import random
 import threading
 from game_engine.clock import Clock
+from enum import IntEnum
+from typing import Tuple
 
 
 class DMX:
@@ -70,6 +72,16 @@ class DMX:
         self.dmx.render()
 
 
+class LightingState(IntEnum):
+    INIT = 1
+    SERVER = 2
+    SERVER_ALERT = 3
+    SHOP = 4
+    GAME = 5
+    WIN = 6
+    FX = 100
+
+
 class LightingEffects:
     # How long each effect occupies the lights. Events that happened during
     # that interval are overlapping and should not be replayed later.
@@ -102,6 +114,12 @@ class LightingEffects:
         self.current_fx = None
         self.fx_interrupted = threading.Event()
         self.fx_thread = threading.Thread(target=self.run_fx)
+        self.state = LightingState.INIT
+        self.prev_state = LightingState.INIT
+        self.win_color: Tuple[int, int, int] = (-1, -1, -1)
+        self.alert_started = -1
+        self.alert_limit = 0.5
+        self.alert_mode = False
 
     def stop(self):
         self.running = False
@@ -111,6 +129,37 @@ class LightingEffects:
     def start(self):
         self.running = True
         self.fx_thread.start()
+
+    # ███████╗████████╗ █████╗ ████████╗███████╗███████╗
+    # ██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██╔════╝██╔════╝
+    # ███████╗   ██║   ███████║   ██║   █████╗  ███████╗
+    # ╚════██║   ██║   ██╔══██║   ██║   ██╔══╝  ╚════██║
+    # ███████║   ██║   ██║  ██║   ██║   ███████╗███████║
+    # ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝
+
+    def server_alert(self):
+        self.state = LightingState.SERVER_ALERT
+
+    def server(self):
+        self.alert_time = 0
+        self.state = LightingState.SERVER
+
+    def shop(self):
+        self.state = LightingState.SHOP
+
+    def game(self):
+        self.state = LightingState.GAME
+
+    def win(self, r: int, g: int, b: int):
+        self.win_color = (r, g, b)
+        self.state = LightingState.WIN
+
+    # ███████╗██╗   ██╗███████╗███╗   ██╗████████╗███████╗
+    # ██╔════╝██║   ██║██╔════╝████╗  ██║╚══██╔══╝██╔════╝
+    # █████╗  ██║   ██║█████╗  ██╔██╗ ██║   ██║   ███████╗
+    # ██╔══╝  ╚██╗ ██╔╝██╔══╝  ██║╚██╗██║   ██║   ╚════██║
+    # ███████╗ ╚████╔╝ ███████╗██║ ╚████║   ██║   ███████║
+    # ╚══════╝  ╚═══╝  ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝
 
     def small_bomb(self):
         self._queue_fx("small_bomb")
@@ -126,6 +175,13 @@ class LightingEffects:
 
     def nuke(self):
         self._queue_fx("nuke")
+
+    # ██╗      ██████╗  ██████╗ ██╗ ██████╗
+    # ██║     ██╔═══██╗██╔════╝ ██║██╔════╝
+    # ██║     ██║   ██║██║  ███╗██║██║
+    # ██║     ██║   ██║██║   ██║██║██║
+    # ███████╗╚██████╔╝╚██████╔╝██║╚██████╗
+    # ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝ ╚═════╝
 
     def _queue_fx(self, name: str):
         with self.fx_queue_lock:
@@ -155,12 +211,14 @@ class LightingEffects:
         last_fx_name = None
         last_fx_started_at = None
         last_fx_duration = 0.0
+        name = ""
 
         while self.running:
             with self.fx_queue_lock:
                 fx = self.fx_queue.pop(0) if self.fx_queue else None
                 queue_was_empty = fx is None
                 if fx is not None:
+                    self.state = LightingState.FX
                     name, queued_at = fx
 
                     # Overlapping effects are normally skipped. A higher-
@@ -185,7 +243,25 @@ class LightingEffects:
 
             if fx is None:
                 if queue_was_empty:
-                    time.sleep(0.1)
+                    if self.state != self.prev_state:
+                        if self.state == LightingState.FX:
+                            self.state = self.prev_state
+
+                        self.prev_state = self.state
+                        if self.state == LightingState.SERVER:
+                            self._server_fx()
+                        elif self.state == LightingState.SERVER_ALERT:
+                            self._server_alert_fx()
+                        elif self.state == LightingState.SHOP:
+                            self._shop_fx()
+                        elif self.state == LightingState.GAME:
+                            self._game_fx()
+                        elif self.state == LightingState.WIN:
+                            self._win_fx()
+                    else:
+                        if self.state == LightingState.SERVER_ALERT:
+                            self._server_alert_fx()
+                        time.sleep(0.1)
                 continue
 
             try:
@@ -215,6 +291,8 @@ class LightingEffects:
             return self.strobe_bomb()
 
     def stop_fx(self):
+        self.state = LightingState.INIT
+        self.prev_state = LightingState.INIT
         with self.fx_queue_lock:
             self.fx_queue.clear()
             self.fx_interrupted.set()
@@ -225,6 +303,13 @@ class LightingEffects:
     def _wait(self, seconds: float) -> bool:
         """Wait for an effect step, returning True when it was interrupted."""
         return self.fx_interrupted.wait(seconds)
+
+    # ██████╗  ██████╗ ███╗   ███╗██████╗ ███████╗
+    # ██╔══██╗██╔═══██╗████╗ ████║██╔══██╗██╔════╝
+    # ██████╔╝██║   ██║██╔████╔██║██████╔╝███████╗
+    # ██╔══██╗██║   ██║██║╚██╔╝██║██╔══██╗╚════██║
+    # ██████╔╝╚██████╔╝██║ ╚═╝ ██║██████╔╝███████║
+    # ╚═════╝  ╚═════╝ ╚═╝     ╚═╝╚═════╝ ╚══════╝
 
     def _small_bomb_fx(self):
         self.dmx.set_all(red=32, amber=64)
@@ -330,6 +415,47 @@ class LightingEffects:
         self.dmx.set_all()
         self.dmx.send()
 
-    def win(self, r: int, g: int, b: int):
+    # ███████╗████████╗ █████╗ ████████╗███████╗    ███████╗██╗  ██╗
+    # ██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██╔════╝    ██╔════╝╚██╗██╔╝
+    # ███████╗   ██║   ███████║   ██║   █████╗      █████╗   ╚███╔╝
+    # ╚════██║   ██║   ██╔══██║   ██║   ██╔══╝      ██╔══╝   ██╔██╗
+    # ███████║   ██║   ██║  ██║   ██║   ███████╗    ██║     ██╔╝ ██╗
+    # ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚══════╝    ╚═╝     ╚═╝  ╚═╝
+
+    def _win_fx(self):
+        (r, g, b) = self.win_color
         self.dmx.set_all(red=r, green=g, blue=b, motor=200)
+        self.dmx.send()
+
+    def _server_fx(self):
+        self.dmx.set_all(green=128, motor=128)
+        self.dmx.send()
+
+    def _server_alert_fx(self):
+        dt = Clock.now() - self.alert_started
+        run = False
+        if self.alert_started < 0:
+            run = True
+        if dt > self.alert_limit:
+            run = True
+        if run:
+            for i, dev in enumerate(self.devices):
+                if self.alert_mode:
+                    effi = i+1
+                else:
+                    effi = i
+                if effi % 2 == 0:
+                    self.dmx.set(dev, red=250, motor=240)
+                else:
+                    self.dmx.set(dev, blue=250, motor=240)
+            self.dmx.send()
+            self.alert_started = Clock.now()
+            self.alert_mode = not self.alert_mode
+
+    def _shop_fx(self):
+        self.dmx.set_all(auto=100, motor=200)
+        self.dmx.send()
+
+    def _game_fx(self):
+        self.dmx.set_all(uv=64, motor=128)
         self.dmx.send()

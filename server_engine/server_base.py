@@ -129,7 +129,8 @@ class BomberServerBase:
         self.end_screen_wait_time = 5
 
         # If DMX enabled lights are connected:
-        self.use_lights = False
+        self.lobby_alert = False
+        self.use_lights = True
         if self.use_lights:
             self.lighting_fx = LightingEffects()
             self.lighting_fx.start()
@@ -425,6 +426,9 @@ class BomberServerBase:
         ready = False
         player_msg_time = 1.0
         prev = -1
+        if self.use_lights:
+            self.lighting_fx.server()
+
         while not ready and not self.ui_should_quit():
             self.ui_tick()
 
@@ -445,6 +449,22 @@ class BomberServerBase:
 
         if ready:
             self.state_machine.update()
+
+    def toggle_lobby_alert(self) -> None:
+        if self.lobby_alert:
+            self.unset_lobby_alert()
+        else:
+            self.set_lobby_alert()
+
+    def set_lobby_alert(self) -> None:
+        self.lobby_alert = True
+        if self.use_lights:
+            self.lighting_fx.server_alert()
+
+    def unset_lobby_alert(self) -> None:
+        self.lobby_alert = False
+        if self.use_lights:
+            self.lighting_fx.server()
 
     ##################
     # Map/session
@@ -489,6 +509,9 @@ class BomberServerBase:
         self.shop_complete = False
         self._update_shop()
         self._send_shop()
+
+        if self.use_lights:
+            self.lighting_fx.shop()
 
         while not self.shop_complete and not self.ui_should_quit():
             self.ui_tick()
@@ -549,6 +572,9 @@ class BomberServerBase:
     def run_game(self) -> None:
         assert self.engine is not None
         self._at_round_start()
+
+        if self.use_lights:
+            self.lighting_fx.game()
 
         while self.engine.running and not self.ui_should_quit():
             self.ui_tick()
