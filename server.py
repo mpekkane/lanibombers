@@ -24,6 +24,12 @@ def main() -> None:
         default=24,
         help="GUI font size",
     )
+    parser.add_argument(
+        "--lights",
+        action="store_true",
+        default=False,
+        help="Enable DMX lighting effects",
+    )
     args = parser.parse_args()
 
     cfg = args.cfg
@@ -31,6 +37,7 @@ def main() -> None:
     headless = not args.display
     session = args.session
     font_size = args.font_size
+    use_lights = args.lights
 
     server = build_server(
         ui=args.ui,
@@ -38,7 +45,8 @@ def main() -> None:
         session=session,
         headless=headless,
         map_path=map_path,
-        font_size=font_size
+        font_size=font_size,
+        use_lights=use_lights,
     )
 
     server.run_forever()

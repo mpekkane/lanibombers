@@ -35,6 +35,7 @@ class CursesBomberServer(BomberServerBase):
         headless: bool,
         map_path: Optional[str],
         log_path: str = "logs/server.log",
+        use_lights: bool = False,
     ) -> None:
         self.log_path = Path(log_path)
 
@@ -51,6 +52,7 @@ class CursesBomberServer(BomberServerBase):
             headless,
             map_path,
             log=lambda _text: None,
+            use_lights=use_lights,
         )
 
         self.debug_prints = False

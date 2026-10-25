@@ -37,6 +37,7 @@ class ConsoleBomberServer(BomberServerBase):
         headless: bool,
         map_path: Optional[str],
         log_path: str = "logs/server.log",
+        use_lights: bool = False,
     ) -> None:
         self.log_path = Path(log_path)
 
@@ -54,6 +55,7 @@ class ConsoleBomberServer(BomberServerBase):
             headless,
             map_path,
             log=print,
+            use_lights=use_lights,
         )
 
     ##################

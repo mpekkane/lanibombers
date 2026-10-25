@@ -82,6 +82,7 @@ class BomberServerBase:
         headless: bool,
         map_path: Optional[str],
         log: Optional[LogFn] = None,
+        use_lights: bool = False,
     ) -> None:
         self.log: LogFn = log or print
         self.state_machine = ServerStateMachine()
@@ -131,7 +132,7 @@ class BomberServerBase:
         # If DMX enabled lights are connected:
         self.lobby_alert = False
         self.nuke_warning = False
-        self.use_lights = True
+        self.use_lights = use_lights
         if self.use_lights:
             self.lighting_fx = LightingEffects()
             self.lighting_fx.start()

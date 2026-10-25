@@ -82,6 +82,7 @@ class TkBomberServer(BomberServerBase):
         log_path: str = "logs/server.log",
         font_size: int = 24,
         ui_scale: float = 1.0,
+        use_lights: bool = False,
     ) -> None:
         self._quit_requested = False
         self._start_requested = False
@@ -160,6 +161,7 @@ class TkBomberServer(BomberServerBase):
             headless,
             map_path,
             log=lambda _text: None,
+            use_lights=use_lights,
         )
 
         self.session_config = self._load_session_config_dict(self.session_path)
