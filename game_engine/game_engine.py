@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sys
 import numpy as np
-from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union, Callable
+from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union, Callable, cast
 from itertools import chain
 import random
 from enum import Enum
@@ -160,6 +160,7 @@ class GameEngine:
         self.round_start_time: Optional[float] = None
         self.log = get_logger()
         self.lighting_fx = lighting_fx
+        self.starting_players = 0
 
     def set_render_callback(self, callback: Callable[[RenderState], None]) -> None:
         self._external_state_callback = callback
@@ -207,6 +208,7 @@ class GameEngine:
 
     def start(self) -> None:
         """Start the game engine and event processing."""
+        self.starting_players = len(self.players)
         self.round_start_time = Clock.now()
         # server should block commands during countdown, but to prevent premature
         # commands
@@ -318,6 +320,8 @@ class GameEngine:
             if p.name == name:
                 self.event_resolver.cancel_object_events(p.id)
                 self.players.remove(p)
+                if p.state != "dead":
+                    self._player_death(p)
 
     def _create_players(self, players: List[Player]) -> None:
         """Create players"""
@@ -456,10 +460,7 @@ class GameEngine:
             if dmg > 0:
                 player_died = player.take_damage(int(dmg))
                 if player_died:
-                    self.player_death_times.append(
-                        (player.id, player.name, Clock.now())
-                    )
-                    self.pending_sounds.append(SoundType.DIE)
+                    self._player_death(player)
 
         for monster in self.monsters:
             if monster.state == "dead":
@@ -475,6 +476,12 @@ class GameEngine:
                 if self.pickups[y][x] is not None and damage_array[y, x] > 0:
                     self.pickups[y][x] = None
 
+    def _player_death(self, player: Player):
+        self.player_death_times.append(
+            (player.id, player.name, Clock.now())
+        )
+        self.pending_sounds.append(SoundType.DIE)
+
         # ending condition: all dead
         number_players_alive = 0
         all_dead = True
@@ -483,7 +490,7 @@ class GameEngine:
                 all_dead = False
                 number_players_alive += 1
 
-        if len(self.players) > 1 and number_players_alive == 1:
+        if self.starting_players > 1 and number_players_alive == 1:
             self.running = False
         if all_dead:
             self.running = False
@@ -1721,15 +1728,21 @@ class GameEngine:
                 ) or (other.entity_type.is_monster() and agent.entity_type.is_player()):
                     # note: current melee is symmetric,
                     # maybe the entering entity should strike first?
-                    other.take_damage(agent.fight_power)
+                    other_died = other.take_damage(agent.fight_power)
                     agent.take_damage(other.fight_power)
                     self.log.info("FIGHT!")
                     self.log.info(f"Agent deals {agent.fight_power} damage")
                     self.log.info(f"Enemy deals {other.fight_power} damage")
                     self.log.info(f"Agent health {agent.health}")
                     self.log.info(f"Enemy health {other.health}")
+                    if other.entity_type.is_player() and other_died:
+                        self._player_death(cast(Player, other))
+
         if agent.state == "dead":
-            self.pending_sounds.append(SoundType.DIE)
+            if agent.entity_type.is_player():
+                self._player_death(cast(Player, agent))
+            else:
+                self.pending_sounds.append(SoundType.DIE)
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""
