@@ -481,6 +481,7 @@ class GameEngine:
             (player.id, player.name, Clock.now())
         )
         self.pending_sounds.append(SoundType.DIE)
+        self.event_resolver.cancel_object_events(player.id)
 
         # ending condition: all dead
         number_players_alive = 0
