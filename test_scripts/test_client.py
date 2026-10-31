@@ -191,8 +191,7 @@ class BomberClient:
 
     def _send_select(self, bomb_type: BombType) -> None:
         """Send a ClientSelect message for the given BombType."""
-        all_types = list(BombType)
-        idx = all_types.index(bomb_type)
+        idx = int(bomb_type)
         self.client.send(ClientSelect(bomb_type=idx))
 
     def on_press(self, symbol: int, modifiers: int) -> None:

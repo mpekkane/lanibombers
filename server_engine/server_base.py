@@ -32,7 +32,7 @@ from network_stack.messages.messages import (
     LobbyPlayers,
 )
 from game_engine.clock import Clock
-from game_engine.entities import Direction
+from game_engine.entities import Direction, EntityState
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
@@ -820,7 +820,7 @@ class BomberServerBase:
         if player is None:
             return
 
-        if player.state == "dead":
+        if player.state == EntityState.DEAD:
             return
 
         cmd: Action = msg.command  # type: ignore
@@ -835,12 +835,12 @@ class BomberServerBase:
             # engine thread via change_entity_direction.
             intended_direction = _ACTION_TO_DIRECTION.get(cmd)
             if cmd == Action.STOP:
-                if player.state == "idle":
+                if player.state == EntityState.IDLE:
                     return
             elif (
                 intended_direction is not None
                 and player.direction == intended_direction
-                and player.state == "walk"
+                and player.state == EntityState.WALK
             ):
                 return
 
@@ -885,12 +885,12 @@ class BomberServerBase:
         if player is None:
             return
 
-        all_types = list(BombType)
 
-        if msg.bomb_type < 0 or msg.bomb_type >= len(all_types):
+        try:
+            target_type = BombType(msg.bomb_type)
+        except ValueError:
             return
 
-        target_type = all_types[msg.bomb_type]
 
         player.select(target_type)
 

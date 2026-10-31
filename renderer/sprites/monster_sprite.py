@@ -1,6 +1,6 @@
 import arcade
 
-from game_engine.entities import Direction, EntityType, DynamicEntity
+from game_engine.entities import Direction, EntityType, DynamicEntity, EntityState
 
 SPRITE_SIZE = 10
 
@@ -39,12 +39,12 @@ class MonsterSprite(arcade.Sprite):
         self.center_y = (self.map_height - monster.y) * SPRITE_SIZE * self.zoom
 
         # Handle dead state
-        if monster.state == 'dead':
+        if monster.state == EntityState.DEAD:
             self.texture = self.blood_green_texture
             return
 
         # Update animation frame if walking (ping-pong: 1,2,3,4,3,2...)
-        if monster.state == 'walk':
+        if monster.state == EntityState.WALK:
             self.frame_timer += delta_time
             frame_duration = 1.0 / self.frames_per_second
             if self.frame_timer >= frame_duration:
@@ -58,7 +58,7 @@ class MonsterSprite(arcade.Sprite):
 
         # Get texture based on state
         current_frame = self.frame_sequence[self.frame_index]
-        frame_to_use = current_frame if monster.state == 'walk' else self.last_frame
+        frame_to_use = current_frame if monster.state == EntityState.WALK else self.last_frame
         texture = self.monster_textures.get(
             (monster.entity_type, monster.direction, frame_to_use),
             self.transparent_texture

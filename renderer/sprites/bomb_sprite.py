@@ -2,7 +2,7 @@ import arcade
 from typing import Optional
 
 from game_engine.clock import Clock
-from game_engine.entities.bomb import Bomb, BombType
+from game_engine.entities.bomb import Bomb, BombType, BombState
 
 SPRITE_SIZE = 10
 NUKE_FRAME_DURATION = 0.1  # seconds per frame for nuke animation
@@ -41,12 +41,12 @@ class BombSprite(arcade.Sprite):
         # Get texture based on bomb type and state
         if bomb.bomb_type == BombType.NUKE:
             frame = self._get_nuke_frame(bomb, current_time)
-            texture_key = (bomb.bomb_type, 'active', frame)
+            texture_key = (bomb.bomb_type, BombState.ACTIVE, frame)
         elif bomb.bomb_type == BombType.FLAME_BARREL:
             frame = self._get_flame_barrel_frame(bomb, current_time)
-            texture_key = (bomb.bomb_type, 'active', frame)
-        elif bomb.state == 'defused':
-            texture_key = (bomb.bomb_type, 'defused', 0)
+            texture_key = (bomb.bomb_type, BombState.ACTIVE, frame)
+        elif bomb.state == BombState.DEFUSED:
+            texture_key = (bomb.bomb_type, BombState.DEFUSED, 0)
         else:
             # Active bomb - select frame from fuse percentage populated by
             # the server in get_render_state (avoids client/server clock skew).
@@ -57,7 +57,7 @@ class BombSprite(arcade.Sprite):
                 frame = 2
             else:
                 frame = 3
-            texture_key = (bomb.bomb_type, 'active', frame)
+            texture_key = (bomb.bomb_type, BombState.ACTIVE, frame)
 
         self.texture = self.bomb_textures.get(texture_key, self.transparent_texture)
 
@@ -71,7 +71,7 @@ class BombSprite(arcade.Sprite):
             self.nuke_last_update[bomb_id] = current_time
 
         # If defused, return the last frame (frozen)
-        if bomb.state == 'defused':
+        if bomb.state == BombState.DEFUSED:
             return self.nuke_frames[bomb_id]
 
         # Check if it's time to advance the frame
@@ -95,7 +95,7 @@ class BombSprite(arcade.Sprite):
             self.flame_barrel_last_update[bomb_id] = current_time
 
         # If defused, return the last frame (frozen)
-        if bomb.state == 'defused':
+        if bomb.state == BombState.DEFUSED:
             return self.flame_barrel_frames[bomb_id]
 
         # Check if it's time to advance the frame

@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 
 from game_engine.agent_state import Action
 from game_engine.clock import Clock
-from game_engine.entities.dynamic_entity import Direction, EntityType
+from game_engine.entities.dynamic_entity import Direction, EntityType, EntityState
 from game_engine.entities.bomb import Bomb, BombType
 from game_engine.input_queue import InputCommand
 from game_engine.monster_ai import MonsterAI, MONSTER_AI_MAP
@@ -60,7 +60,7 @@ class MonsterController:
         self._running = True
         self._thread = threading.Thread(
             target=self._run,
-            name=f"monster-{self.monster.entity_type.value}-{self.monster.id}",
+            name=f"monster-{self.monster.entity_type.name.lower()}-{self.monster.id}",
             daemon=True,
         )
         self._thread.start()
@@ -76,7 +76,7 @@ class MonsterController:
             Clock.sleep(THINK_INTERVAL)
             if not self._running:
                 break
-            if self.monster.state == "dead":
+            if self.monster.state == EntityState.DEAD:
                 continue
 
             state, updated = self._get_state()
@@ -96,7 +96,7 @@ class MonsterController:
 
     def _execute_action(self, action: Action) -> None:
         """Execute an AI action via the input queue."""
-        if self.monster.state == "dead":
+        if self.monster.state == EntityState.DEAD:
             return
 
         now = Clock.now()
@@ -106,12 +106,12 @@ class MonsterController:
             # engine thread via change_entity_direction. We just capture
             # the intended direction into the command.
             if action == Action.STOP:
-                if self.monster.state == "idle":
+                if self.monster.state == EntityState.IDLE:
                     return
                 direction = None
             else:
                 direction = _ACTION_TO_DIRECTION[action]
-                if self.monster.direction == direction and self.monster.state == "walk":
+                if self.monster.direction == direction and self.monster.state == EntityState.WALK:
                     return
             self.engine.input_queue.submit(
                 InputCommand(

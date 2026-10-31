@@ -98,10 +98,10 @@ def parse_map(tilemap: array.array, width: int, height: int) -> MapData:
                 entity_type_str, direction_str = MONSTER_SPAWN_TILES[tile_id]
                 # offset to the center of the tile. (0,0) is the last pixel in the grid, (.5,.5) is the center of the first tile
                 monster = DynamicEntity.create_monster(
-                    EntityType(entity_type_str),
+                    EntityType[entity_type_str.upper()],
                     float(x + 0.5),
                     float(y + 0.5),
-                    Direction(direction_str),
+                    Direction[direction_str.upper()],
                 )
                 monsters.append(monster)
                 # Replace spawn tile with empty in tilemap

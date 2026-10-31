@@ -1,6 +1,6 @@
 import arcade
 
-from game_engine.entities import Direction, DynamicEntity
+from game_engine.entities import Direction, DynamicEntity, EntityState
 
 SPRITE_SIZE = 10
 
@@ -39,14 +39,14 @@ class PlayerSprite(arcade.Sprite):
         self.center_y = (self.map_height - player.y) * SPRITE_SIZE * self.zoom
 
         # Handle dead state
-        if player.state == 'dead':
+        if player.state == EntityState.DEAD:
             self.texture = self.blood_texture
             return
 
         # Update animation frame if walking or digging (ping-pong: 1,2,3,4,3,2...)
-        if player.state in ('walk', 'dig'):
+        if player.state in (EntityState.WALK, EntityState.DIG):
             self.frame_timer += delta_time
-            fps = player.get_dig_power() * 3 if player.state == 'dig' else self.frames_per_second
+            fps = player.get_dig_power() * 3 if player.state == EntityState.DIG else self.frames_per_second
             frame_duration = 1.0 / fps
             if self.frame_timer >= frame_duration:
                 self.frame_timer -= frame_duration
@@ -59,7 +59,7 @@ class PlayerSprite(arcade.Sprite):
 
         # Get texture based on state
         current_frame = self.frame_sequence[self.frame_index]
-        frame_to_use = current_frame if player.state in ('walk', 'dig') else self.last_frame
+        frame_to_use = current_frame if player.state in (EntityState.WALK, EntityState.DIG) else self.last_frame
         texture = self.player_textures.get(
             (self.sprite_id, player.state, player.direction, frame_to_use),
             self.transparent_texture

@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Any
 from common.config_reader import user_config_path
 from common.keymapper import key_to_char
-from game_engine.entities import Direction
+from game_engine.entities import Direction, EntityState
 from renderer.bitmap_text import BitmapText
 from renderer.player_colorizer import (
     PlayerColorizer,
@@ -135,7 +135,7 @@ class PreviewPlayer:
         self.x = 4.0  # Start in middle
         self.y = 4.0
         self.direction = Direction.DOWN
-        self.state = "walk"  # walk, dig, idle
+        self.state = EntityState.WALK  # walk, dig, idle
         self.frame = 1
         self.frame_timer = 0.0
         self.move_timer = 0.0
@@ -152,16 +152,16 @@ class PreviewPlayer:
 
         # Update animation frame
         frame_duration = (
-            DIG_FRAME_DURATION if self.state == "dig" else WALK_FRAME_DURATION
+            DIG_FRAME_DURATION if self.state == EntityState.DIG else WALK_FRAME_DURATION
         )
         self.frame_timer += delta_time
         if self.frame_timer >= frame_duration:
             self.frame_timer = 0.0
             # Ping-pong animation: 1, 2, 3, 4, 3, 2, 1, ...
-            if self.state == "walk" or self.state == "dig":
+            if self.state == EntityState.WALK or self.state == EntityState.DIG:
                 self.frame = self.frame % 4 + 1
 
-        if self.state == "dig":
+        if self.state == EntityState.DIG:
             self.dig_timer += delta_time
             if self.dig_timer >= DIG_DURATION:
                 # Finish digging - destroy the tile
@@ -170,12 +170,12 @@ class PreviewPlayer:
                     if 0 <= tx < MINI_MAP_SIZE and 0 <= ty < MINI_MAP_SIZE:
                         mini_map[ty][tx] = 0  # Set to empty
                         destroyed_tile = (tx, ty)
-                self.state = "walk"
+                self.state = EntityState.WALK
                 self.dig_timer = 0.0
                 self.dig_target = None
                 self._choose_new_target(mini_map)
 
-        elif self.state == "walk":
+        elif self.state == EntityState.WALK:
             # Move toward target
             dx = self.target_x - self.x
             dy = self.target_y - self.y
@@ -222,7 +222,7 @@ class PreviewPlayer:
         # 30% chance to dig if there's a diggable tile
         if diggable and random.random() < 0.3:
             nx, ny, direction = random.choice(diggable)
-            self.state = "dig"
+            self.state = EntityState.DIG
             self.direction = direction
             self.dig_target = (nx, ny)
             self.dig_timer = 0.0

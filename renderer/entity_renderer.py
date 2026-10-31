@@ -7,8 +7,8 @@ import os
 
 import arcade
 
-from game_engine.entities import Direction, EntityType
-from common.bomb_dictionary import BombType
+from game_engine.entities import Direction, EntityType, EntityState
+from common.bomb_dictionary import BombType, BombState
 from game_engine.render_state import RenderState
 
 from renderer.sprites import (
@@ -65,7 +65,7 @@ class EntityRenderer:
         for entity_type, sprite_prefix in monster_types:
             for direction in Direction:
                 for frame in range(1, 5):
-                    sprite_name = f"{sprite_prefix}_{direction.value}_{frame}"
+                    sprite_name = f"{sprite_prefix}_{direction.name.lower()}_{frame}"
                     path = os.path.join(sprites_path, f"{sprite_name}.png")
                     texture = arcade.load_texture(path)
                     self.monster_textures[(entity_type, direction, frame)] = texture
@@ -333,7 +333,7 @@ class EntityRenderer:
         for i, monster in enumerate(state.monsters):
             self.monster_sprites[i].entity_type = monster.entity_type
             self.monster_sprites[i].update_from_entity(monster, delta_time)
-            is_dead = monster.state == "dead"
+            is_dead = monster.state == EntityState.DEAD
             if is_dead and not self._monster_in_blood[i]:
                 self._move_to_blood(self.monster_sprites[i], self.monster_sprite_list)
                 self._monster_in_blood[i] = True
@@ -344,7 +344,7 @@ class EntityRenderer:
         # Update players
         for i, player in enumerate(state.players):
             self.player_sprites[i].update_from_entity(player, delta_time)
-            is_dead = player.state == "dead"
+            is_dead = player.state == EntityState.DEAD
             if is_dead and not self._player_in_blood[i]:
                 self._move_to_blood(self.player_sprites[i], self.player_sprite_list)
                 self._player_in_blood[i] = True
@@ -359,12 +359,12 @@ class EntityRenderer:
         def load_animated(bomb_type, base_name, has_defused=True):
             for frame in range(1, 4):
                 path = os.path.join(self.sprites_path, f"{base_name}{frame}.png")
-                self.bomb_textures[(bomb_type, "active", frame)] = arcade.load_texture(
+                self.bomb_textures[(bomb_type, BombState.ACTIVE, frame)] = arcade.load_texture(
                     path
                 )
             if has_defused:
                 path = os.path.join(self.sprites_path, f"{base_name}_defused.png")
-                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(
+                self.bomb_textures[(bomb_type, BombState.DEFUSED, 0)] = arcade.load_texture(
                     path
                 )
 
@@ -373,14 +373,14 @@ class EntityRenderer:
             path = os.path.join(self.sprites_path, f"{sprite_name}.png")
             texture = arcade.load_texture(path)
             for frame in range(1, 4):
-                self.bomb_textures[(bomb_type, "active", frame)] = texture
+                self.bomb_textures[(bomb_type, BombState.ACTIVE, frame)] = texture
             if defused_name:
                 defused_path = os.path.join(self.sprites_path, f"{defused_name}.png")
-                self.bomb_textures[(bomb_type, "defused", 0)] = arcade.load_texture(
+                self.bomb_textures[(bomb_type, BombState.DEFUSED, 0)] = arcade.load_texture(
                     defused_path
                 )
             else:
-                self.bomb_textures[(bomb_type, "defused", 0)] = texture
+                self.bomb_textures[(bomb_type, BombState.DEFUSED, 0)] = texture
 
         # Animated bombs (3 frames + defused)
         load_animated(BombType.BIG_BOMB, "bigbomb")
@@ -400,12 +400,12 @@ class EntityRenderer:
         # Flame barrel has 2-frame animation like nuke
         for frame in [1, 2]:
             path = os.path.join(self.sprites_path, f"smallbarrel{frame}.png")
-            self.bomb_textures[(BombType.FLAME_BARREL, "active", frame)] = (
+            self.bomb_textures[(BombType.FLAME_BARREL, BombState.ACTIVE, frame)] = (
                 arcade.load_texture(path)
             )
         # Defused state
         defused_path = os.path.join(self.sprites_path, "smallbarrel_defused.png")
-        self.bomb_textures[(BombType.FLAME_BARREL, "defused", 0)] = arcade.load_texture(
+        self.bomb_textures[(BombType.FLAME_BARREL, BombState.DEFUSED, 0)] = arcade.load_texture(
             defused_path
         )
 
@@ -417,9 +417,9 @@ class EntityRenderer:
 
         # GRASSHOPPER_HOP uses same texture as GRASSHOPPER
         for frame in range(1, 4):
-            self.bomb_textures[(BombType.GRASSHOPPER_HOP, "active", frame)] = (
-                self.bomb_textures[(BombType.GRASSHOPPER, "active", frame)]
+            self.bomb_textures[(BombType.GRASSHOPPER_HOP, BombState.ACTIVE, frame)] = (
+                self.bomb_textures[(BombType.GRASSHOPPER, BombState.ACTIVE, frame)]
             )
-        self.bomb_textures[(BombType.GRASSHOPPER_HOP, "defused", 0)] = (
-            self.bomb_textures[(BombType.GRASSHOPPER, "defused", 0)]
+        self.bomb_textures[(BombType.GRASSHOPPER_HOP, BombState.DEFUSED, 0)] = (
+            self.bomb_textures[(BombType.GRASSHOPPER, BombState.DEFUSED, 0)]
         )

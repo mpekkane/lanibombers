@@ -439,7 +439,7 @@ class LanibombersWindow(arcade.Window):
     def _send_select(self, bomb_type: BombType) -> None:
         """Send a ClientSelect message for the given BombType."""
         assert self.network_client is not None
-        idx = list(BombType).index(bomb_type)
+        idx = int(bomb_type)
         self.network_client.send(ClientSelect(bomb_type=idx))  # type: ignore[call-arg]
 
     def on_press(self, symbol: int, modifiers: int) -> None:

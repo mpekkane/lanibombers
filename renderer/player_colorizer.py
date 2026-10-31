@@ -8,7 +8,7 @@ import arcade
 from PIL import Image
 from typing import Dict, Optional, Tuple
 
-from game_engine.entities import Direction
+from game_engine.entities import Direction, EntityState
 
 
 # Player color options (16 colors)
@@ -101,22 +101,22 @@ class PlayerColorizer:
             for direction in Direction:
                 for frame in range(1, 5):
                     # Walking sprites
-                    sprite_name = f"player{sprite_id}_{direction.value}_{frame}"
+                    sprite_name = f"player{sprite_id}_{direction.name.lower()}_{frame}"
                     path = os.path.join(self.sprites_path, f"{sprite_name}.png")
                     if os.path.exists(path):
                         img = Image.open(path).convert('RGBA')
-                        self.player_images[(sprite_id, "walk", direction, frame)] = img
-                        self.player_images[(sprite_id, "idle", direction, frame)] = img
-                        self.player_textures[(sprite_id, "walk", direction, frame)] = arcade.Texture(img)
-                        self.player_textures[(sprite_id, "idle", direction, frame)] = arcade.Texture(img)
+                        self.player_images[(sprite_id, EntityState.WALK, direction, frame)] = img
+                        self.player_images[(sprite_id, EntityState.IDLE, direction, frame)] = img
+                        self.player_textures[(sprite_id, EntityState.WALK, direction, frame)] = arcade.Texture(img)
+                        self.player_textures[(sprite_id, EntityState.IDLE, direction, frame)] = arcade.Texture(img)
 
                     # Digging sprites
-                    dig_sprite_name = f"player{sprite_id}_dig_{direction.value}_{frame}"
+                    dig_sprite_name = f"player{sprite_id}_dig_{direction.name.lower()}_{frame}"
                     dig_path = os.path.join(self.sprites_path, f"{dig_sprite_name}.png")
                     if os.path.exists(dig_path):
                         dig_img = Image.open(dig_path).convert('RGBA')
-                        self.player_images[(sprite_id, "dig", direction, frame)] = dig_img
-                        self.player_textures[(sprite_id, "dig", direction, frame)] = arcade.Texture(dig_img)
+                        self.player_images[(sprite_id, EntityState.DIG, direction, frame)] = dig_img
+                        self.player_textures[(sprite_id, EntityState.DIG, direction, frame)] = arcade.Texture(dig_img)
 
         # Load player card images
         for sprite_id in range(1, 5):
@@ -180,13 +180,13 @@ class PlayerColorizer:
             recolored_card = self._swap_colors(self.player_card_images[sprite_id], card_swap)
             self.player_card_textures[sprite_id] = arcade.Texture(recolored_card)
 
-    def get_player_texture(self, sprite_id: int, state: str, direction: Direction,
+    def get_player_texture(self, sprite_id: int, state: EntityState, direction: Direction,
                            frame: int) -> Optional[arcade.Texture]:
         """Get a player sprite texture.
 
         Args:
             sprite_id: The player appearance (1-4)
-            state: Player state ("walk", "idle", "dig")
+            state: Entity animation state
             direction: Player facing direction
             frame: Animation frame (1-4)
 

@@ -24,7 +24,7 @@ from network_stack.messages.messages import (
     Countdown,
 )
 from game_engine.clock import Clock
-from game_engine.entities import Direction
+from game_engine.entities import Direction, EntityState
 from game_engine.render_state import RenderState
 from game_engine.agent_state import Action
 from game_engine.input_queue import InputCommand
@@ -440,7 +440,7 @@ class BomberServer:
         if player is None:
             return
 
-        if player.state == "dead":
+        if player.state == EntityState.DEAD:
             return
 
         cmd: Action = msg.command  # type: ignore
@@ -449,27 +449,27 @@ class BomberServer:
 
         if cmd.is_move():
             if cmd == Action.RIGHT:
-                if player.direction == Direction.RIGHT and player.state == "walk":
+                if player.direction == Direction.RIGHT and player.state == EntityState.WALK:
                     return
                 player.direction = Direction.RIGHT
-                player.state = "walk"
+                player.state = EntityState.WALK
             elif cmd == Action.LEFT:
-                if player.direction == Direction.LEFT and player.state == "walk":
+                if player.direction == Direction.LEFT and player.state == EntityState.WALK:
                     return
                 player.direction = Direction.LEFT
-                player.state = "walk"
+                player.state = EntityState.WALK
             elif cmd == Action.UP:
-                if player.direction == Direction.UP and player.state == "walk":
+                if player.direction == Direction.UP and player.state == EntityState.WALK:
                     return
                 player.direction = Direction.UP
-                player.state = "walk"
+                player.state = EntityState.WALK
             elif cmd == Action.DOWN:
-                if player.direction == Direction.DOWN and player.state == "walk":
+                if player.direction == Direction.DOWN and player.state == EntityState.WALK:
                     return
                 player.direction = Direction.DOWN
-                player.state = "walk"
+                player.state = EntityState.WALK
             elif cmd == Action.STOP:
-                player.state = "idle"
+                player.state = EntityState.IDLE
 
             self.engine.input_queue.submit(
                 InputCommand(entity=player, action=cmd, timestamp=now)
@@ -505,10 +505,10 @@ class BomberServer:
         if player is None:
             return
 
-        all_types = list(BombType)
-        if msg.bomb_type < 0 or msg.bomb_type >= len(all_types):
+        try:
+            target_type = BombType(msg.bomb_type)
+        except ValueError:
             return
-        target_type = all_types[msg.bomb_type]
         for i, (bomb_type, _count) in enumerate(player.inventory):
             if bomb_type == target_type:
                 player.set_selected(i)

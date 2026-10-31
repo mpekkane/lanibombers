@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 from typing import List, Tuple, Dict
 from game_engine.clock import Clock
@@ -9,6 +11,7 @@ from dataclasses import dataclass, field
 from game_engine.utils import xy_to_tile
 from common.logger import get_logger
 from common.player_constants import BASE_DIGGING_POWER
+import struct
 
 
 @dataclass
@@ -18,6 +21,68 @@ class Player(DynamicEntity):
     selected: int = 0
     dig_power: int = BASE_DIGGING_POWER
     selected_type: BombType = BombType.SMALL_BOMB
+
+    byte_size = None
+    _player_format = struct.Struct("!BBBBIBBB")
+
+    def to_bytes(self) -> bytes:
+        name = self.name.encode("utf-8")
+        if len(self.name) > 20 or len(name) > 40:
+            raise ValueError("Player name must fit in 20 characters and 40 UTF-8 bytes")
+        for label, value, bits in (
+            ("money", self.money, 14), ("dig power", self.dig_power, 7),
+            ("selected inventory index", self.selected, 5),
+        ):
+            if not 0 <= value < 1 << bits:
+                raise ValueError(f"Player {label} must fit in {bits} bits")
+        if len(self.inventory) > 32:
+            raise ValueError("Player inventory cannot exceed 32 entries")
+        stats = (self.money | self.dig_power << 14 | self.selected << 21
+                 | int(BombType(self.selected_type)) << 26)
+        inventory = bytearray()
+        for bomb_type, count in self.inventory:
+            inventory.extend(bytes((int(BombType(bomb_type)), count)))
+        tools = bytearray()
+        for tool_type, count in self.tools.items():
+            if not 0 <= count < 32:
+                raise ValueError("Tool count must fit in 5 bits")
+            tools.append(int(ToolType(tool_type)) << 5 | count)
+        header = self._player_format.pack(
+            self.sprite_id, *self.color, stats, len(name), len(self.inventory), len(tools)
+        )
+        return DynamicEntity.to_bytes(self) + header + name + inventory + tools
+
+    @staticmethod
+    def from_bytes(buffer: bytes) -> Player:
+        base_size = DynamicEntity.byte_size
+        base = DynamicEntity.from_bytes(buffer[:base_size])
+        start = base_size + Player._player_format.size
+        sprite, r, g, b, stats, name_size, inventory_size, tools_size = (
+            Player._player_format.unpack(buffer[base_size:start])
+        )
+        if inventory_size > 32 or name_size > 40 or tools_size > len(ToolType):
+            raise ValueError("Invalid player record counts")
+        if len(buffer) != start + name_size + inventory_size * 2 + tools_size:
+            raise ValueError("Invalid player record size")
+        name = buffer[start:start + name_size].decode("utf-8")
+        if len(name) > 20 or stats >> 31:
+            raise ValueError("Invalid player name or reserved stats bits")
+        start += name_size
+        inventory = []
+        for _ in range(inventory_size):
+            inventory.append((BombType(buffer[start]), buffer[start + 1]))
+            start += 2
+        tools = {}
+        for packed in buffer[start:]:
+            tools[ToolType(packed >> 5)] = packed & 31
+        return Player(
+            id=base.id, x=base.x, y=base.y, speed=base.speed, health=base.health,
+            direction=base.direction, entity_type=base.entity_type, state=base.state,
+            name=name, sprite_id=sprite, color=(r, g, b), money=stats & 16383,
+            dig_power=(stats >> 14) & 127, selected=(stats >> 21) & 31,
+            selected_type=BombType((stats >> 26) & 31),
+            inventory=inventory, tools=tools,
+        )
 
     def test_inventory(self) -> None:
         self.inventory.append((BombType.SMALL_BOMB, 50))

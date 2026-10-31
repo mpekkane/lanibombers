@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 
 from common.item_dictionary import PowerupType
 from game_engine.entities.pickup import Pickup, PickupType
@@ -13,14 +13,14 @@ from common.tile_dictionary import (
 )
 
 
-class ToolType(Enum):
-    SMALL_PICK = 'smallpick'
-    BIG_PICK = 'bigpick'
-    DRILL = 'drill'
-    MEDPACK = 'medpack'
-    CRATE = 'crate'
-    SUPER_DRILL = 'super_drill'
-    KEVLAR_VEST = 'kevlar_vest'
+class ToolType(IntEnum):
+    SMALL_PICK = 0
+    BIG_PICK = 1
+    DRILL = 2
+    MEDPACK = 3
+    CRATE = 4
+    SUPER_DRILL = 5
+    KEVLAR_VEST = 6
 
     @staticmethod
     def from_powerup(pt: PowerupType) -> ToolType:

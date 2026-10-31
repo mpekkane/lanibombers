@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID, uuid4
+from game_engine.entities.dynamic_entity import Direction
 
 
 @dataclass
@@ -29,4 +30,4 @@ class Event:
 @dataclass
 class MoveEvent(Event):
     """Movement event"""
-    direction: str = ""
+    direction: Direction = Direction.DOWN

@@ -11,7 +11,7 @@ import numpy as np
 
 from game_engine.clock import Clock
 from game_engine.render_state import RenderState, SoundType
-from game_engine.entities.dynamic_entity import Direction
+from game_engine.entities.dynamic_entity import Direction, EntityState
 
 
 # Direction to velocity mapping (dx, dy per unit speed)
@@ -166,7 +166,7 @@ class ClientSimulation:
             New DynamicEntity with extrapolated position
         """
         # Only extrapolate if entity is walking
-        if entity.state != 'walk' or entity.speed <= 0:
+        if entity.state != EntityState.WALK or entity.speed <= 0:
             return entity
 
         # Get velocity from direction

@@ -2,7 +2,7 @@ import array
 from game_engine.clock import Clock
 from typing import List, Tuple, Dict
 from common.tile_dictionary import EMPTY_TILE_ID, MONSTER_SPAWN_TILES
-from game_engine.entities import Direction, EntityType, DynamicEntity
+from game_engine.entities import Direction, EntityType, DynamicEntity, EntityState
 import random
 from copy import deepcopy
 
@@ -66,7 +66,7 @@ class Game:
             entity_type=EntityType.PLAYER,
             name=name,
             sprite_id=num_players+1,
-            state="idle",
+            state=EntityState.IDLE,
         )
         self.players[name] = deepcopy(player)
 
@@ -92,7 +92,7 @@ class Game:
                 name="Player1",
                 colour=(255, 0, 0),
                 sprite_id=1,
-                state="dig",
+                state=EntityState.DIG,
             ),
             "p2": DynamicEntity(
                 x=8,
@@ -102,7 +102,7 @@ class Game:
                 name="Player2",
                 colour=(0, 255, 0),
                 sprite_id=2,
-                state="idle",
+                state=EntityState.IDLE,
             ),
         }
         self.start_time = Clock.now()
@@ -117,7 +117,7 @@ class Game:
                 y = i // self.width
 
                 monster = DynamicEntity(
-                    x=x, y=y, direction=direction, entity_type=entity_type, state="walk"
+                    x=x, y=y, direction=direction, entity_type=entity_type, state=EntityState.WALK
                 )
                 self.monsters.append(monster)
 
@@ -143,7 +143,7 @@ class Game:
         for key, player in self.players.items():
             dx = 0
             dy = 0
-            if player.state == "walk":
+            if player.state == EntityState.WALK:
                 if player.direction == Direction.RIGHT:
                     dx = dt
                 elif player.direction == Direction.LEFT:

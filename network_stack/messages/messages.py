@@ -18,6 +18,7 @@ from common.item_dictionary import PowerupType
 from game_engine.shop import Shop
 from game_engine.session_parser import SessionPlayer
 from common.item_dictionary import ItemType
+from network_stack.encoding import encode, decode
 from uuid import UUID
 from enum import IntEnum
 
@@ -338,22 +339,36 @@ class GameState(Message):
         b_height = self.height.to_bytes(1, "big")
         b_server_time = struct.pack("!d", self.server_time)  # 8 bytes double
         b_tilemap = self.tilemap.tobytes()
-        b_explosions = self.explosions.tobytes()
-        b_players = pickle.dumps(self.players)
-        b_monsters = pickle.dumps(self.monsters)
-        b_pickups = pickle.dumps(self.pickups)
-        b_bombs = pickle.dumps(self.bombs)
+        b_explosions = encode(self.explosions, big=True)
+
+        player_records = [player.to_bytes() for player in self.players]
+        b_players = b"".join(len(record).to_bytes(2, "big") + record for record in player_records)
+        b_monsters = b"".join(monster.to_bytes() for monster in self.monsters)
+        b_pickups = b"".join(pickup.to_bytes() for pickup in self.pickups)
+        b_bombs = b"".join(bomb.to_bytes() for bomb in self.bombs)
         b_sounds = bytes(self.sounds)
         b_running = int(self.running).to_bytes(1, "big")
         b_round_time_left = struct.pack("!d", self.round_time_left)
         # auxiliary data
-        b_tilemap_size = self.tilemap.size.to_bytes(4, "big")
-        b_explosions_size = self.explosions.size.to_bytes(4, "big")
+        b_tilemap_size = len(b_tilemap).to_bytes(4, "big")
+        b_explosions_size = len(b_explosions).to_bytes(4, "big")
         b_players_size = len(b_players).to_bytes(2, "big")
         b_monsters_size = len(b_monsters).to_bytes(2, "big")
         b_pickups_size = len(b_pickups).to_bytes(2, "big")
         b_bombs_size = len(b_bombs).to_bytes(2, "big")
         b_sounds_size = len(b_sounds).to_bytes(2, "big")
+
+        print("-"*80)
+        print(f"b_tilemap_size: {len(b_tilemap)}")
+        print(f"uncompressed: {len(self.tilemap.tobytes())}")
+        print(f"b_explosions_size: {len(b_explosions)}")
+        print(f"uncompressed: {len(self.explosions.tobytes())}")
+        print(f"b_players_size: {len(b_players)}")
+        print(f"b_monsters_size: {len(b_monsters)}")
+        print(f"b_pickups_size: {len(b_pickups)}")
+        print(f"b_bombs_size: {len(b_bombs)}")
+        print(f"b_sounds_size: {len(b_sounds)}")
+        print("-"*80)
 
         return (
             b_width
@@ -393,35 +408,50 @@ class GameState(Message):
         (round_time_left,) = struct.unpack("!d", payload[29:37])
         start = 37
         stop = start + tilemap_size
-        tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
-            (height, width)
-        )
+        if tilemap_size == width * height:
+            tilemap = np.frombuffer(payload[start:stop], dtype=np.uint8)
+        else:
+            tilemap = decode(payload[start:stop])
+        tilemap = tilemap.reshape((height, width))
         start = stop
         stop = start + explosions_size
-        explosions = np.frombuffer(payload[start:stop], dtype=np.uint8).reshape(
-            (height, width)
-        )
+        explosions = decode(payload[start:stop], big=True).reshape((height, width))
         start = stop
         stop = start + players_size
-        players = pickle.loads(payload[start:stop])
+        players = []
+        while start < stop:
+            if start + 2 > stop:
+                raise ValueError("Truncated player record length")
+            record_size = int.from_bytes(payload[start:start + 2], "big")
+            start += 2
+            if start + record_size > stop:
+                raise ValueError("Truncated player record")
+            players.append(Player.from_bytes(payload[start:start + record_size]))
+            start += record_size
         start = stop
         stop = start + monsters_size
-        if monsters_size == 5:
-            monsters = []
-        else:
-            monsters = pickle.loads(payload[start:stop])
+        if monsters_size % DynamicEntity.byte_size:
+            raise ValueError("Invalid monster payload size")
+        monsters = [
+            DynamicEntity.from_bytes(payload[offset:offset + DynamicEntity.byte_size])
+            for offset in range(start, stop, DynamicEntity.byte_size)
+        ]
         start = stop
         stop = start + pickups_size
-        if pickups_size == 5:
-            pickups = []
-        else:
-            pickups = pickle.loads(payload[start:stop])
+        if pickups_size % Pickup.byte_size:
+            raise ValueError("Invalid pickup payload size")
+        pickups = [
+            Pickup.from_bytes(payload[offset:offset + Pickup.byte_size])
+            for offset in range(start, stop, Pickup.byte_size)
+        ]
         start = stop
         stop = start + bombs_size
-        if bombs_size == 5:
-            bombs = []
-        else:
-            bombs = pickle.loads(payload[start:stop])
+        if bombs_size % Bomb.byte_size:
+            raise ValueError("Invalid bomb payload size")
+        bombs = [
+            Bomb.from_bytes(payload[offset:offset + Bomb.byte_size])
+            for offset in range(start, stop, Bomb.byte_size)
+        ]
         start = stop
         stop = start + sounds_size
         sounds = tuple(payload[start:stop])
@@ -596,7 +626,7 @@ class SessionInfo(Message):
         b_width = self.width.to_bytes(1, "big")
         b_height = self.height.to_bytes(1, "big")
         b_tilemap = self.tilemap.tobytes()
-        b_pickups = pickle.dumps(self.pickups)
+        b_pickups = b"".join(pickup.to_bytes() for pickup in self.pickups)
         b_tilemap_size = self.tilemap.size.to_bytes(4, "big")
         b_pickups_size = len(b_pickups).to_bytes(2, "big")
 
@@ -611,7 +641,7 @@ class SessionInfo(Message):
         )
 
     @classmethod
-    def from_bytes(cls, payload: bytes) -> GameState:
+    def from_bytes(cls, payload: bytes) -> SessionInfo:
         rounds = int(payload[0])
         width = int(payload[1])
         height = int(payload[2])
@@ -624,10 +654,12 @@ class SessionInfo(Message):
         )
         start = stop
         stop = start + pickups_size
-        if pickups_size == 5:
-            pickups = []
-        else:
-            pickups = pickle.loads(payload[start:stop])
+        if pickups_size % Pickup.byte_size:
+            raise ValueError("Invalid pickup payload size")
+        pickups = [
+            Pickup.from_bytes(payload[offset:offset + Pickup.byte_size])
+            for offset in range(start, stop, Pickup.byte_size)
+        ]
 
         return cls(
             rounds_left=rounds,
@@ -689,10 +721,7 @@ class LobbyPlayers(Message):
         b_players = pickle.dumps(self.players)
         b_players_size = len(b_players).to_bytes(2, "big")
 
-        return (
-            b_players_size
-            + b_players
-        )
+        return b_players_size + b_players
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> GameState:

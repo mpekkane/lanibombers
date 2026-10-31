@@ -3,46 +3,51 @@ Bomb type definitions for lanibombers.
 Central location for bomb types, names, and icon mappings.
 """
 
-from enum import Enum
+from enum import IntEnum
 
 
-class ExplosionType(Enum):
-    NONE = 'none'
-    SMALL = 'small'
-    MEDIUM = 'medium'
-    LARGE = 'large'
-    NUKE = 'nuke'
-    FLAME = 'flame'
-    DIRECTED_FLAME = 'directed_flame'
-    SMALL_CROSS = 'small_cross'
-    BIG_CROSS = 'big_cross'
+class BombState(IntEnum):
+    ACTIVE = 0
+    DEFUSED = 1
 
 
-class BombType(Enum):
-    BIG_BOMB = 'big_bomb'
-    C4 = 'c4'
-    C4_TILE = 'c4_tile'  # Internal: explosion from C4 tile chain reaction
-    LANDMINE = 'landmine'
-    SMALL_REMOTE = 'small_remote'
-    BIG_REMOTE = 'big_remote'
-    SMALL_BOMB = "small_bomb"
-    URETHANE = "urethane"
-    SMALL_CROSS_BOMB = "small_cross_bomb"
-    BIG_CROSS_BOMB = "big_cross_bomb"
-    DYNAMITE = "dynamite"
-    NUKE = "nuke"
-    GRASSHOPPER = "grasshopper"
-    GRASSHOPPER_HOP = "grasshopper_hop"  # Internal: subsequent grasshopper explosions
-    FLAME_BARREL = "flame_barrel"
-    CRACKER_BARREL = "cracker_barrel"
-    DIGGER_BOMB = "digger_bomb"
-    BIOSLIME = "bioslime"
-    METAL_PLATE = "metal_plate"
-    FLAMETHROWER = "flamethrower"
-    FIRE_EXTINGUISHER = "fire_extinguisher"
-    CLONE = "clone"
-    TELEPORT = "teleport"
-    GRENADE = "grenade"
+class ExplosionType(IntEnum):
+    NONE = 0
+    SMALL = 1
+    MEDIUM = 2
+    LARGE = 3
+    NUKE = 4
+    FLAME = 5
+    DIRECTED_FLAME = 6
+    SMALL_CROSS = 7
+    BIG_CROSS = 8
+
+
+class BombType(IntEnum):
+    BIG_BOMB = 0
+    C4 = 1
+    C4_TILE = 2  # Internal: explosion from C4 tile chain reaction
+    LANDMINE = 3
+    SMALL_REMOTE = 4
+    BIG_REMOTE = 5
+    SMALL_BOMB = 6
+    URETHANE = 7
+    SMALL_CROSS_BOMB = 8
+    BIG_CROSS_BOMB = 9
+    DYNAMITE = 10
+    NUKE = 11
+    GRASSHOPPER = 12
+    GRASSHOPPER_HOP = 13  # Internal: subsequent grasshopper explosions
+    FLAME_BARREL = 14
+    CRACKER_BARREL = 15
+    DIGGER_BOMB = 16
+    BIOSLIME = 17
+    METAL_PLATE = 18
+    FLAMETHROWER = 19
+    FIRE_EXTINGUISHER = 20
+    CLONE = 21
+    TELEPORT = 22
+    GRENADE = 23
 
     def is_timed(self) -> bool:
         return self not in (BombType.LANDMINE, BombType.SMALL_REMOTE, BombType.BIG_REMOTE, BombType.CRACKER_BARREL, BombType.FLAMETHROWER, BombType.FIRE_EXTINGUISHER, BombType.CLONE, BombType.GRENADE)

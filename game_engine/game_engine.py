@@ -10,7 +10,7 @@ from uuid import UUID
 from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType
+from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType, EntityState
 from game_engine.engine_utils import (
     flood_fill,
     get_solid_map,
@@ -25,7 +25,7 @@ from common.tile_dictionary import (
 )
 from game_engine.entities.player import Player
 from game_engine.entities.pickup import Pickup, PickupType
-from game_engine.entities.bomb import Bomb, BombType
+from game_engine.entities.bomb import Bomb, BombType, BombState
 from common.bomb_dictionary import (
     GRASSHOPPER_CONFIG,
     FLAME_BARREL_CONFIG,
@@ -228,7 +228,7 @@ class GameEngine:
     def process_inputs(self) -> None:
         """Drain the input queue and apply commands. Called from the resolver thread."""
         for cmd in self.input_queue.drain():
-            if cmd.entity.state == "dead":
+            if cmd.entity.state == EntityState.DEAD:
                 continue
             if cmd.action.is_move():
                 self.change_entity_direction(cmd.entity, cmd)
@@ -304,7 +304,7 @@ class GameEngine:
             direction=Direction.RIGHT,
             name=session_player.name,
             sprite_id=num_players + 1,
-            state="idle",
+            state=EntityState.IDLE,
             speed=3,
             fight_power=20,
             health=session_player.max_health,
@@ -320,7 +320,7 @@ class GameEngine:
             if p.name == name:
                 self.event_resolver.cancel_object_events(p.id)
                 self.players.remove(p)
-                if p.state != "dead":
+                if p.state != EntityState.DEAD:
                     self._player_death(p)
 
     def _create_players(self, players: List[Player]) -> None:
@@ -453,7 +453,7 @@ class GameEngine:
             damage_array: Numeric numpy array where values indicate damage per tile.
         """
         for player in self.players:
-            if player.state == "dead":
+            if player.state == EntityState.DEAD:
                 continue
             px, py = xy_to_tile(player.x, player.y)
             dmg = damage_array[py, px]
@@ -463,7 +463,7 @@ class GameEngine:
                     self._player_death(player)
 
         for monster in self.monsters:
-            if monster.state == "dead":
+            if monster.state == EntityState.DEAD:
                 continue
             mx, my = xy_to_tile(monster.x, monster.y)
             if 0 <= mx < self.width and 0 <= my < self.height:
@@ -487,7 +487,7 @@ class GameEngine:
         number_players_alive = 0
         all_dead = True
         for player in self.players:
-            if player.state != "dead":
+            if player.state != EntityState.DEAD:
                 all_dead = False
                 number_players_alive += 1
 
@@ -528,7 +528,7 @@ class GameEngine:
         cmd: Optional[InputCommand] = None,
     ) -> None:
         """Create and handle player movement events"""
-        if player.state == "dead":
+        if player.state == EntityState.DEAD:
             return
 
         # Apply the input command's captured intent. This is now the single
@@ -537,10 +537,10 @@ class GameEngine:
         # InputCommands, they no longer mutate the entity directly.
         if cmd is not None:
             if cmd.action == Action.STOP:
-                player.state = "idle"
+                player.state = EntityState.IDLE
             elif cmd.direction is not None:
                 player.direction = cmd.direction
-                player.state = "walk"
+                player.state = EntityState.WALK
 
         # Capture wall-clock time once for premature event resolution.
         # This is the single place where Clock.now() is used for movement
@@ -584,7 +584,7 @@ class GameEngine:
     def collision_check(self, entity: DynamicEntity, next_tile: Tile, now: float = 0.0):
         # dig
         if next_tile.diggable:
-            entity.state = "dig"
+            entity.state = EntityState.DIG
             self.dig(entity, now)
         # interact
         elif next_tile.interactable:
@@ -600,12 +600,12 @@ class GameEngine:
                     if not bomb_blocked:
                         self.move_entity(entity, push=True, now=now)
                     else:
-                        entity.state = "idle"
+                        entity.state = EntityState.IDLE
                 else:
-                    entity.state = "idle"
+                    entity.state = EntityState.IDLE
         # if nothing can be done: stop
         else:
-            entity.state = "idle"
+            entity.state = EntityState.IDLE
 
     def try_push_bomb(self, entity: DynamicEntity) -> bool:
         """Try to push a bomb in the next tile ahead of entity.
@@ -635,19 +635,19 @@ class GameEngine:
                         bomb.x, bomb.y = int(cx), int(cy)
                         return False  # pushed successfully, entity can continue
                 # Can't push — block movement
-                entity.state = "idle"
+                entity.state = EntityState.IDLE
                 return True
         return False  # no bomb ahead, entity can continue
 
     def move_entity(self, entity: DynamicEntity, push: bool = False, now: float = 0.0):
         """Main movement generator function from dynamic entities"""
-        if entity.state == "dead":
+        if entity.state == EntityState.DEAD:
             return
 
         # When walking, calculate distance to the next half-tile boundary
         # (0.0 or 0.5 fractional) in the movement direction.
         # d is always positive; direction is stored separately in the event.
-        if entity.state == "walk":
+        if entity.state == EntityState.WALK:
             if entity.direction in (Direction.RIGHT, Direction.LEFT):
                 frac = entity.x % 1.0
             elif entity.direction in (Direction.DOWN, Direction.UP):
@@ -690,7 +690,7 @@ class GameEngine:
                 event_type=event,
                 created_at=now,
                 created_by=entity.id,
-                direction=str(entity.direction.value),
+                direction=entity.direction,
                 source=f"move_entity<-{caller}",
             )
             self.event_resolver.schedule_event(movement_event)
@@ -1058,7 +1058,7 @@ class GameEngine:
     def _resolve_flamethrower(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve FLAMETHROWER - 90-degree cone flame in player's facing direction."""
         cfg = FLAMETHROWER_CONFIG
-        direction = bomb.direction if bomb.direction else Direction.DOWN
+        direction = bomb.direction if bomb.direction is not None else Direction.DOWN
 
         # Create directed flame explosion
         directed_flame = DirectedFlameExplosion(
@@ -1102,7 +1102,7 @@ class GameEngine:
     def _resolve_fire_extinguisher(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve FIRE_EXTINGUISHER - 90-degree cone that defuses bombs."""
         cfg = FIRE_EXTINGUISHER_CONFIG
-        direction = bomb.direction if bomb.direction else Direction.DOWN
+        direction = bomb.direction if bomb.direction is not None else Direction.DOWN
 
         # Create directed flame explosion (reuse the cone calculation)
         directed_flame = DirectedFlameExplosion(
@@ -1124,7 +1124,7 @@ class GameEngine:
             if other_bomb is bomb:
                 continue  # Skip the fire extinguisher itself
             if final_mask[other_bomb.y, other_bomb.x]:
-                other_bomb.state = "defused"
+                other_bomb.state = BombState.DEFUSED
                 # Reschedule explosion to 24 hours from now
                 self.event_resolver.reschedule_events_by_target(
                     other_bomb, "explode", defuse_delay, now
@@ -1170,7 +1170,7 @@ class GameEngine:
     def _resolve_grenade(self, bomb: Bomb, now: float = 0.0) -> None:
         """Resolve GRENADE - create a grenade projectile entity."""
         cfg = GRENADE_CONFIG
-        direction = bomb.direction if bomb.direction else Direction.DOWN
+        direction = bomb.direction if bomb.direction is not None else Direction.DOWN
 
         # Create grenade entity at bomb position
         grenade = DynamicEntity.create_grenade(
@@ -1241,7 +1241,7 @@ class GameEngine:
         # Check for player in next tile
         for player in self.players:
             px, py = xy_to_tile(player.x, player.y)
-            if px == nx and py == ny and player.state != "dead":
+            if px == nx and py == ny and player.state != EntityState.DEAD:
                 # Explode in the tile with the player
                 self._explode_grenade(grenade, nx, ny, now=current_time)
                 return
@@ -1514,7 +1514,7 @@ class GameEngine:
 
         There's a lot of printing, as there's a lot to debug, also in future
         """
-        if target.state == "dead":
+        if target.state == EntityState.DEAD:
             return
 
         # Use event's scheduled time for normal resolution (timer-fired).
@@ -1585,7 +1585,7 @@ class GameEngine:
             in_bounds, next_tile = self.get_neighbor_tile(target)
             if not in_bounds:
                 blocked = True
-                target.state = "idle"
+                target.state = EntityState.IDLE
             elif next_tile.solid:
                 blocked = True
                 self.collision_check(target, next_tile, current_time)
@@ -1607,7 +1607,7 @@ class GameEngine:
     def resolve_dig(
         self, target: DynamicEntity, event: Event, flags: ResolveFlags
     ) -> None:
-        if target.state == "dead":
+        if target.state == EntityState.DEAD:
             return
 
         is_player = target.entity_type == EntityType.PLAYER
@@ -1633,7 +1633,7 @@ class GameEngine:
         if target_tile.health > 0:
             self.dig(target, event.trigger_at)
         else:
-            target.state = "walk"
+            target.state = EntityState.WALK
             self.move_entity(target, now=event.trigger_at)
 
     def get_neighbor_tile(
@@ -1722,7 +1722,7 @@ class GameEngine:
         px, py = xy_to_tile(agent.x, agent.y)
         for other in entities:
             ox, oy = (int)(other.x), (int)(other.y)
-            if ox == px and oy == py and other.state != "dead" and other.id != agent.id:
+            if ox == px and oy == py and other.state != EntityState.DEAD and other.id != agent.id:
                 # only monster/player combat
                 if (
                     other.entity_type.is_player() and agent.entity_type.is_monster()
@@ -1739,7 +1739,7 @@ class GameEngine:
                     if other.entity_type.is_player() and other_died:
                         self._player_death(cast(Player, other))
 
-        if agent.state == "dead":
+        if agent.state == EntityState.DEAD:
             if agent.entity_type.is_player():
                 self._player_death(cast(Player, agent))
             else:
@@ -1755,7 +1755,7 @@ class GameEngine:
             dt = elapsed * player.speed  # blocks per second
             dx = 0
             dy = 0
-            if player.state == "walk":
+            if player.state == EntityState.WALK:
                 if player.direction == Direction.RIGHT:
                     dx = dt
                 elif player.direction == Direction.LEFT:
