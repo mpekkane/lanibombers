@@ -5,6 +5,7 @@ speed_multiplier: 1.0
 spawn_type: 0
 round_time: 120
 money_inject: 500
+base_dig_power: 1
 maps:
 - file: RANDOM
   width: 64

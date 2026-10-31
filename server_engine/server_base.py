@@ -934,6 +934,7 @@ class BomberServerBase:
                 color=player_color,
                 appearance=player_appearance,
                 money=self.session.starting_money,
+                base_dig_power=self.session.base_dig_power
             )
         )  # type: ignore
 

@@ -775,6 +775,7 @@ class QtBomberServer(BomberServerBase):
             "spawn_type": SpawnType(getattr(self.session, "spawn_type", SpawnType.EDGES)),
             "round_time": int(getattr(self.session, "round_time", 60)),
             "money_inject": int(getattr(self.session, "money_inject", 500)),
+            "base_dig_power": int(getattr(self.session, "base_dig_power", 1)),
             "maps": [],
         }
 
@@ -787,6 +788,7 @@ class QtBomberServer(BomberServerBase):
         config.setdefault("spawn_type", SpawnType.EDGES)
         config.setdefault("round_time", 60)
         config.setdefault("money_inject", 500)
+        config.setdefault("base_dig_power", 1)
         config.setdefault("maps", [])
 
         config["starting_money"] = int(config["starting_money"])
@@ -801,6 +803,7 @@ class QtBomberServer(BomberServerBase):
             config["spawn_type"] = SpawnType(spawn_type)
         config["round_time"] = int(config["round_time"])
         config["money_inject"] = int(config["money_inject"])
+        config["base_dig_power"] = int(config["base_dig_power"])
         if not isinstance(config["maps"], list):
             config["maps"] = []
         return config
@@ -1002,6 +1005,10 @@ class SessionEditorDialog(QDialog):
         self.money_inject.setRange(0, 100_000_000)
         self.money_inject.setValue(int(config["money_inject"]))
 
+        self.base_dig_power = QSpinBox()
+        self.base_dig_power.setRange(0, 100_000_000)
+        self.base_dig_power.setValue(int(config["base_dig_power"]))
+
         form.addRow("Starting money", self.money)
         form.addRow("Floating market", self.floating)
         form.addRow("Damage multiplier", self.damage)
@@ -1009,6 +1016,7 @@ class SessionEditorDialog(QDialog):
         form.addRow("Spawn type", self.spawn)
         form.addRow("Round time (s)", self.round_time)
         form.addRow("Money after each round", self.money_inject)
+        form.addRow("Base dig power", self.base_dig_power)
         root.addLayout(form)
 
         maps_header = QHBoxLayout()
@@ -1147,6 +1155,7 @@ class SessionEditorDialog(QDialog):
                 "spawn_type": SpawnType.from_string(self.spawn.currentText()),
                 "round_time": int(self.round_time.value()),
                 "money_inject": int(self.money_inject.value()),
+                "base_dig_power": int(self.base_dig_power.value()),
                 "maps": [self.server._map_entry_to_yaml_value(e) for e in self.map_entries],
             }
             return self.server._normalize_session_config_dict(config)
@@ -1197,6 +1206,7 @@ class SessionEditorDialog(QDialog):
         self.spawn.setCurrentText(config["spawn_type"].to_string())
         self.round_time.setValue(int(config["round_time"]))
         self.money_inject.setValue(int(config["money_inject"]))
+        self.base_dig_power.setValue(int(config["base_dig_power"]))
         self.map_entries = [
             self.server._normalize_map_entry_for_editor(e) for e in config.get("maps", [])
         ]
