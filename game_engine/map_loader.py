@@ -126,7 +126,7 @@ def parse_map(tilemap: array.array, width: int, height: int) -> MapData:
             elif tile_id in TOOL_TILES:
                 tool_type_str = TOOL_TILES[tile_id]
                 tool = Tool(
-                    x=x, y=y, tool_type=ToolType(tool_type_str), visual_id=tile_id
+                    x=x, y=y, tool_type=ToolType.from_str(tool_type_str), visual_id=tile_id
                 )
                 tools.append(tool)
                 # Replace tool tile with empty in tilemap

@@ -358,18 +358,6 @@ class GameState(Message):
         b_bombs_size = len(b_bombs).to_bytes(2, "big")
         b_sounds_size = len(b_sounds).to_bytes(2, "big")
 
-        print("-"*80)
-        print(f"b_tilemap_size: {len(b_tilemap)}")
-        print(f"uncompressed: {len(self.tilemap.tobytes())}")
-        print(f"b_explosions_size: {len(b_explosions)}")
-        print(f"uncompressed: {len(self.explosions.tobytes())}")
-        print(f"b_players_size: {len(b_players)}")
-        print(f"b_monsters_size: {len(b_monsters)}")
-        print(f"b_pickups_size: {len(b_pickups)}")
-        print(f"b_bombs_size: {len(b_bombs)}")
-        print(f"b_sounds_size: {len(b_sounds)}")
-        print("-"*80)
-
         return (
             b_width
             + b_height

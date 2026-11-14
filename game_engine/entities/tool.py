@@ -23,6 +23,23 @@ class ToolType(IntEnum):
     KEVLAR_VEST = 6
 
     @staticmethod
+    def from_str(string: str) -> ToolType:
+        if string == "bigpick":
+            return ToolType.BIG_PICK
+        elif string == "smallpick":
+            return ToolType.SMALL_PICK
+        elif string == "drill":
+            return ToolType.DRILL
+        elif string == "superdrill":
+            return ToolType.SUPER_DRILL
+        elif string == "kevlar":
+            return ToolType.KEVLAR_VEST
+        elif string == "medpack":
+            return ToolType.MEDPACK
+        else:
+            raise ValueError("Unknown tool string")
+
+    @staticmethod
     def from_powerup(pt: PowerupType) -> ToolType:
         if pt == PowerupType.BIG_PICK:
             return ToolType.BIG_PICK

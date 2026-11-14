@@ -218,7 +218,7 @@ def decode_pcx(data):
 SPRITE_DEFS = [
     # (x, y, w, h, ox, oy, name)
 
-    # Row 0 
+    # Row 0
     (0, 0, 10, 10, 0, 0, 'empty'),
     (1, 0, 10, 10, 0, 0, 'concrete'),
     (2, 0, 10, 10, 0, 0, 'dirt1'),
@@ -252,7 +252,7 @@ SPRITE_DEFS = [
     (30, 0, 10, 10, 0, 0, 'player2_down_3'),
     (31, 0, 10, 10, 0, 0, 'player2_down_4'),
 
-    # Row 1 
+    # Row 1
     (0, 1, 10, 10, 0, 0, 'smallbomb1'),
     (1, 1, 10, 10, 0, 0, 'bigbomb1'),
     (2, 1, 10, 10, 0, 0, 'dynamite1'),
@@ -286,7 +286,7 @@ SPRITE_DEFS = [
     (30, 1, 10, 10, 0, 0, 'player1_down_3'),
     (31, 1, 10, 10, 0, 0, 'player1_down_4'),
 
-    # Row 2 
+    # Row 2
     (0, 2, 10, 10, 0, 0, 'smallbomb2'),
     (1, 2, 10, 10, 0, 0, 'smallbomb3'),
     (2, 2, 10, 10, 0, 0, 'crate'),
@@ -355,7 +355,7 @@ SPRITE_DEFS = [
     (30, 3, 10, 10, 0, 0, 'player3_down_3'),
     (31, 3, 10, 10, 0, 0, 'player3_down_4'),
 
-    # Row 4 
+    # Row 4
     (14, 4, 10, 10, 0, 0, 'blood_green'),
     (15, 4, 10, 10, 0, 0, 'grasshopper'),
     (16, 4, 10, 10, 0, 0, 'player4_right_1'),
