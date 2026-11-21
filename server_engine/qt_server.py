@@ -12,7 +12,7 @@ import yaml
 
 from common.config_reader import resource_path
 from network_stack.shared.web_utils import get_local_ip
-from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session
+from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session, SessionPlayer
 from game_engine.spawn_points import SpawnType
 
 from PySide6.QtCore import Qt, QRectF
@@ -171,6 +171,7 @@ class QtBomberServer(BomberServerBase):
         self.ping_value: Optional[QLabel] = None
         self.ip_value: Optional[QLabel] = None
         self.players_list: Optional[QListWidget] = None
+        self._player_rows_key: tuple | None = None
         self.log_view: Optional[QPlainTextEdit] = None
         self.footer_label: Optional[QLabel] = None
 
@@ -458,6 +459,7 @@ class QtBomberServer(BomberServerBase):
         self.app.setFont(QFont(self._sans_family, base))
         if self.players_list is not None:
             self.players_list.setFont(QFont(self._mono_family, max(9, round(14 * scale))))
+            self._player_rows_key = None
         if self.log_view is not None:
             self.log_view.setFont(QFont(self._mono_family, max(9, round(13 * scale))))
         self.win.setStyleSheet(self._stylesheet(scale))
@@ -502,6 +504,15 @@ class QtBomberServer(BomberServerBase):
             selection-background-color: #1d4ed8;
         }}
         QListWidget#players::item {{ padding: {px(3)}px {px(4)}px; }}
+        QPushButton#kickBtn {{
+            background: #334155;
+            color: #ffffff;
+            border: none;
+            border-radius: {px(5)}px;
+            padding: {px(4)}px {px(10)}px;
+        }}
+        QPushButton#kickBtn:hover {{ background: #b91c1c; }}
+        QPushButton#kickBtn:disabled {{ color: #94a3b8; }}
 
         QLabel#footer {{ color: #6b7c99; font-size: {px(13)}px; padding-top: {px(2)}px; }}
 
@@ -634,33 +645,50 @@ class QtBomberServer(BomberServerBase):
         if self.players_list is None:
             return
 
+        players = sorted(self.players, key=lambda player: player.score, reverse=True)
+        rows_key = tuple((p.id, p.name, p.score, p.money) for p in players)
+        if rows_key == self._player_rows_key:
+            return
+        self._player_rows_key = rows_key
+
         scroll = self.players_list.verticalScrollBar()
         prev = scroll.value()
 
         self.players_list.clear()
-        if not self.players:
+        if not players:
             self.players_list.addItem("No players connected")
             return
 
-        rows = self.get_scoreboard_rows()
-        for i, (name, score) in enumerate(rows, start=1):
-            player = self._get_session_player_by_name(name)
-            if player is None:
-                line = f"{i:>2}.  {name:<18} score={score:<5}"
-            else:
-                line = (
-                    f"{i:>2}.  {player.name:<18} "
-                    f"score={player.score:<5} money={player.money:<5}"
+        for rank, player in enumerate(players, start=1):
+            item = QListWidgetItem(self.players_list)
+            row = QWidget()
+            layout = QHBoxLayout(row)
+            layout.setContentsMargins(4, 3, 4, 3)
+            label = QLabel()
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            label.setFont(self.players_list.font())
+            label.setText(
+                f"{rank:>2}.  {player.name:<18} "
+                f"score={player.score:<5} money={player.money:<5}"
+            )
+            layout.addWidget(label, 1)
+            kick_button = QPushButton("Kick")
+            kick_button.setObjectName("kickBtn")
+            kick_button.setAccessibleName(f"Kick {player.name}")
+            kick_button.clicked.connect(
+                lambda _checked, target=player, button=kick_button: self._kick_player(
+                    target, button
                 )
-            self.players_list.addItem(line)
+            )
+            layout.addWidget(kick_button)
+            item.setSizeHint(row.sizeHint())
+            self.players_list.setItemWidget(item, row)
 
         scroll.setValue(min(prev, scroll.maximum()))
 
-    def _get_session_player_by_name(self, name: str):
-        for player in self.players:
-            if player.name == name:
-                return player
-        return None
+    def _kick_player(self, player: SessionPlayer, button: QPushButton) -> None:
+        if self.kick_player(player):
+            button.setEnabled(False)
 
     def _update_log_tail(self) -> None:
         if self.log_view is None:

@@ -4,6 +4,7 @@ This enables the BomberClient/Server to create transport layer client/servers
 """
 
 from typing import Optional
+from network_stack.servers.transport_server import OnDisconnect as ServerDisconnect
 from network_stack.servers.transport_server import TransportServer, OnReceive
 from network_stack.servers.tcp_server import TCPServer
 from network_stack.servers.udp_server import UDPServer
@@ -16,9 +17,9 @@ from network_stack.clients.tcp_scanner import TCPScanner
 from network_stack.clients.udp_scanner import UDPScanner
 
 
-def get_server(protocol: str, port: int, on_receive: OnReceive, on_disconnect: OnDisconnect) -> TransportServer:
+def get_server(protocol: str, port: int, on_receive: OnReceive, on_disconnect: ServerDisconnect) -> TransportServer:
     if protocol == "udp":
-        return UDPServer(port, on_receive)
+        return UDPServer(port, on_receive, on_disconnect=on_disconnect)
     if protocol == "tcp":
         return TCPServer(port, on_receive, on_disconnect)
     raise ValueError(protocol)

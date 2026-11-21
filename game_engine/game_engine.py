@@ -337,12 +337,17 @@ class GameEngine:
         return self._create_player(player)
 
     def remove_player(self, name: str) -> None:
-        for p in self.players:
-            if p.name == name:
-                self.event_resolver.cancel_object_events(p.id)
-                self.players.remove(p)
-                if p.state != EntityState.DEAD:
-                    self._player_death(p)
+        index = self.player_map.pop(name, None)
+        if index is None:
+            return
+
+        player = self.players.pop(index)
+        for i in range(index, len(self.players)):
+            self.player_map[self.players[i].name] = i
+        if player.is_alive():
+            self._player_death(player)
+        else:
+            self.event_resolver.cancel_object_events(player.id)
 
     def _create_players(self, players: List[Player]) -> None:
         """Create players"""

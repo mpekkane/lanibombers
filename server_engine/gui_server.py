@@ -12,7 +12,7 @@ import copy
 import yaml
 
 from common.config_reader import resource_path
-from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session
+from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session, SessionPlayer
 from game_engine.spawn_points import SpawnType
 
 DEFAULT_RANDOM_PARAMS = {
@@ -149,7 +149,9 @@ class TkBomberServer(BomberServerBase):
         self.ping_var: Optional[tk.StringVar] = None
         self.footer_var: Optional[tk.StringVar] = None
 
-        self.players_list: Optional[tk.Listbox] = None
+        self.players_canvas: Optional[tk.Canvas] = None
+        self.players_rows: Optional[ttk.Frame] = None
+        self._player_rows_key: tuple | None = None
         self.log_text: Optional[tk.Text] = None
         self.start_button: Optional[ttk.Button] = None
         self.session_button: Optional[ttk.Button] = None
@@ -964,29 +966,30 @@ class TkBomberServer(BomberServerBase):
         main.add(players_frame, weight=1)
         main.add(log_frame, weight=3)
 
-        self.players_list = tk.Listbox(
+        canvas = tk.Canvas(
             players_frame,
-            height=8,
-            font=self.base_font,
-            activestyle="none",
+            height=8 * self.base_font.metrics("linespace"),
             bg=self.panel_bg,
-            fg=self.text_fg,
-            selectbackground=self.selection_bg,
-            selectforeground="#000000",
-            relief=tk.FLAT,
             highlightthickness=1,
             highlightbackground=self.panel_border,
             borderwidth=0,
         )
-        self.players_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar = ttk.Scrollbar(players_frame, orient=tk.VERTICAL, command=canvas.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.configure(yscrollcommand=scrollbar.set)
 
-        players_scroll = ttk.Scrollbar(
-            players_frame,
-            orient=tk.VERTICAL,
-            command=self.players_list.yview,
+        rows = ttk.Frame(canvas)
+        rows_window = canvas.create_window((0, 0), window=rows, anchor="nw")
+        rows.bind(
+            "<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        players_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.players_list.config(yscrollcommand=players_scroll.set)
+        canvas.bind(
+            "<Configure>", lambda event: canvas.itemconfigure(rows_window, width=event.width)
+        )
+        rows.columnconfigure(0, weight=1)
+        self.players_canvas = canvas
+        self.players_rows = rows
 
         self.log_text = tk.Text(
             log_frame,
@@ -2210,44 +2213,44 @@ class TkBomberServer(BomberServerBase):
         self.footer_var.set(self._footer_text())
 
     def _update_players(self) -> None:
-        if self.players_list is None:
+        canvas, rows = self.players_canvas, self.players_rows
+        if canvas is None or rows is None:
             return
 
-        old_top = self.players_list.yview()[0]
+        players = sorted(self.players, key=lambda player: player.score, reverse=True)
+        rows_key = tuple((p.id, p.name, p.score, p.money) for p in players)
+        if rows_key == self._player_rows_key:
+            return
+        self._player_rows_key = rows_key
 
-        self.players_list.delete(0, tk.END)
+        old_top = canvas.yview()[0]
+        for child in rows.winfo_children():
+            child.destroy()
 
-        if not self.players:
-            self.players_list.insert(tk.END, "No players connected")
+        if not players:
+            ttk.Label(rows, text="No players connected").grid(sticky="w")
             return
 
-        rows = self.get_scoreboard_rows()
+        for index, player in enumerate(players):
+            line = (
+                f"{index + 1:>2}. {player.name:<18} "
+                f"score={player.score:<4} money={player.money:<4}"
+            )
+            ttk.Label(rows, text=line, font=self.base_font).grid(
+                row=index, column=0, sticky="w", padx=4
+            )
+            button = ttk.Button(rows, text="Kick")
+            button.configure(
+                command=lambda target=player, control=button: self._kick_player(target, control)
+            )
+            button.grid(row=index, column=1, sticky="e", padx=4)
 
-        for i, (name, score) in enumerate(rows, start=1):
-            player = self._get_session_player_by_name(name)
+        rows.update_idletasks()
+        canvas.yview_moveto(old_top)
 
-            if player is None:
-                line = f"{i:>2}. {name:<18} score={score:<4}"
-            else:
-                line = (
-                    f"{i:>2}. "
-                    f"{player.name:<18} "
-                    f"score={player.score:<4} "
-                    f"money={player.money:<4}"
-                )
-
-            self.players_list.insert(tk.END, line)
-
-        try:
-            self.players_list.yview_moveto(old_top)
-        except tk.TclError:
-            pass
-
-    def _get_session_player_by_name(self, name: str):
-        for player in self.players:
-            if player.name == name:
-                return player
-        return None
+    def _kick_player(self, player: SessionPlayer, button: ttk.Button) -> None:
+        if self.kick_player(player):
+            button.state(["disabled"])
 
     def _update_log_tail(self) -> None:
         if self.log_text is None:

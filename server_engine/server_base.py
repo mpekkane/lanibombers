@@ -774,6 +774,9 @@ class BomberServerBase:
         rows.sort(key=lambda row: row[1], reverse=True)
         return rows
 
+    def kick_player(self, player: SessionPlayer) -> bool:
+        return player in self.players and self.server.disconnect_player(player.name)
+
     def end_game(self) -> None:
         self.ui_show_end_message()
 
@@ -973,7 +976,8 @@ class BomberServerBase:
                 self.pings.pop(key, None)
 
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
-        ctx.name = msg.name  # type: ignore
+        if ctx.name is not None:
+            return
 
         player_name = msg.name
         player_color = msg.color
@@ -993,6 +997,7 @@ class BomberServerBase:
                 ),
             )
         else:
+            ctx.name = player_name
             self.players.append(
                 SessionPlayer(
                     name=player_name,

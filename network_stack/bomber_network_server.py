@@ -15,6 +15,7 @@ After this, the responsibility of receiving and sending logic is to the owning c
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Callable, Dict, Type, TypeVar, cast, List
+from twisted.python.failure import Failure
 from network_stack.messages.messages import Message
 from network_stack.shared.factory import get_server
 from network_stack.servers.transport_server import (
@@ -121,6 +122,13 @@ class BomberNetworkServer:
 
     def disconnect(self, proto: TransportServerProtocol) -> None:
         self._server.disconnect(proto)
+
+    def disconnect_player(self, name: str) -> bool:
+        for client in self._clients:
+            if client.name == name:
+                client.disconnect()
+                return True
+        return False
 
     def disconnect_all(self) -> None:
         for client in self._clients:

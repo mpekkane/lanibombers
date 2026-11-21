@@ -9,6 +9,8 @@ from typing import Dict, Optional, Tuple
 import threading
 from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
+from twisted.internet.error import ConnectionDone
+from twisted.python.failure import Failure
 
 from network_stack.messages.messages import (
     Message,
@@ -16,12 +18,15 @@ from network_stack.messages.messages import (
     decode_message,
     Discover,
     Announce,
+    ClientConnectionState,
+    ClientConnectionStateMessage,
 )
 from network_stack.shared.types import PeerState
 from network_stack.servers.transport_server import (
     TransportServer,
     TransportServerProtocol,
     OnReceive,
+    OnDisconnect,
 )
 from common.logger import get_logger
 
@@ -85,6 +90,7 @@ class UDPServer(TransportServer):
         port: int,
         on_receive: OnReceive,
         *,
+        on_disconnect: Optional[OnDisconnect] = None,
         interface: str = "0.0.0.0",
         broadcast_addr: str = "255.255.255.255",
         multicast_group: Optional[str] = None,  # e.g. "239.255.0.1"
@@ -92,6 +98,7 @@ class UDPServer(TransportServer):
     ) -> None:
         super().__init__(port, on_receive)
         self.log = get_logger()
+        self._on_disconnect = on_disconnect
         self.interface = interface
         self.broadcast_addr = broadcast_addr
         self.multicast_group = multicast_group
@@ -203,7 +210,20 @@ class UDPServer(TransportServer):
         proto.send_message(msg)
 
     def disconnect(self, proto: TransportServerProtocol) -> None:
-        """UDP has no connection to close. We can forget the peer state"""
-        if isinstance(proto, UDPPeer):
-            self._state_by_peer.pop(proto, None)
-            self._peers_by_addr.pop(proto.addr, None)
+        if not isinstance(proto, UDPPeer):
+            return
+
+        def _disconnect() -> None:
+            if self._peers_by_addr.get(proto.addr) is not proto:
+                return
+            state = self._state_by_peer.pop(proto)
+            self._peers_by_addr.pop(proto.addr)
+            if self._listening_port is not None:
+                proto.send_message(
+                    ClientConnectionStateMessage(ClientConnectionState.DISCONNECTED)
+                )
+            if self._on_disconnect is not None:
+                self._on_disconnect(state, proto, Failure(ConnectionDone()))
+
+        if reactor.running:
+            reactor.callFromThread(_disconnect)
