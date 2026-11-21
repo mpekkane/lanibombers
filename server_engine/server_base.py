@@ -50,6 +50,7 @@ from game_engine import GameEngine
 from game_engine.sound_engine import SoundEngine
 from game_engine.render_state import SoundType
 from game_engine.session_parser import (
+    ScoringType,
     Session,
     SessionMapType,
     SessionPlayer,
@@ -645,7 +646,6 @@ class BomberServerBase:
 
     def _at_round_end(self) -> None:
         assert self.engine is not None
-        points_by_name = self.score_players()
         quit_session = self.session.session_complete()
 
         for player in self.players:
@@ -659,6 +659,8 @@ class BomberServerBase:
                 player.dig_power = BASE_DIGGING_POWER
                 player.max_health = 100
 
+        points_by_name = self.score_players()
+        for player in self.players:
             if not quit_session:
                 player.money += self.session.money_inject
             player.score += points_by_name[player.name]
@@ -681,6 +683,18 @@ class BomberServerBase:
             self.server.broadcast(info, None)
 
     def score_players(self) -> Dict[str, int]:
+        match self.session.scoring_type:
+            case ScoringType.SURVIVAL:
+                return self._score_survival()
+            case ScoringType.DEATHMATCH:
+                return self._score_deathmatch()
+            case ScoringType.TREASURE_HUNT:
+                return self._score_treasure_hunt()
+            case ScoringType.COMBO:
+                return self._score_combo()
+        raise ValueError(f"Unsupported scoring type: {self.session.scoring_type}")
+
+    def _score_survival(self) -> Dict[str, int]:
         """
         Survivors get max points.
 
@@ -713,6 +727,45 @@ class BomberServerBase:
 
         for death_rank, name in enumerate(dead_names_in_order):
             points_by_name[name] = death_rank + 1
+
+        return points_by_name
+
+    def _score_deathmatch(self) -> Dict[str, int]:
+        assert self.engine is not None
+        points_by_name: Dict[str, int] = {}
+
+        for player in self.players:
+            kills = self.engine.player_kills.get(player.id, 0)
+            if self.session.count_monster_kills:
+                kills += self.engine.monster_kills.get(player.id, 0)
+            points_by_name[player.name] = kills
+
+        return points_by_name
+
+    def _score_treasure_hunt(self) -> Dict[str, int]:
+        points_by_name: Dict[str, int] = {}
+
+        for player in self.players:
+            points_by_name[player.name] = player.money // 100
+
+        return points_by_name
+
+    def _score_combo(self) -> Dict[str, int]:
+        survivor_points = self._score_survival()
+        kill_points = self._score_deathmatch()
+        money_points = self._score_treasure_hunt()
+
+        points_by_name: Dict[str, int] = {}
+
+        for player in self.players:
+            survive = survivor_points[player.name]
+            kills = kill_points[player.name]
+            money = money_points[player.name]
+            points_by_name[player.name] = int(
+                self.session.weight_survival * survive
+                + self.session.weight_kill * kills
+                + self.session.weight_money * money
+            )
 
         return points_by_name
 

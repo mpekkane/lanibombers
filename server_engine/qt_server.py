@@ -12,7 +12,7 @@ import yaml
 
 from common.config_reader import resource_path
 from network_stack.shared.web_utils import get_local_ip
-from game_engine.session_parser import Session
+from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session
 from game_engine.spawn_points import SpawnType
 
 from PySide6.QtCore import Qt, QRectF
@@ -773,6 +773,9 @@ class QtBomberServer(BomberServerBase):
             "damage_multiplier": getattr(self.session, "damage_multiplier", 1.0),
             "speed_multiplier": getattr(self.session, "speed_multiplier", 1.0),
             "spawn_type": SpawnType(getattr(self.session, "spawn_type", SpawnType.EDGES)),
+            "scoring_type": self.session.scoring_type,
+            "count_monster_kills": self.session.count_monster_kills,
+            **{key: getattr(self.session, key) for key in COMBO_WEIGHT_LABELS},
             "round_time": int(getattr(self.session, "round_time", 60)),
             "money_inject": int(getattr(self.session, "money_inject", 500)),
             "base_dig_power": int(getattr(self.session, "base_dig_power", 1)),
@@ -786,6 +789,7 @@ class QtBomberServer(BomberServerBase):
         config.setdefault("damage_multiplier", 1.0)
         config.setdefault("speed_multiplier", 1.0)
         config.setdefault("spawn_type", SpawnType.EDGES)
+        config.setdefault("scoring_type", ScoringType.SURVIVAL)
         config.setdefault("round_time", 60)
         config.setdefault("money_inject", 500)
         config.setdefault("base_dig_power", 1)
@@ -801,6 +805,10 @@ class QtBomberServer(BomberServerBase):
             config["spawn_type"] = SpawnType[spawn_type]
         else:
             config["spawn_type"] = SpawnType(spawn_type)
+        config["scoring_type"] = ScoringType(config["scoring_type"])
+        config["count_monster_kills"] = bool(config.get("count_monster_kills", True))
+        for key in COMBO_WEIGHT_LABELS:
+            config[key] = float(config.get(key, 1.0))
         config["round_time"] = int(config["round_time"])
         config["money_inject"] = int(config["money_inject"])
         config["base_dig_power"] = int(config["base_dig_power"])
@@ -911,6 +919,7 @@ class QtBomberServer(BomberServerBase):
         with path.open("w", encoding="utf-8") as f:
             serializable_config = self._normalize_session_config_dict(config)
             serializable_config["spawn_type"] = int(serializable_config["spawn_type"])
+            serializable_config["scoring_type"] = int(serializable_config["scoring_type"])
             yaml.dump(serializable_config, f, default_flow_style=False, sort_keys=False)
 
     ##################
@@ -997,6 +1006,13 @@ class SessionEditorDialog(QDialog):
             self.spawn.addItem(st.to_string())
         self.spawn.setCurrentText(config["spawn_type"].to_string())
 
+        self.scoring_type = QComboBox()
+        for scoring_type in ScoringType:
+            self.scoring_type.addItem(scoring_type.to_string(), int(scoring_type))
+        self.scoring_type.setCurrentIndex(
+            self.scoring_type.findData(int(config["scoring_type"]))
+        )
+
         self.round_time = QSpinBox()
         self.round_time.setRange(0, 1_000_000)
         self.round_time.setValue(int(config["round_time"]))
@@ -1014,6 +1030,27 @@ class SessionEditorDialog(QDialog):
         form.addRow("Damage multiplier", self.damage)
         form.addRow("Speed multiplier", self.speed)
         form.addRow("Spawn type", self.spawn)
+        form.addRow("Scoring type", self.scoring_type)
+        self.count_monster_kills = QCheckBox()
+        self.count_monster_kills.setChecked(config["count_monster_kills"])
+        form.addRow("Count monster kills", self.count_monster_kills)
+        self.combo_weights: dict[str, QDoubleSpinBox] = {}
+        for key, label in COMBO_WEIGHT_LABELS.items():
+            weight = QDoubleSpinBox()
+            weight.setRange(-1_000_000, 1_000_000)
+            weight.setDecimals(4)
+            weight.setSingleStep(0.1)
+            weight.setValue(config[key])
+            self.combo_weights[key] = weight
+            form.addRow(label, weight)
+
+        def update_combo_weight_visibility() -> None:
+            show_weights = self.scoring_type.currentData() == ScoringType.COMBO
+            for weight in self.combo_weights.values():
+                form.setRowVisible(weight, show_weights)
+
+        self.scoring_type.currentIndexChanged.connect(update_combo_weight_visibility)
+        update_combo_weight_visibility()
         form.addRow("Round time (s)", self.round_time)
         form.addRow("Money after each round", self.money_inject)
         form.addRow("Base dig power", self.base_dig_power)
@@ -1153,6 +1190,9 @@ class SessionEditorDialog(QDialog):
                 "damage_multiplier": float(self.damage.value()),
                 "speed_multiplier": float(self.speed.value()),
                 "spawn_type": SpawnType.from_string(self.spawn.currentText()),
+                "scoring_type": ScoringType(self.scoring_type.currentData()),
+                "count_monster_kills": self.count_monster_kills.isChecked(),
+                **{key: weight.value() for key, weight in self.combo_weights.items()},
                 "round_time": int(self.round_time.value()),
                 "money_inject": int(self.money_inject.value()),
                 "base_dig_power": int(self.base_dig_power.value()),
@@ -1204,6 +1244,12 @@ class SessionEditorDialog(QDialog):
         self.damage.setValue(float(config["damage_multiplier"]))
         self.speed.setValue(float(config["speed_multiplier"]))
         self.spawn.setCurrentText(config["spawn_type"].to_string())
+        self.scoring_type.setCurrentIndex(
+            self.scoring_type.findData(int(config["scoring_type"]))
+        )
+        self.count_monster_kills.setChecked(config["count_monster_kills"])
+        for key, weight in self.combo_weights.items():
+            weight.setValue(config[key])
         self.round_time.setValue(int(config["round_time"]))
         self.money_inject.setValue(int(config["money_inject"]))
         self.base_dig_power.setValue(int(config["base_dig_power"]))

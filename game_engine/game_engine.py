@@ -1,7 +1,17 @@
 from __future__ import annotations
 import sys
 import numpy as np
-from typing import Any, Optional, List, Dict, Tuple, TYPE_CHECKING, Union, Callable, cast
+from typing import (
+    Any,
+    Optional,
+    List,
+    Dict,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+    Callable,
+    cast,
+)
 from itertools import chain
 import random
 from enum import Enum
@@ -10,7 +20,12 @@ from uuid import UUID
 from game_engine.agent_state import Action
 from game_engine.clock import Clock
 from game_engine.entities.tile import Tile, TileType
-from game_engine.entities.dynamic_entity import DynamicEntity, Direction, EntityType, EntityState
+from game_engine.entities.dynamic_entity import (
+    DynamicEntity,
+    Direction,
+    EntityType,
+    EntityState,
+)
 from game_engine.engine_utils import (
     flood_fill,
     get_solid_map,
@@ -128,6 +143,8 @@ class GameEngine:
         self.explosions = np.zeros((self.height, self.width), dtype=np.uint8)
         self.players: List[Player] = []
         self.player_death_times: List[Tuple[UUID, str, float]] = []
+        self.player_kills: Dict[UUID, int] = {}
+        self.monster_kills: Dict[UUID, int] = {}
         self.player_map: Dict[str, int] = {}
         self.monsters: List[DynamicEntity] = []
         self.pickups: List[List[Optional[Pickup]]] = [
@@ -204,15 +221,10 @@ class GameEngine:
         self.starting_poses = get_spawn_points(n, self.map_data, self.spawn_type)
 
         d = 3
-        for pos in self.starting_poses:
-            for r in range(-d, d+1):
-                px = pos[0]+r
-                px = clamp(px, 0, self.map_data.width)
-                self.tiles[px][pos[1]] = Tile.create_empty()
-            for r in range(-d, d+1):
-                py = pos[1]+r
-                py = clamp(py, 0, self.map_data.height)
-                self.tiles[pos[0]][py] = Tile.create_empty()
+        for x, y in self.starting_poses:
+            for offset in range(-d, d + 1):
+                self.set_tile(y + offset, x, Tile.create_empty())
+                self.set_tile(y, x + offset, Tile.create_empty())
 
     def start(self) -> None:
         """Start the game engine and event processing."""
@@ -307,6 +319,7 @@ class GameEngine:
         num_players = len(self.players)
         start_pose = self.starting_poses[num_players]
         player = Player(
+            id=session_player.id,
             x=start_pose[1] + 0.5,
             y=start_pose[0] + 0.5,
             direction=Direction.RIGHT,
@@ -454,7 +467,7 @@ class GameEngine:
                     other_bomb, "explode", delay, now
                 )
 
-    def _damage_entities_in_area(self, damage_array: np.ndarray) -> None:
+    def _damage_entities_in_area(self, damage_array: np.ndarray, planter: UUID) -> None:
         """Damage players, monsters, and pickups in the affected area.
 
         Args:
@@ -468,7 +481,7 @@ class GameEngine:
             if dmg > 0:
                 player_died = player.take_damage(int(dmg))
                 if player_died:
-                    self._player_death(player)
+                    self._player_death(player, planter)
 
         for monster in self.monsters:
             if monster.state == EntityState.DEAD:
@@ -477,19 +490,25 @@ class GameEngine:
             if 0 <= mx < self.width and 0 <= my < self.height:
                 dmg = damage_array[my, mx]
                 if dmg > 0:
-                    monster.take_damage(int(dmg))
+                    died = monster.take_damage(int(dmg))
+                    if died:
+                        self._monster_death(monster, planter)
 
         for y in range(len(self.pickups)):
             for x in range(len(self.pickups[y])):
                 if self.pickups[y][x] is not None and damage_array[y, x] > 0:
                     self.pickups[y][x] = None
 
-    def _player_death(self, player: Player):
-        self.player_death_times.append(
-            (player.id, player.name, Clock.now())
-        )
+    def _player_death(self, player: Player, killer: UUID = None):
+        self.player_death_times.append((player.id, player.name, Clock.now()))
         self.pending_sounds.append(SoundType.DIE)
         self.event_resolver.cancel_object_events(player.id)
+
+        # record kill
+        if killer is not None and player.id != killer:
+            kills = self.player_kills.get(killer, 0)
+            self.player_kills[killer] = kills + 1
+            self.log.info(f"{killer} killed {player.name}. Total kills: {kills+1}")
 
         # ending condition: all dead
         number_players_alive = 0
@@ -503,6 +522,13 @@ class GameEngine:
             self.running = False
         if all_dead:
             self.running = False
+
+    def _monster_death(self, monster: DynamicEntity, killer: UUID = None):
+        kills = self.monster_kills.get(killer, 0)
+        self.monster_kills[killer] = kills + 1
+        self.log.info(
+            f"{killer} killed {monster.id}. Total kills: {kills+1}"
+        )
 
     def clear_entity_move_events(
         self, player: DynamicEntity, resolve_time: float = 0.0
@@ -896,7 +922,7 @@ class GameEngine:
         self._trigger_bombs_in_area(target, damage_array, now=event.trigger_at)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(damage_array)
+        self._damage_entities_in_area(damage_array, target.owner_id)
 
         # Grasshopper: spawn next hop if we haven't reached 13 explosions
         if is_grasshopper:
@@ -1099,7 +1125,7 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, final_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(final_mask * cfg["damage"])
+        self._damage_entities_in_area(final_mask * cfg["damage"], bomb.owner_id)
 
         self.pending_sounds.append(SoundType.EXPLOSION)
 
@@ -1322,7 +1348,7 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(fill_mask * cfg["damage"])
+        self._damage_entities_in_area(fill_mask * cfg["damage"], bomb.owner_id)
 
         self.pending_sounds.append(SoundType.EXPLOSION)
 
@@ -1359,7 +1385,9 @@ class GameEngine:
         self._trigger_bombs_in_area(bomb, fill_mask, now=now)
 
         # Damage players, monsters, and pickups
-        self._damage_entities_in_area(fill_mask * cfg["flood_fill_damage"])
+        self._damage_entities_in_area(
+            fill_mask * cfg["flood_fill_damage"], bomb.owner_id
+        )
 
         # Schedule scattered medium explosions
         scatter_count = cfg["scatter_explosions"]
@@ -1726,11 +1754,22 @@ class GameEngine:
         self.switch_state = self.switch_state.switch()
 
     def fight(self, agent: DynamicEntity) -> None:
+        if not agent.is_alive():
+            return
+
         entities = self.players + self.monsters
         px, py = xy_to_tile(agent.x, agent.y)
         for other in entities:
+            if not other.is_alive():
+                continue
+
             ox, oy = (int)(other.x), (int)(other.y)
-            if ox == px and oy == py and other.state != EntityState.DEAD and other.id != agent.id:
+            if (
+                ox == px
+                and oy == py
+                and other.state != EntityState.DEAD
+                and other.id != agent.id
+            ):
                 # only monster/player combat
                 if (
                     other.entity_type.is_player() and agent.entity_type.is_monster()
@@ -1738,20 +1777,25 @@ class GameEngine:
                     # note: current melee is symmetric,
                     # maybe the entering entity should strike first?
                     other_died = other.take_damage(agent.fight_power)
-                    agent.take_damage(other.fight_power)
+                    agent_died = agent.take_damage(other.fight_power)
                     self.log.info("FIGHT!")
                     self.log.info(f"Agent deals {agent.fight_power} damage")
                     self.log.info(f"Enemy deals {other.fight_power} damage")
                     self.log.info(f"Agent health {agent.health}")
                     self.log.info(f"Enemy health {other.health}")
-                    if other.entity_type.is_player() and other_died:
-                        self._player_death(cast(Player, other))
+                    if other_died:
+                        if other.entity_type.is_player():
+                            self._player_death(cast(Player, other))
+                        else:
+                            self._monster_death(other, agent.id)
 
-        if agent.state == EntityState.DEAD:
-            if agent.entity_type.is_player():
-                self._player_death(cast(Player, agent))
-            else:
-                self.pending_sounds.append(SoundType.DIE)
+                    if agent_died:
+                        if agent.entity_type.is_player():
+                            self._player_death(cast(Player, agent))
+                        else:
+                            self.pending_sounds.append(SoundType.DIE)
+                            self._monster_death(agent, other.id)
+                        break
 
     def update_player_state(self):
         """OBSOLETE: used for tick-rendering"""

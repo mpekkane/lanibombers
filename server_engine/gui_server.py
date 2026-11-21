@@ -12,7 +12,7 @@ import copy
 import yaml
 
 from common.config_reader import resource_path
-from game_engine.session_parser import Session
+from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType, Session
 from game_engine.spawn_points import SpawnType
 
 DEFAULT_RANDOM_PARAMS = {
@@ -1073,6 +1073,9 @@ class TkBomberServer(BomberServerBase):
             "damage_multiplier": getattr(self.session, "damage_multiplier", 1.0),
             "speed_multiplier": getattr(self.session, "speed_multiplier", 1.0),
             "spawn_type": SpawnType(getattr(self.session, "spawn_type", SpawnType.EDGES)),
+            "scoring_type": self.session.scoring_type,
+            "count_monster_kills": self.session.count_monster_kills,
+            **{key: getattr(self.session, key) for key in COMBO_WEIGHT_LABELS},
             "round_time": int(getattr(self.session, "round_time", 60)),
             "money_inject": int(getattr(self.session, "money_inject", 500)),
             "maps": [],
@@ -1086,6 +1089,7 @@ class TkBomberServer(BomberServerBase):
         config.setdefault("damage_multiplier", 1.0)
         config.setdefault("speed_multiplier", 1.0)
         config.setdefault("spawn_type", SpawnType.EDGES)
+        config.setdefault("scoring_type", ScoringType.SURVIVAL)
         config.setdefault("round_time", 60)
         config.setdefault("money_inject", 500)
         config.setdefault("maps", [])
@@ -1100,6 +1104,10 @@ class TkBomberServer(BomberServerBase):
             config["spawn_type"] = SpawnType[spawn_type]
         else:
             config["spawn_type"] = SpawnType(spawn_type)
+        config["scoring_type"] = ScoringType(config["scoring_type"])
+        config["count_monster_kills"] = bool(config.get("count_monster_kills", True))
+        for key in COMBO_WEIGHT_LABELS:
+            config[key] = float(config.get(key, 1.0))
         config["round_time"] = int(config["round_time"])
         config["money_inject"] = int(config["money_inject"])
 
@@ -1198,6 +1206,10 @@ class TkBomberServer(BomberServerBase):
         spawn_type_var = tk.StringVar(
             value=self.session_config.get("spawn_type", SpawnType.EDGES).to_string()
         )
+        scoring_types = {scoring_type.to_string(): scoring_type for scoring_type in ScoringType}
+        scoring_type_var = tk.StringVar(
+            value=self.session_config.get("scoring_type", ScoringType.SURVIVAL).to_string()
+        )
         round_time_var = tk.StringVar(
             value=str(self.session_config.get("round_time", 60))
         )
@@ -1227,8 +1239,45 @@ class TkBomberServer(BomberServerBase):
         )
         spawn_combo.grid(row=4, column=1, sticky="ew", pady=8)
 
-        self._session_editor_row(form, 5, "Round time", round_time_var)
-        self._session_editor_row(form, 6, "Money after each round", money_inject_var)
+        ttk.Label(form, text="Scoring type").grid(
+            row=5, column=0, sticky="w", pady=8, padx=(0, 16)
+        )
+        ttk.Combobox(
+            form,
+            textvariable=scoring_type_var,
+            values=list(scoring_types),
+            state="readonly",
+            width=20,
+            font=self.base_font,
+        ).grid(row=5, column=1, sticky="ew", pady=8)
+
+        count_monster_kills_var = tk.BooleanVar(
+            value=self.session_config.get("count_monster_kills", True)
+        )
+        ttk.Checkbutton(
+            form, text="Count monster kills", variable=count_monster_kills_var
+        ).grid(row=6, column=1, sticky="w", pady=8)
+
+        weight_form = ttk.Frame(form)
+        weight_form.grid(row=7, column=0, columnspan=2, sticky="ew")
+        weight_form.columnconfigure(1, weight=1)
+        weight_vars = {}
+        for row, (key, label) in enumerate(COMBO_WEIGHT_LABELS.items()):
+            value = tk.StringVar(value=str(self.session_config.get(key, 1.0)))
+            weight_vars[key] = value
+            self._session_editor_row(weight_form, row, label, value)
+
+        def update_combo_weight_visibility(*_args: str) -> None:
+            if scoring_types[scoring_type_var.get()] == ScoringType.COMBO:
+                weight_form.grid()
+            else:
+                weight_form.grid_remove()
+
+        scoring_type_var.trace_add("write", update_combo_weight_visibility)
+        update_combo_weight_visibility()
+
+        self._session_editor_row(form, 8, "Round time", round_time_var)
+        self._session_editor_row(form, 9, "Money after each round", money_inject_var)
 
         form.columnconfigure(1, weight=1)
 
@@ -1259,6 +1308,9 @@ class TkBomberServer(BomberServerBase):
                     "damage_multiplier": float(damage_multiplier_var.get()),
                     "speed_multiplier": float(speed_multiplier_var.get()),
                     "spawn_type": SpawnType.from_string(spawn_type_var.get()),
+                    "scoring_type": scoring_types[scoring_type_var.get()],
+                    "count_monster_kills": count_monster_kills_var.get(),
+                    **{key: float(value.get()) for key, value in weight_vars.items()},
                     "round_time": int(round_time_var.get()),
                     "money_inject": int(money_inject_var.get()),
                     "maps": maps,
@@ -1321,6 +1373,10 @@ class TkBomberServer(BomberServerBase):
             damage_multiplier_var.set(str(config["damage_multiplier"]))
             speed_multiplier_var.set(str(config["speed_multiplier"]))
             spawn_type_var.set(config["spawn_type"].to_string())
+            scoring_type_var.set(config["scoring_type"].to_string())
+            count_monster_kills_var.set(config["count_monster_kills"])
+            for key, value in weight_vars.items():
+                value.set(str(config[key]))
             round_time_var.set(str(config["round_time"]))
             money_inject_var.set(str(config["money_inject"]))
 
@@ -2098,6 +2154,7 @@ class TkBomberServer(BomberServerBase):
         with path.open("w", encoding="utf-8") as f:
             serializable_config = self._normalize_session_config_dict(config)
             serializable_config["spawn_type"] = int(serializable_config["spawn_type"])
+            serializable_config["scoring_type"] = int(serializable_config["scoring_type"])
             yaml.dump(
                 serializable_config,
                 f,

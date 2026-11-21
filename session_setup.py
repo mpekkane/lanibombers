@@ -21,6 +21,7 @@ from renderer.tile_renderer import TileRenderer
 from game_engine.map_loader import load_map
 from game_engine.random_map_generator import RandomMapGenerator
 from game_engine.render_state import RenderState
+from game_engine.session_parser import COMBO_WEIGHT_LABELS, ScoringType
 from game_engine.spawn_points import SpawnType
 
 # ============================================================================
@@ -101,6 +102,9 @@ class SessionSetup(arcade.Window):
         self.editing_map_entry = False
         self.edit_original_map_index = 0
         self.spawn_type = SpawnType.EDGES
+        self.scoring_type = ScoringType.SURVIVAL
+        self.count_monster_kills = True
+        self.combo_weights = dict.fromkeys(COMBO_WEIGHT_LABELS, 1.0)
         self.round_time = 60
         self.money_inject = 500
 
@@ -245,6 +249,7 @@ class SessionSetup(arcade.Window):
             SpawnType.UNIFORM_DIST_RANDOM,
         ]
         spawn_index = spawn_type_list.index(self.spawn_type)
+        scoring_types = list(ScoringType)
         self.fixed_fields = [
             MenuField(
                 name="Starting Money",
@@ -287,6 +292,22 @@ class SessionSetup(arcade.Window):
                 selected_option_index=spawn_index,
             ),
             MenuField(
+                name="Scoring type",
+                field_type=FieldType.OPTION,
+                value=self.scoring_type,
+                options=scoring_types,
+                option_names=[scoring_type.to_string() for scoring_type in scoring_types],
+                selected_option_index=scoring_types.index(self.scoring_type),
+            ),
+            MenuField(
+                name="Count monster kills",
+                field_type=FieldType.OPTION,
+                value=self.count_monster_kills,
+                options=[False, True],
+                option_names=["No", "Yes"],
+                selected_option_index=int(self.count_monster_kills),
+            ),
+            MenuField(
                 name="Round time",
                 field_type=FieldType.NUMERIC,
                 value=self.round_time,
@@ -303,6 +324,19 @@ class SessionSetup(arcade.Window):
                 max_value=100000000,
             ),
         ]
+
+        if self.scoring_type == ScoringType.COMBO:
+            self.fixed_fields.extend(
+                MenuField(
+                    name=label,
+                    field_type=FieldType.NUMERIC,
+                    value=self.combo_weights[key],
+                    step=0.1,
+                    min_value=-1_000_000,
+                    max_value=1_000_000,
+                )
+                for key, label in COMBO_WEIGHT_LABELS.items()
+            )
 
         self.fields = list(self.fixed_fields)
 
@@ -760,11 +794,20 @@ class SessionSetup(arcade.Window):
             self.speed_multiplier = changed_field.value
         elif name == "Spawn type":
             self.spawn_type = changed_field.value
+        elif name == "Scoring type":
+            self.scoring_type = changed_field.value
+            self._rebuild_fields()
+        elif name == "Count monster kills":
+            self.count_monster_kills = changed_field.value
         elif name == "Round time":
             self.round_time = changed_field.value
         elif name == "Money after each round":
             self.money_inject = int(changed_field.value)
         else:
+            for key, label in COMBO_WEIGHT_LABELS.items():
+                if name == label:
+                    self.combo_weights[key] = float(changed_field.value)
+                    return
             # Random map sub-fields — route to the owning entry's random_params
             idx = changed_field.map_entry_index
             if idx >= 0 and idx < len(self.map_list):
@@ -830,6 +873,12 @@ class SessionSetup(arcade.Window):
         if "spawn_type" in config:
             self.spawn_type = SpawnType(int(config["spawn_type"]))
 
+        self.scoring_type = ScoringType(config.get("scoring_type", ScoringType.SURVIVAL))
+        self.count_monster_kills = bool(config.get("count_monster_kills", True))
+        self.combo_weights = {
+            key: float(config.get(key, 1.0)) for key in COMBO_WEIGHT_LABELS
+        }
+
         if "round_time" in config:
             self.round_time = int(config["round_time"])
 
@@ -893,6 +942,9 @@ class SessionSetup(arcade.Window):
             "damage_multiplier": self.damage_multiplier,
             "speed_multiplier": self.speed_multiplier,
             "spawn_type": int(self.spawn_type),
+            "scoring_type": int(self.scoring_type),
+            "count_monster_kills": self.count_monster_kills,
+            **self.combo_weights,
             "round_time": int(self.round_time),
             "money_inject": int(self.money_inject),
             "maps": maps_out,

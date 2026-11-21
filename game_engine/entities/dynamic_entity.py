@@ -112,6 +112,9 @@ class DynamicEntity(GameObject):
         """Add money to the entity."""
         self.money += amount
 
+    def is_alive(self) -> bool:
+        return self.state != EntityState.DEAD
+
     @staticmethod
     def create_monster(
         monster_type: EntityType, x: float, y: float, direction: Direction

@@ -14,6 +14,23 @@ class SessionMapType(IntEnum):
     LOAD = 1
 
 
+class ScoringType(IntEnum):
+    SURVIVAL = 0
+    DEATHMATCH = 1
+    TREASURE_HUNT = 2
+    COMBO = 3
+
+    def to_string(self) -> str:
+        return self.name.replace("_", " ").capitalize()
+
+
+COMBO_WEIGHT_LABELS = {
+    "weight_survival": "Survival weight",
+    "weight_kill": "Kill weight",
+    "weight_money": "Treasure weight",
+}
+
+
 class SessionPlayer:
 
     def __init__(
@@ -91,6 +108,11 @@ class Session:
         round_time: int,
         money_inject: int,
         base_dig_power: int,
+        scoring_type: ScoringType = ScoringType.SURVIVAL,
+        weight_survival: float = 1.0,
+        weight_kill: float = 1.0,
+        weight_money: float = 1.0,
+        count_monster_kills: bool = True,
     ) -> None:
         self.valid = True
         self.starting_money = starting_money
@@ -102,6 +124,11 @@ class Session:
         self.maps = maps
         self.money_inject = money_inject
         self.base_dig_power = base_dig_power
+        self.scoring_type = scoring_type
+        self.weight_survival = weight_survival
+        self.weight_kill = weight_kill
+        self.weight_money = weight_money
+        self.count_monster_kills = count_monster_kills
         self._current_map = 0
 
     def get_next_map(self) -> SessionMap:
@@ -140,6 +167,10 @@ class Session:
         money_inject = config.get_config_mandatory("money_inject", int)
         base_dig_power = config.get_config_def(
             "base_dig_power", int, BASE_DIGGING_POWER
+        )
+
+        scoring_type = config.get_config_def(
+            "scoring_type", ScoringType, ScoringType.SURVIVAL
         )
 
         maps = []
@@ -188,6 +219,11 @@ class Session:
             round_time,
             money_inject,
             base_dig_power,
+            scoring_type=scoring_type,
+            weight_survival=config.get_config_def("weight_survival", float, 1.0),
+            weight_kill=config.get_config_def("weight_kill", float, 1.0),
+            weight_money=config.get_config_def("weight_money", float, 1.0),
+            count_monster_kills=config.get_config_def("count_monster_kills", bool, True),
         )
 
     @staticmethod
