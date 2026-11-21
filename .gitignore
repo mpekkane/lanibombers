@@ -13,3 +13,4 @@ dist/
 *.orig
 .vscode/
 logs/
+AGENTS.md

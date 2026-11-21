@@ -10,7 +10,6 @@ from network_stack.shared.factory import get_scanner
 from renderer.bitmap_text import BitmapText
 from common.logger import get_logger
 from network_stack.messages.messages import ClientConnectionState
-from common.keymapper import key_to_char
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
@@ -81,6 +80,7 @@ class ServerFinderView(arcade.View):
         self.server_list_sprites = arcade.SpriteList()
         self._cached_server_key = None
         self.writing = False
+        self._opening_chat = False
         self.text_msg = ""
         self.chat_sprites = arcade.SpriteList()
         self.player_sprites = arcade.SpriteList()
@@ -352,8 +352,10 @@ class ServerFinderView(arcade.View):
     # ------------------------------------------------------------------
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+        self._opening_chat = False
         if self._connected and not self.writing and symbol == arcade.key.Y:
             self.writing = True
+            self._opening_chat = True
             self.text_msg = ""
         elif self._connected and self.writing:
             if symbol == arcade.key.ESCAPE:
@@ -362,14 +364,7 @@ class ServerFinderView(arcade.View):
                 self.writing = False
                 self.window.send_chat(self.text_msg)
             elif symbol == arcade.key.BACKSPACE:
-                if self.text_msg:
-                    self.text_msg = self.text_msg[:-1]
-                    self.player_name = self.text_msg
-            else:
-                char = key_to_char(symbol, modifiers, is_text=True)
-                if char and len(self.text_msg) < self.max_chat_line_len:
-                    self.text_msg += char
-                    self.player_name = self.text_msg
+                self.text_msg = self.text_msg[:-1]
             return
         else:
             if symbol == arcade.key.ESCAPE:
@@ -387,6 +382,17 @@ class ServerFinderView(arcade.View):
             elif symbol in (arcade.key.RETURN, arcade.key.ENTER):
                 if self._servers and not self._connected:
                     self._connect(self._servers[self._selected])
+
+    def on_text(self, text: str) -> None:
+        if not self._connected or not self.writing:
+            return
+        if self._opening_chat:
+            self._opening_chat = False
+            if text.lower() == "y":
+                return
+
+        remaining = self.max_chat_line_len - len(self.text_msg)
+        self.text_msg += "".join(char for char in text if char.isprintable())[:remaining]
 
     # ------------------------------------------------------------------
     # Connection
