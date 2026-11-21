@@ -121,6 +121,7 @@ class BomberServerBase:
 
         self.players: List[SessionPlayer] = []
         self.pending_players: dict[str, SessionPlayer] = {}
+        self._disconnected_players: dict[str, SessionPlayer] = {}
         self._admission_lock = RLock()
         self._shop_info: SessionInfo | None = None
         self._latest_game_state: GameState | None = None
@@ -230,6 +231,7 @@ class BomberServerBase:
         with self._admission_lock:
             self.players.clear()
             self.pending_players.clear()
+            self._disconnected_players.clear()
             self._shop_info = None
             self._latest_game_state = None
             self._countdown = None
@@ -530,13 +532,7 @@ class BomberServerBase:
     def run_shop(self) -> None:
         info = self.generate_next_map()
         with self._admission_lock:
-            if self.pending_players:
-                money, score = self._join_starting_values()
-                for player in self.pending_players.values():
-                    player.money = money
-                    player.score = score
-            self.players.extend(self.pending_players.values())
-            self.pending_players.clear()
+            self.players.extend(self._take_pending_players())
             self.shop_complete = False
             self._update_shop()
             self._shop_info = info
@@ -858,9 +854,12 @@ class BomberServerBase:
 
         self.server.disconnect_all()
         self._stop_networking()
-        self.session.reset()
-        self.rounds_left = self.session.rounds_left()
-        self.state_machine.update()
+        with self._admission_lock:
+            self.pending_players.clear()
+            self._disconnected_players.clear()
+            self.session.reset()
+            self.rounds_left = self.session.rounds_left()
+            self.state_machine.update()
         if self.use_lights:
             self.lighting_fx.stop_fx()
 
@@ -1027,6 +1026,22 @@ class BomberServerBase:
         score = min(player.score for player in self.players) - 1
         return money, score
 
+    def _take_pending_players(self) -> list[SessionPlayer]:
+        players = list(self.pending_players.values())
+        if players:
+            money, score = self._join_starting_values()
+            for player in players:
+                if self._disconnected_players.pop(player.name, None) is not None:
+                    self.server.log.info(
+                        "Restored %s in the shop (score=%d, money=%d, inventory=%s)",
+                        player.name, player.score, player.money, player.inventory,
+                    )
+                else:
+                    player.money = money
+                    player.score = score
+        self.pending_players.clear()
+        return players
+
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
         with self._admission_lock:
             if ctx.name is not None:
@@ -1050,13 +1065,19 @@ class BomberServerBase:
                 )
                 return
 
-            player = SessionPlayer(
-                name=name,
-                color=msg.color,
-                appearance=msg.appearance_id,
-                money=self.session.starting_money,
-                base_dig_power=self.session.base_dig_power,
-            )
+            player = self._disconnected_players.get(name)
+            returning = player is not None
+            if player is None:
+                player = SessionPlayer(
+                    name=name,
+                    color=msg.color,
+                    appearance=msg.appearance_id,
+                    money=self.session.starting_money,
+                    base_dig_power=self.session.base_dig_power,
+                )
+            else:
+                player.color = msg.color
+                player.appearance = msg.appearance_id
             ctx.name = name
             if self.state == ServerState.GAME or (
                 self.state == ServerState.SHOP
@@ -1068,16 +1089,25 @@ class BomberServerBase:
             elif self.state == ServerState.SHOP:
                 mode = JoinMode.SHOP
                 if self._shop_info is not None and self.shop is not None:
-                    player.money, player.score = self._join_starting_values()
+                    if returning:
+                        self._disconnected_players.pop(name)
+                    else:
+                        player.money, player.score = self._join_starting_values()
                     self.shop.add_player(player)
                 else:
                     self.pending_players[name] = player
             else:
                 mode = JoinMode.LOBBY
+                self._disconnected_players.pop(name, None)
                 self.players.append(player)
 
             ctx.send(ClientConnectionStateMessage(ClientConnectionState.CONNECTED))
             ctx.send(JoinReply(mode))
+            if returning:
+                self.server.log.info(
+                    "Recognized reconnect for %s (mode=%s, score=%d, money=%d, inventory=%s)",
+                    name, mode.name, player.score, player.money, player.inventory,
+                )
             if mode == JoinMode.SHOP and self._shop_info is not None:
                 ctx.send(self._shop_info)
                 self._send_shop()
@@ -1143,8 +1173,27 @@ class BomberServerBase:
             if name is None or self.pending_players.pop(name, None) is not None:
                 return
 
+            player = next((player for player in self.players if player.name == name), None)
+            if player is None:
+                return
+
             if self.state == ServerState.GAME and self.engine is not None:
+                game_player = self.engine.get_player_by_name(name)
+                if game_player is not None:
+                    player.money = game_player.money
+                    player.inventory = list(game_player.inventory)
+                    player.tools = {}
+                    player.dig_power = BASE_DIGGING_POWER
+                    player.max_health = 100
                 self.engine.remove_player(name)
+
+            player.created = False
+            if self.state.running():
+                self._disconnected_players[name] = player
+                self.server.log.info(
+                    "Saved state for %s (score=%d, money=%d, inventory=%s)",
+                    name, player.score, player.money, player.inventory,
+                )
 
             if (
                 self.state == ServerState.SHOP
@@ -1153,16 +1202,13 @@ class BomberServerBase:
             ):
                 self.shop.remove_player(name)
                 if not self.players and self.pending_players:
-                    for player in self.pending_players.values():
-                        self.shop.add_player(player)
-                    self.pending_players.clear()
+                    for pending_player in self._take_pending_players():
+                        self.shop.add_player(pending_player)
                     self.server.broadcast(self._shop_info)
                 self.shop_complete = bool(self.players) and self.shop.all_done
                 self._send_shop()
-
-            for player in list(self.players):
-                if player.name == name:
-                    self.players.remove(player)
+            else:
+                self.players.remove(player)
 
 
 def ping_thread(server: BomberServerBase) -> None:
