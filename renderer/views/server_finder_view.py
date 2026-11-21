@@ -133,8 +133,25 @@ class ServerFinderView(arcade.View):
         if self.window.connection_state == ClientConnectionState.DISCONNECTED:
             self.window.connection_state = ClientConnectionState.NONE
             self._connected = False
-            self.chat_sprites = arcade.SpriteList()
+            self._connecting = False
             self.player_sprites = arcade.SpriteList()
+
+            if self.window.connection_state_msg is not None:
+                sprites = arcade.SpriteList()
+                chat_x = SERVER_LIST_X + 320 * self.zoom
+                chat_y = self.window.height - SERVER_LIST_Y * self.zoom
+                line = self.bitmap_text.create_text_sprites(
+                    self.window.connection_state_msg,
+                    chat_x,
+                    chat_y,
+                    color=(0xFF, 0xFF, 0x00),
+                )
+                for s in line:
+                    sprites.append(s)
+                self.chat_sprites = sprites
+            else:
+                self.chat_sprites = arcade.SpriteList()
+
             if not self._scanning:
                 self._start_scan()
 

@@ -118,6 +118,7 @@ class LanibombersWindow(arcade.Window):
         self.auto = auto
         self.log = get_logger()
         self.connection_state = ClientConnectionState.NONE
+        self.connection_state_msg = None
         self.chat_log = []
         self.lobby_players = []
 
@@ -289,6 +290,10 @@ class LanibombersWindow(arcade.Window):
 
     def _on_client_state(self, msg: ClientConnectionStateMessage) -> None:
         self.connection_state = msg.state
+        if msg.msg is not None and len(msg.msg) > 0:
+            self.connection_state_msg = msg.msg
+        else:
+            self.connection_state_msg = None
 
     def _on_chat(self, msg: ChatText) -> None:
         m = re.fullmatch(r"<([^>]+)>\s*(.*)", msg.text)

@@ -684,18 +684,20 @@ class ClientConnectionStateMessage(Message):
 
     TYPE: ClassVar[int] = 15
     state: ClientConnectionState
+    msg: str = ""
 
     def to_bytes(self) -> bytes:
         # main data
         b_state = int(self.state).to_bytes(1, "big")
+        b_msg = self.msg.encode("utf-8")
 
-        return b_state
+        return b_state + b_msg
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> ClientConnectionStateMessage:
         state = ClientConnectionState(int(payload[0]))
-
-        return cls(state=state)
+        msg = payload[1:].decode("utf-8")
+        return cls(state=state, msg=msg)
 
 
 @register_message

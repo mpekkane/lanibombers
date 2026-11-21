@@ -885,12 +885,10 @@ class BomberServerBase:
         if player is None:
             return
 
-
         try:
             target_type = BombType(msg.bomb_type)
         except ValueError:
             return
-
 
         player.select(target_type)
 
@@ -928,19 +926,33 @@ class BomberServerBase:
         player_color = msg.color
         player_appearance = msg.appearance_id
 
-        self.players.append(
-            SessionPlayer(
-                name=player_name,
-                color=player_color,
-                appearance=player_appearance,
-                money=self.session.starting_money,
-                base_dig_power=self.session.base_dig_power
-            )
-        )  # type: ignore
+        taken = False
+        for player in self.players:
+            if player.name == player_name:
+                taken = True
+                break
 
-        self.server.send_to_client(
-            ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED)
-        )
+        if taken:
+            self.server.send_to_client(
+                ctx,
+                ClientConnectionStateMessage(
+                    ClientConnectionState.DISCONNECTED, msg="name taken"
+                ),
+            )
+        else:
+            self.players.append(
+                SessionPlayer(
+                    name=player_name,
+                    color=player_color,
+                    appearance=player_appearance,
+                    money=self.session.starting_money,
+                    base_dig_power=self.session.base_dig_power,
+                )
+            )  # type: ignore
+
+            self.server.send_to_client(
+                ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED)
+            )
 
     def create_game_player(self, session_player: SessionPlayer) -> None:
         assert self.engine is not None
