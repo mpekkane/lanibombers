@@ -203,8 +203,16 @@ class GameEngine:
             n = len(self.players)
         self.starting_poses = get_spawn_points(n, self.map_data, self.spawn_type)
 
+        d = 3
         for pos in self.starting_poses:
-            self.tiles[pos[0]][pos[1]] = Tile.create_empty()
+            for r in range(-d, d+1):
+                px = pos[0]+r
+                px = clamp(px, 0, self.map_data.width)
+                self.tiles[px][pos[1]] = Tile.create_empty()
+            for r in range(-d, d+1):
+                py = pos[1]+r
+                py = clamp(py, 0, self.map_data.height)
+                self.tiles[pos[0]][py] = Tile.create_empty()
 
     def start(self) -> None:
         """Start the game engine and event processing."""
