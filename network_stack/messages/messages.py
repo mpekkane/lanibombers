@@ -723,3 +723,23 @@ class LobbyPlayers(Message):
         return cls(
             players=players,
         )
+
+
+class JoinMode(IntEnum):
+    LOBBY = 0
+    SHOP = 1
+    SPECTATE = 2
+
+
+@register_message
+@dataclass(frozen=True)
+class JoinReply(Message):
+    TYPE: ClassVar[int] = 17
+    mode: JoinMode
+
+    def to_bytes(self) -> bytes:
+        return bytes((int(self.mode),))
+
+    @classmethod
+    def from_bytes(cls, payload: bytes) -> JoinReply:
+        return cls(JoinMode(payload[0]))

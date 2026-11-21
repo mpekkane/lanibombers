@@ -2200,7 +2200,7 @@ class TkBomberServer(BomberServerBase):
         state = self.state_machine.get_state()
 
         self.state_var.set(state.name)
-        self.players_var.set(str(len(self.players)))
+        self.players_var.set(str(len(self.players) + len(self.pending_players)))
         self.rounds_var.set(str(self.rounds_left))
 
         if self.average_ping >= 0:
@@ -2218,7 +2218,9 @@ class TkBomberServer(BomberServerBase):
             return
 
         players = sorted(self.players, key=lambda player: player.score, reverse=True)
-        rows_key = tuple((p.id, p.name, p.score, p.money) for p in players)
+        spectators = list(self.pending_players.values())
+        players.extend(spectators)
+        rows_key = tuple((p.id, p.name, p.score, p.money, p in spectators) for p in players)
         if rows_key == self._player_rows_key:
             return
         self._player_rows_key = rows_key
@@ -2232,10 +2234,13 @@ class TkBomberServer(BomberServerBase):
             return
 
         for index, player in enumerate(players):
-            line = (
-                f"{index + 1:>2}. {player.name:<18} "
-                f"score={player.score:<4} money={player.money:<4}"
-            )
+            if player in spectators:
+                line = f"    {player.name:<18} spectating"
+            else:
+                line = (
+                    f"{index + 1:>2}. {player.name:<18} "
+                    f"score={player.score:<4} money={player.money:<4}"
+                )
             ttk.Label(rows, text=line, font=self.base_font).grid(
                 row=index, column=0, sticky="w", padx=4
             )

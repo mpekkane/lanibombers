@@ -76,14 +76,7 @@ class _UDPWire(DatagramProtocol):
 
 
 class UDPServer(TransportServer):
-    """
-    UDP transport server.
-
-    Two ways to "broadcast":
-    - If exclude is None: send ONE datagram to broadcast/multicast address (true broadcast).
-    - If exclude is provided: cannot exclude with true broadcast, so we unicast to known peers
-      except the excluded peer.
-    """
+    """UDP transport server with discovery and unicast updates to connected peers."""
 
     def __init__(
         self,
@@ -185,25 +178,14 @@ class UDPServer(TransportServer):
     def broadcast(
         self, msg: Message, exclude: Optional[TransportServerProtocol] = None
     ) -> None:
-        """UDP Broadcasting"""
-        payload = encode_message(msg)
+        def _send() -> None:
+            payload = encode_message(msg)
+            for peer in self._state_by_peer:
+                if peer is not exclude:
+                    self._wire.transport.write(payload, peer.addr)
 
-        # If we can do true broadcast (no exclude), send ONE datagram to broadcast address.
-        if exclude is None:
-            # UDP broadcast
-            self._wire.transport.write(payload, (self.broadcast_addr, self.port))
-
-            # Optional multicast send too (if configured)
-            if self.multicast_group is not None:
-                self._wire.transport.write(payload, (self.multicast_group, self.port))
-            return
-
-        # If exclude is requested, true broadcast can't exclude.
-        # Fall back to per-peer unicast to known peers.
-        for peer in list(self._state_by_peer.keys()):
-            if peer is exclude:
-                continue
-            self._wire.transport.write(payload, peer.addr)
+        if reactor.running:
+            reactor.callFromThread(_send)
 
     def send_to(self, proto: TransportServerProtocol, msg: Message) -> None:
         """Works for UDPPeer and any other TransportServerProtocol"""

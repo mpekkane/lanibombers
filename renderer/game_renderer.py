@@ -66,9 +66,11 @@ class GameView(arcade.View):
         show_stats: bool = False,
         show_grid: bool = True,
         item_hotkeys: Optional[Dict[BombType, str]] = None,
+        spectating: bool = False,
     ):
         super().__init__()
         self.client_player_name = client_player_name
+        self.spectating = spectating
         self.item_hotkeys = item_hotkeys or {}
         self.show_stats = show_stats
         self.render_state_function = render_state_function
@@ -131,6 +133,14 @@ class GameView(arcade.View):
         self.margin_renderer = MarginRenderer(
             self.zoom, self.window.height, self.client_player_name
         )
+        if self.spectating:
+            font = self.margin_renderer.bitmap_text
+            label = "Spectating"
+            self.spectator_label = font.create_text_sprites(
+                label,
+                (self.window.width - font.get_text_width(label)) / 2,
+                self.window.height - self.zoom,
+            )
 
         # Calculate y offset for UI space at top
         self.ui_offset = UI_TOP_MARGIN * self.zoom
@@ -194,7 +204,14 @@ class GameView(arcade.View):
             return
 
         state = self.render_state_function()
-        if not state.running:
+        if self.spectating:
+            if self.window.session_end:
+                self.window.view_complete(ClientStateAction.END)
+                return
+            if self.window.shop_ready():
+                self.window.view_complete()
+                return
+        elif not state.running:
             if not self.closing:
                 self.closing = True
             else:
@@ -293,6 +310,8 @@ class GameView(arcade.View):
         Returns:
             The client's player entity, or None if not found
         """
+        if self.spectating:
+            return next((player for player in players if player.is_alive()), None)
         for player in players:
             if player.name == self.client_player_name:
                 return player
@@ -398,6 +417,8 @@ class GameView(arcade.View):
         self.ui_camera.use()
         self.header_renderer.on_draw(show_stats=not shaking and self.show_stats)
         self.margin_renderer.on_draw()
+        if self.spectating:
+            self.spectator_label.draw(pixelated=True)
 
         # Draw perf graphs without shake (stationary)
         if shaking and self.show_stats:
@@ -472,7 +493,9 @@ class GameView(arcade.View):
         self.input_callback_bound = True
 
     def on_key_press(self, symbol: int, modifiers: int):
-        if self.input_callback is not None:
+        if self.spectating and symbol == arcade.key.ESCAPE:
+            self.window.disconnect()
+        elif not self.spectating and self.input_callback is not None:
             self.input_callback(symbol, modifiers)
 
     def on_key_release(self, symbol: int, modifiers: int):

@@ -8,7 +8,10 @@ Modes:
 
 from __future__ import annotations
 
+from dataclasses import replace
+from threading import RLock
 import uuid
+from copy import deepcopy
 from typing import Dict, List, Optional, Callable
 
 import numpy as np
@@ -30,6 +33,8 @@ from network_stack.messages.messages import (
     ClientConnectionStateMessage,
     ClientConnectionState,
     LobbyPlayers,
+    JoinMode,
+    JoinReply,
 )
 from game_engine.clock import Clock
 from game_engine.entities import Direction, EntityState
@@ -115,6 +120,11 @@ class BomberServerBase:
         self.MAX_PING_BUFFER = 1
 
         self.players: List[SessionPlayer] = []
+        self.pending_players: dict[str, SessionPlayer] = {}
+        self._admission_lock = RLock()
+        self._shop_info: SessionInfo | None = None
+        self._latest_game_state: GameState | None = None
+        self._countdown: int | None = None
 
         self.shop: Optional[Shop] = None
         self.shop_complete = False
@@ -198,6 +208,9 @@ class BomberServerBase:
         disconnects clients, stops networking, clears transient state, and
         moves the state machine to STOPPED.
         """
+        with self._admission_lock:
+            self.state_machine.stop()
+
         if self.engine is not None:
             try:
                 self.engine.stop()
@@ -214,7 +227,12 @@ class BomberServerBase:
         for player in self.players:
             player.created = False
 
-        self.players.clear()
+        with self._admission_lock:
+            self.players.clear()
+            self.pending_players.clear()
+            self._shop_info = None
+            self._latest_game_state = None
+            self._countdown = None
         self.pings.clear()
         self.average_ping = -1
         self.ping_count = 0
@@ -224,7 +242,7 @@ class BomberServerBase:
         self._stop_networking()
 
         self.session.reset()
-        self.state_machine.stop()
+        self.rounds_left = self.session.rounds_left()
 
         if self.use_lights:
             self.lighting_fx.stop_fx()
@@ -356,7 +374,9 @@ class BomberServerBase:
     ##################
 
     def render_callback(self, state: RenderState) -> None:
-        self.server.broadcast(GameState.from_render(state), None)  # type: ignore
+        snapshot = GameState.from_render(state)
+        self._latest_game_state = snapshot
+        self.server.broadcast(snapshot)
 
     def get_render_state(self) -> Optional[RenderState]:
         """Returns RenderState with dimensions and sprite indices."""
@@ -415,8 +435,9 @@ class BomberServerBase:
                 self.engine = None
                 self.sound_engine = None
 
-                self._start_networking()
-                self.state_machine.update()
+                with self._admission_lock:
+                    self._start_networking()
+                    self.state_machine.update()
                 return
 
             Clock.sleep(0.1)
@@ -473,7 +494,7 @@ class BomberServerBase:
     # Map/session
     ##################
 
-    def generate_next_map(self) -> None:
+    def generate_next_map(self) -> SessionInfo:
         self.rounds_left = self.session.rounds_left()
         next_map = self.session.get_next_map()
 
@@ -494,38 +515,50 @@ class BomberServerBase:
                 next_map.room_chance,
             )
 
-        info = SessionInfo(
+        return SessionInfo(
             rounds_left=self.rounds_left,
             width=self.map_data.width,
             height=self.map_data.height,
             tilemap=GameEngine.tilemap_to_numpy(self.map_data.tiles),
             pickups=self.map_data.treasures,
         )
-        self.server.broadcast(info, None)
 
     ##################
     # Shop
     ##################
 
     def run_shop(self) -> None:
-        self.generate_next_map()
-        self.shop_complete = False
-        self._update_shop()
-        self._send_shop()
+        info = self.generate_next_map()
+        with self._admission_lock:
+            if self.pending_players:
+                money, score = self._join_starting_values()
+                for player in self.pending_players.values():
+                    player.money = money
+                    player.score = score
+            self.players.extend(self.pending_players.values())
+            self.pending_players.clear()
+            self.shop_complete = False
+            self._update_shop()
+            self._shop_info = info
+            self.server.broadcast(info)
+            self._send_shop()
 
         if self.use_lights:
             self.lighting_fx.shop()
 
-        while not self.shop_complete and not self.ui_should_quit():
+        while not self.ui_should_quit():
             self.ui_tick()
 
             if self._handle_stop_server_request():
                 return
 
-            Clock.sleep(1)
+            with self._admission_lock:
+                if self.shop_complete:
+                    self._shop_info = None
+                    self.state_machine.update()
+                    return
 
-        if self.shop_complete:
-            self.state_machine.update()
+            Clock.sleep(1)
 
     def _update_shop(self) -> None:
         if self.shop is None:
@@ -540,41 +573,48 @@ class BomberServerBase:
     def _send_shop(self) -> None:
         if self.shop is None:
             return
-        self.server.broadcast(ShopState.from_shop(self.shop), None)
+        self.server.broadcast(deepcopy(ShopState.from_shop(self.shop)))
 
     ##################
     # Game
     ##################
 
     def start_game(self) -> None:
-        assert self.map_data is not None
+        with self._admission_lock:
+            assert self.map_data is not None
 
-        self.engine = GameEngine(
-            self.map_data.width,
-            self.map_data.height,
-            spawn_type=self.session.spawn_type,
-            max_round_time=self.session.round_time,
-            lighting_fx=self.lighting_fx,
-        )
-        self.engine.set_render_callback(self.render_callback)
-        self.engine.load_map(self.map_data)
-        self.engine.set_starting_points(num_players=len(self.players))
+            self.engine = GameEngine(
+                self.map_data.width,
+                self.map_data.height,
+                spawn_type=self.session.spawn_type,
+                max_round_time=self.session.round_time,
+                lighting_fx=self.lighting_fx,
+            )
+            self.engine.set_render_callback(self.render_callback)
+            self.engine.load_map(self.map_data)
+            if self.players:
+                self.engine.set_starting_points(num_players=len(self.players))
+            else:
+                self.engine.running = False
 
-        self.sound_engine = (
-            SoundEngine(music_volume=0.5, fx_volume=1.0) if not self.headless else None
-        )
+            self.sound_engine = (
+                SoundEngine(music_volume=0.5, fx_volume=1.0)
+                if not self.headless
+                else None
+            )
 
-        for player in self.players:
-            if not player.created:
-                self.create_game_player(player)
-                player.created = True
+            for player in self.players:
+                if not player.created:
+                    self.create_game_player(player)
+                    player.created = True
 
-        self.render_callback(self.engine.get_render_state())
+            self.render_callback(self.engine.get_render_state())
         self.run_game()
 
     def run_game(self) -> None:
         assert self.engine is not None
-        self._at_round_start()
+        if self.engine.running:
+            self._at_round_start()
 
         if self.use_lights:
             self.lighting_fx.game()
@@ -586,7 +626,7 @@ class BomberServerBase:
                 return
 
             render_state = self.engine.get_render_state()
-            self.server.broadcast(GameState.from_render(render_state), None)
+            self.render_callback(render_state)
 
             if self.use_lights:
                 nuke_found = False
@@ -629,6 +669,7 @@ class BomberServerBase:
 
             if new_count != count:
                 count = new_count
+                self._countdown = count
                 self.server.broadcast(Countdown(count=count))
                 if self.use_lights:
                     self.lighting_fx.countdown()
@@ -642,33 +683,37 @@ class BomberServerBase:
             Clock.sleep(0.1)
 
         self.engine.start()
+        self._countdown = None
         self.game_on_countdown = False
 
     def _at_round_end(self) -> None:
-        assert self.engine is not None
-        quit_session = self.session.session_complete()
+        with self._admission_lock:
+            assert self.engine is not None
+            quit_session = self.session.session_complete()
 
-        for player in self.players:
-            player.created = False
+            for player in self.players:
+                player.created = False
 
-            gp = self.engine.get_player_by_name(player.name)
-            if gp is not None:
-                player.inventory = gp.inventory
-                player.money = gp.money
-                player.tools = {}
-                player.dig_power = BASE_DIGGING_POWER
-                player.max_health = 100
+                gp = self.engine.get_player_by_name(player.name)
+                if gp is not None:
+                    player.inventory = gp.inventory
+                    player.money = gp.money
+                    player.tools = {}
+                    player.dig_power = BASE_DIGGING_POWER
+                    player.max_health = 100
 
-        points_by_name = self.score_players()
-        for player in self.players:
-            if not quit_session:
-                player.money += self.session.money_inject
-            player.score += points_by_name[player.name]
+            points_by_name = self.score_players()
+            for player in self.players:
+                if not quit_session:
+                    player.money += self.session.money_inject
+                player.score += points_by_name[player.name]
 
-        self.engine = None
+            self.engine = None
+            self._latest_game_state = None
+            self._countdown = None
+
+            self.state_machine.update(quit=quit_session)
         self.ui_show_scores()
-
-        self.state_machine.update(quit=quit_session)
         if self.use_lights:
             self.lighting_fx.stop_fx()
 
@@ -775,7 +820,12 @@ class BomberServerBase:
         return rows
 
     def kick_player(self, player: SessionPlayer) -> bool:
-        return player in self.players and self.server.disconnect_player(player.name)
+        with self._admission_lock:
+            connected = (
+                player in self.players
+                or self.pending_players.get(player.name) is player
+            )
+            return connected and self.server.disconnect_player(player.name)
 
     def end_game(self) -> None:
         self.ui_show_end_message()
@@ -791,9 +841,9 @@ class BomberServerBase:
                     max_points = p.score
                     winner = p
 
-            assert winner
             self.lighting_fx.stop_fx()
-            self.lighting_fx.win(winner.color[0], winner.color[1], winner.color[2])
+            if winner is not None:
+                self.lighting_fx.win(winner.color[0], winner.color[1], winner.color[2])
 
         while dt < self.end_screen_wait_time and not self.ui_should_quit():
             self.ui_tick()
@@ -809,6 +859,7 @@ class BomberServerBase:
         self.server.disconnect_all()
         self._stop_networking()
         self.session.reset()
+        self.rounds_left = self.session.rounds_left()
         self.state_machine.update()
         if self.use_lights:
             self.lighting_fx.stop_fx()
@@ -828,25 +879,28 @@ class BomberServerBase:
     ##################
 
     def on_control(self, msg: ClientControl, ctx: ClientContext) -> None:
-        current_state = self.state_machine.get_state()
+        with self._admission_lock:
+            if ctx.name is None or ctx.name in self.pending_players:
+                return
 
-        if current_state == ServerState.GAME:
-            if not self.game_on_countdown:
-                self._on_control_game(msg, ctx)
-        elif current_state == ServerState.SHOP:
-            self._on_control_shop(msg, ctx)
+            if self.state == ServerState.SHOP:
+                if self._shop_info is not None and not self.shop_complete:
+                    self._on_control_shop(msg, ctx)
+                return
+
+            if self.state != ServerState.GAME or self.game_on_countdown:
+                return
+
+        self._on_control_game(msg, ctx)
 
     def _on_control_shop(self, msg: ClientControl, ctx: ClientContext) -> None:
-        if self.shop is None:
+        if self.shop is None or ctx.name is None:
             return
 
         cmd: Action = msg.command  # type: ignore
         assert isinstance(cmd, Action)
 
-        player = None
-        if ctx.state.name is not None:
-            player = self.get_player(ctx.state.name)
-
+        player = self.shop.get_player(ctx.name)
         if player is None:
             return
 
@@ -863,15 +917,11 @@ class BomberServerBase:
         self._send_shop()
 
     def _on_control_game(self, msg: ClientControl, ctx: ClientContext) -> None:
-        if not self.state.running():
-            return
-        if self.engine is None:
+        engine = self.engine
+        if self.state != ServerState.GAME or ctx.name is None or engine is None:
             return
 
-        if ctx.state.name is not None:
-            player = self.engine.get_player_by_name(ctx.state.name)
-        else:
-            player = self.engine.get_player_by_name("unnamed")
+        player = engine.get_player_by_name(ctx.name)
 
         if player is None:
             return
@@ -900,7 +950,7 @@ class BomberServerBase:
             ):
                 return
 
-            self.engine.input_queue.submit(
+            engine.input_queue.submit(
                 InputCommand(
                     entity=player,
                     action=cmd,
@@ -913,7 +963,7 @@ class BomberServerBase:
             if cmd == Action.FIRE:
                 bomb = player.plant_bomb()
                 if bomb is not None:
-                    self.engine.input_queue.submit(
+                    engine.input_queue.submit(
                         InputCommand(
                             entity=player,
                             action=cmd,
@@ -923,21 +973,16 @@ class BomberServerBase:
                     )
 
             elif cmd == Action.REMOTE:
-                self.engine.input_queue.submit(
+                engine.input_queue.submit(
                     InputCommand(entity=player, action=cmd, timestamp=now)
                 )
 
     def on_select(self, msg: ClientSelect, ctx: ClientContext) -> None:
-        if not self.state.running():
-            return
-        if self.engine is None:
+        engine = self.engine
+        if self.state != ServerState.GAME or ctx.name is None or engine is None:
             return
 
-        if ctx.state.name is not None:
-            player = self.engine.get_player_by_name(ctx.state.name)
-        else:
-            player = self.engine.get_player_by_name("unnamed")
-
+        player = engine.get_player_by_name(ctx.name)
         if player is None:
             return
 
@@ -975,42 +1020,71 @@ class BomberServerBase:
             for key in oldest_keys:
                 self.pings.pop(key, None)
 
+    def _join_starting_values(self) -> tuple[int, int]:
+        if not self.players or self.rounds_left == len(self.session.maps):
+            return self.session.starting_money, 0
+        money = sum(player.money for player in self.players) // len(self.players)
+        score = min(player.score for player in self.players) - 1
+        return money, score
+
     def on_name(self, msg: Name, ctx: ClientContext) -> None:
-        if ctx.name is not None:
-            return
+        with self._admission_lock:
+            if ctx.name is not None:
+                return
 
-        player_name = msg.name
-        player_color = msg.color
-        player_appearance = msg.appearance_id
+            name = msg.name
+            if not self.state.running():
+                rejection = "Session is unavailable"
+            elif name in self.pending_players or any(
+                player.name == name for player in self.players
+            ):
+                rejection = "name taken"
+            else:
+                rejection = None
 
-        taken = False
-        for player in self.players:
-            if player.name == player_name:
-                taken = True
-                break
-
-        if taken:
-            self.server.send_to_client(
-                ctx,
-                ClientConnectionStateMessage(
-                    ClientConnectionState.DISCONNECTED, msg="name taken"
-                ),
-            )
-        else:
-            ctx.name = player_name
-            self.players.append(
-                SessionPlayer(
-                    name=player_name,
-                    color=player_color,
-                    appearance=player_appearance,
-                    money=self.session.starting_money,
-                    base_dig_power=self.session.base_dig_power,
+            if rejection is not None:
+                ctx.send(
+                    ClientConnectionStateMessage(
+                        ClientConnectionState.DISCONNECTED, msg=rejection
+                    )
                 )
-            )  # type: ignore
+                return
 
-            self.server.send_to_client(
-                ctx, ClientConnectionStateMessage(ClientConnectionState.CONNECTED)
+            player = SessionPlayer(
+                name=name,
+                color=msg.color,
+                appearance=msg.appearance_id,
+                money=self.session.starting_money,
+                base_dig_power=self.session.base_dig_power,
             )
+            ctx.name = name
+            if self.state == ServerState.GAME or (
+                self.state == ServerState.SHOP
+                and self._shop_info is not None
+                and self.shop_complete
+            ):
+                mode = JoinMode.SPECTATE
+                self.pending_players[name] = player
+            elif self.state == ServerState.SHOP:
+                mode = JoinMode.SHOP
+                if self._shop_info is not None and self.shop is not None:
+                    player.money, player.score = self._join_starting_values()
+                    self.shop.add_player(player)
+                else:
+                    self.pending_players[name] = player
+            else:
+                mode = JoinMode.LOBBY
+                self.players.append(player)
+
+            ctx.send(ClientConnectionStateMessage(ClientConnectionState.CONNECTED))
+            ctx.send(JoinReply(mode))
+            if mode == JoinMode.SHOP and self._shop_info is not None:
+                ctx.send(self._shop_info)
+                self._send_shop()
+            elif mode == JoinMode.SPECTATE and self._latest_game_state is not None:
+                if self._countdown is not None:
+                    ctx.send(Countdown(count=self._countdown))
+                ctx.send(replace(self._latest_game_state, sounds=()))
 
     def create_game_player(self, session_player: SessionPlayer) -> None:
         assert self.engine is not None
@@ -1064,20 +1138,31 @@ class BomberServerBase:
             self.show_ping_stats(avg_s)
 
     def on_disconnect(self, ctx: ClientContext) -> None:
-        name = ctx.name
+        with self._admission_lock:
+            name = ctx.name
+            if name is None or self.pending_players.pop(name, None) is not None:
+                return
 
-        if name is None:
-            return
+            if self.state == ServerState.GAME and self.engine is not None:
+                self.engine.remove_player(name)
 
-        if self.state == ServerState.GAME and self.engine is not None:
-            self.engine.remove_player(name)
+            if (
+                self.state == ServerState.SHOP
+                and self._shop_info is not None
+                and self.shop is not None
+            ):
+                self.shop.remove_player(name)
+                if not self.players and self.pending_players:
+                    for player in self.pending_players.values():
+                        self.shop.add_player(player)
+                    self.pending_players.clear()
+                    self.server.broadcast(self._shop_info)
+                self.shop_complete = bool(self.players) and self.shop.all_done
+                self._send_shop()
 
-        if self.state == ServerState.SHOP and self.shop is not None:
-            self.shop.remove_player(name)
-
-        for player in list(self.players):
-            if player.name == name:
-                self.players.remove(player)
+            for player in list(self.players):
+                if player.name == name:
+                    self.players.remove(player)
 
 
 def ping_thread(server: BomberServerBase) -> None:

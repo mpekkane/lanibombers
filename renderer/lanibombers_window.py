@@ -21,7 +21,9 @@ from network_stack.messages.messages import (
     ClientConnectionStateMessage,
     ClientConnectionState,
     ChatText,
-    LobbyPlayers
+    LobbyPlayers,
+    JoinMode,
+    JoinReply,
 )
 from common.bomb_dictionary import BombType, BOMB_NAME_TO_TYPE
 from common.keymapper import map_keys, parse_arcade_key
@@ -118,6 +120,7 @@ class LanibombersWindow(arcade.Window):
         self.auto = auto
         self.log = get_logger()
         self.connection_state = ClientConnectionState.NONE
+        self.join_mode: JoinMode | None = None
         self.connection_state_msg = None
         self.chat_log = []
         self.lobby_players = []
@@ -198,22 +201,21 @@ class LanibombersWindow(arcade.Window):
             view.bind_input_callback(self.on_press)
             self.sound_engine.shop()
             return view
-        elif state == ClientState.GAME:
-            self.create_game_simulation()
-            ok = False
-            while not ok:
-                ok = (
-                    self.client_simulation is not None
-                    and self.client_simulation.has_state()
-                )
-                Clock.sleep(0.1)
+        elif state in (ClientState.GAME, ClientState.SPECTATE):
+            spectating = state == ClientState.SPECTATE
+            if not spectating:
+                self.create_game_simulation()
+                while not self.client_simulation.has_state():
+                    Clock.sleep(0.1)
             view = GameView(
                 self.get_render_state,
                 client_player_name=self.name,
                 item_hotkeys=self.item_hotkeys,
                 show_stats=self.show_stats,
+                spectating=spectating,
             )
-            view.bind_input_callback(self.on_press)
+            if not spectating:
+                view.bind_input_callback(self.on_press)
             self.sound_engine.game()
             return view
         # TODO: ending view
@@ -244,7 +246,7 @@ class LanibombersWindow(arcade.Window):
             self.got_shop = False
             self.got_session = False
             self.session_end = False
-        elif state == ClientState.GAME:
+        elif state in (ClientState.GAME, ClientState.SPECTATE):
             self.client_simulation = None
             self.countdown = None
             self.countdown_value_started_at = None
@@ -260,6 +262,17 @@ class LanibombersWindow(arcade.Window):
 
     def connect(self, host: str, port: int, player_config: dict) -> None:
         """Create and start a BomberNetworkClient for the given server."""
+        self.join_mode = None
+        self.connection_state = ClientConnectionState.NONE
+        self.shop = None
+        self.got_shop = False
+        self.got_session = False
+        self.session_end = False
+        self.standings = None
+        self.next_rounds_left = None
+        self.client_simulation = None
+        self.countdown = None
+        self.countdown_value_started_at = None
         client = BomberNetworkClient(_CLIENT_CFG_PATH, self.local_ip)
         client.server_ip = host
         client.server_port = port
@@ -278,6 +291,7 @@ class LanibombersWindow(arcade.Window):
         client.set_callback(ClientConnectionStateMessage, self._on_client_state)
         client.set_callback(ChatText, self._on_chat)
         client.set_callback(LobbyPlayers, self._on_lobby_players)
+        client.set_callback(JoinReply, self._on_join_reply)
         client.set_on_disconnect(self._on_disconnect)
         client.start()
 
@@ -287,6 +301,19 @@ class LanibombersWindow(arcade.Window):
             self.setup_input(self.player_config_path)
         else:
             self.setup_input()
+
+    def _on_join_reply(self, msg: JoinReply) -> None:
+        if msg.mode == JoinMode.SPECTATE and self.client_simulation is None:
+            self.create_game_simulation()
+        self.join_mode = msg.mode
+
+    def shop_ready(self) -> bool:
+        return (
+            self.got_session
+            and bool(self.next_rounds_left)
+            and self.shop is not None
+            and self.shop.get_player(self.name or "Player") is not None
+        )
 
     def _on_client_state(self, msg: ClientConnectionStateMessage) -> None:
         self.connection_state = msg.state
@@ -449,7 +476,7 @@ class LanibombersWindow(arcade.Window):
 
     def on_press(self, symbol: int, modifiers: int) -> None:
         """Translate arcade key press to a network message and send to server."""
-        if self.network_client is None:
+        if self.network_client is None or self.state_machine.get_state() == ClientState.SPECTATE:
             return
         if symbol in self._hotkey_keys:
             self._send_select(self._hotkey_keys[symbol])
@@ -575,6 +602,8 @@ class LanibombersWindow(arcade.Window):
                 action = random.choice(actions)
                 self.on_press(action, 0)
                 Clock.sleep(random.random())
+            elif state == ClientState.SPECTATE:
+                Clock.sleep(0.1)
             elif state == ClientState.ENDING:
                 pass
             elif state == ClientState.QUIT:

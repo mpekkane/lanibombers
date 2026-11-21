@@ -9,7 +9,8 @@ import arcade
 from network_stack.shared.factory import get_scanner
 from renderer.bitmap_text import BitmapText
 from common.logger import get_logger
-from network_stack.messages.messages import ClientConnectionState
+from game_engine.state_machine import ClientStateAction
+from network_stack.messages.messages import ClientConnectionState, JoinMode
 
 # Defaults used when no config is available; can be overridden by the window later.
 _DEFAULT_BASE_ADDR = "192.168"
@@ -156,8 +157,20 @@ class ServerFinderView(arcade.View):
                 self._start_scan()
 
         if self._connected:
-            if self.window.shop is not None:
+            if self.window.join_mode == JoinMode.SPECTATE:
+                if self.window.session_end:
+                    self.window.view_complete(ClientStateAction.END)
+                    return
+                if self.window.shop_ready():
+                    self.window.view_complete()
+                    return
+                simulation = self.window.client_simulation
+                if simulation is not None and simulation.has_state():
+                    self.window.view_complete(ClientStateAction.SPECTATE)
+                    return
+            elif self.window.shop_ready():
                 self.window.view_complete()
+                return
 
         if self._scanning:
             self._scan_elapsed += delta_time
@@ -173,9 +186,6 @@ class ServerFinderView(arcade.View):
                 )
                 self._name_sent = True
 
-            # simulation = self.window.client_simulation
-            # if simulation is not None and simulation.has_state():
-            #     self.window.view_complete()
             if self.window.connection_state == ClientConnectionState.CONNECTED:
                 self._connected = True
                 self._connecting = False
@@ -368,8 +378,6 @@ class ServerFinderView(arcade.View):
             return
         else:
             if symbol == arcade.key.ESCAPE:
-                from game_engine.state_machine import ClientStateAction
-
                 self.window.view_complete(ClientStateAction.RESTART)
             elif symbol == arcade.key.R:
                 self._start_scan()

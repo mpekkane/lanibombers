@@ -39,7 +39,8 @@ class SessionPlayer:
         color: Tuple[int, int, int],
         appearance: int,
         money: int,
-        base_dig_power: int
+        base_dig_power: int,
+        score: int = 0
     ) -> None:
         self.id: UUID = uuid4()
         self.name = name
@@ -51,7 +52,7 @@ class SessionPlayer:
         self.tools: Dict[ToolType, int] = {}
         self.dig_power = base_dig_power
         self.max_health = 100
-        self.score = 0
+        self.score = score
 
     def to_player(self) -> Player:
         return Player(

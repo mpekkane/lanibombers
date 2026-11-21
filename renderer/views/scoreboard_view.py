@@ -145,11 +145,13 @@ class ScoreboardView(arcade.View):
         """Build recolored player sprites for top 4 ranked players."""
         z = self.zoom
         ranked = sorted(self.players, key=lambda p: p.score, reverse=True)[:4]
+        self.player_sprite_list = arcade.SpriteList()
+        if not ranked:
+            return
         top_score = ranked[0].score
         draw_count = sum(1 for p in ranked if p.score == top_score)
         is_draw = draw_count > 1
 
-        self.player_sprite_list = arcade.SpriteList()
         for i, player in enumerate(ranked):
             prefix = APPEARANCE_PREFIX[player.appearance]
             if is_draw and player.score == top_score:

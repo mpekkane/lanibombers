@@ -72,13 +72,15 @@ class Shop:
         return all_done
 
     def remove_player(self, name: str) -> None:
-        for p in self.players:
-            if p.name == name:
-                self.players.remove(p)
-
-        for (player, state) in self.state:
-            if player == name:
-                self.state.remove((player, state))
+        player = self.get_player(name)
+        if player is None:
+            return
+        self.players.remove(player)
+        self.state = [(name_, ready) for name_, ready in self.state if name_ != name]
+        self.cursor_positions = [(pid, pos) for pid, pos in self.cursor_positions if pid != player.id]
+        self.cursor_visual_positions = [
+            (pid, pos) for pid, pos in self.cursor_visual_positions if pid != player.id
+        ]
 
     def update_state(self, items, state, cursor_positions):
         self.items = items
@@ -87,14 +89,19 @@ class Shop:
 
     def reset_shop(self):
         self.state = []
-        for p in self.players:
-            self.state.append((p.name, False))
-
         self.cursor_positions: List[Tuple[UUID, ItemType | str]] = []
         self.cursor_visual_positions: List[Tuple[UUID, int]] = []
-        for p in self.players:
-            self.cursor_positions.append((p.id, self.items[0][0]))
-            self.cursor_visual_positions.append((p.id, 0))
+        for player in self.players:
+            self._init_player(player)
+
+    def add_player(self, player: SessionPlayer) -> None:
+        self.players.append(player)
+        self._init_player(player)
+
+    def _init_player(self, player: SessionPlayer) -> None:
+        self.state.append((player.name, False))
+        self.cursor_positions.append((player.id, self.items[0][0]))
+        self.cursor_visual_positions.append((player.id, 0))
 
     def get_state(self) -> ShopRenderState:
         width, height = 64, 45

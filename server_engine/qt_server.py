@@ -628,7 +628,7 @@ class QtBomberServer(BomberServerBase):
         state = self.state_machine.get_state()
         self.alert_button.setChecked(self.lobby_alert)
         self.state_value.setText(state.name)
-        self.players_value.setText(str(len(self.players)))
+        self.players_value.setText(str(len(self.players) + len(self.pending_players)))
         self.rounds_value.setText(str(self.rounds_left))
 
         if self.average_ping >= 0:
@@ -646,7 +646,9 @@ class QtBomberServer(BomberServerBase):
             return
 
         players = sorted(self.players, key=lambda player: player.score, reverse=True)
-        rows_key = tuple((p.id, p.name, p.score, p.money) for p in players)
+        spectators = list(self.pending_players.values())
+        players.extend(spectators)
+        rows_key = tuple((p.id, p.name, p.score, p.money, p in spectators) for p in players)
         if rows_key == self._player_rows_key:
             return
         self._player_rows_key = rows_key
@@ -667,10 +669,13 @@ class QtBomberServer(BomberServerBase):
             label = QLabel()
             label.setTextFormat(Qt.TextFormat.PlainText)
             label.setFont(self.players_list.font())
-            label.setText(
-                f"{rank:>2}.  {player.name:<18} "
-                f"score={player.score:<5} money={player.money:<5}"
-            )
+            if player in spectators:
+                label.setText(f"     {player.name:<18} spectating")
+            else:
+                label.setText(
+                    f"{rank:>2}.  {player.name:<18} "
+                    f"score={player.score:<5} money={player.money:<5}"
+                )
             layout.addWidget(label, 1)
             kick_button = QPushButton("Kick")
             kick_button.setObjectName("kickBtn")

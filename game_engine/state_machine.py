@@ -51,6 +51,7 @@ class ClientStateAction(IntEnum):
     SETUP = 2
     CONNECT = 3
     END = 4
+    SPECTATE = 5
     QUIT = 100
     RESTART = 200
 
@@ -64,6 +65,7 @@ class ClientState(IntEnum):
     LOBBY = 30
     SHOP = 40
     GAME = 50
+    SPECTATE = 55
     ENDING = 60
     QUIT = 70
 
@@ -101,13 +103,23 @@ class ClientStateMachine:
         elif self.state == ClientState.SETUP:
             self.state = ClientState.MENU
         elif self.state == ClientState.CONNECT:
-            self.state = ClientState.SHOP
+            if action == ClientStateAction.SPECTATE:
+                self.state = ClientState.SPECTATE
+            elif action == ClientStateAction.END:
+                self.state = ClientState.ENDING
+            else:
+                self.state = ClientState.SHOP
         elif self.state == ClientState.SHOP:
             self.state = ClientState.GAME
         elif self.state == ClientState.GAME:
             if (
                 rounds_left is not None and rounds_left == 0
             ) or action == ClientStateAction.END:
+                self.state = ClientState.ENDING
+            else:
+                self.state = ClientState.SHOP
+        elif self.state == ClientState.SPECTATE:
+            if action == ClientStateAction.END:
                 self.state = ClientState.ENDING
             else:
                 self.state = ClientState.SHOP
