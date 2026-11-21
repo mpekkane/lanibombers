@@ -223,8 +223,12 @@ class GameEngine:
         d = 3
         for x, y in self.starting_poses:
             for offset in range(-d, d + 1):
-                self.set_tile(y + offset, x, Tile.create_empty())
-                self.set_tile(y, x + offset, Tile.create_empty())
+                tile = self.get_tile(y + offset, x)
+                if tile is not None and tile.diggable:
+                    self.set_tile(y + offset, x, Tile.create_empty())
+                tile = self.get_tile(y, x + offset)
+                if tile is not None and tile.diggable:
+                    self.set_tile(y, x + offset, Tile.create_empty())
 
     def start(self) -> None:
         """Start the game engine and event processing."""
